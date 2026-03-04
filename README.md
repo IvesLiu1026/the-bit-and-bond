@@ -113,10 +113,17 @@ This repo includes two workflows:
   - Runs on push/PR to `main`.
   - Rust: `fmt`, `clippy`, `test`.
   - Flutter: `analyze`, `test`.
+- `PR Preview Build` (`.github/workflows/pr_preview.yml`)
+  - Runs on pull requests to `main`.
+  - Builds Flutter web preview bundle.
+  - Uploads build as workflow artifact and comments instructions in the PR.
 - `CD Build Artifacts` (`.github/workflows/cd_build_artifacts.yml`)
   - Manual trigger (`workflow_dispatch`).
   - Builds Rust release binary and Flutter web release bundle.
   - Uploads artifacts to the workflow run.
+- `Release` (`.github/workflows/release.yml`)
+  - Runs on tag push `v*` (or manual dispatch with a tag).
+  - Runs tests, builds Rust + Flutter web, then publishes a GitHub Release with assets.
 
 ### Trigger CD manually
 
@@ -131,3 +138,10 @@ This repo includes two workflows:
 
 Note: the current CD workflow builds and uploads artifacts only. Deployment to a host
 (Cloudflare/VM/Kubernetes/etc.) can be added as the next step.
+
+## Branch protection note
+
+`main` branch protection (required PR reviews/checks) requires a plan that supports
+branch protection for private repositories. If unavailable on your current plan,
+keep using the same PR + CI policy as a team rule and enforce via repository settings
+that are still available (for example, squash merge only).

@@ -1,0 +1,55 @@
+name: PR Preview Build
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: pr-preview-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  flutter-web-preview:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/client_flutter
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Build web preview
+        run: flutter build web --release --web-renderer canvaskit
+
+      - name: Upload preview artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-preview-${{ github.event.pull_request.number || github.run_number }}
+          path: apps/client_flutter/build/web
+          if-no-files-found: error
+
+      - name: Post PR preview instructions
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: preview-build
+          message: |
+            Preview build is ready as workflow artifact.
+            - Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            - Artifact name: `web-preview-${{ github.event.pull_request.number }}`
+            Download and unzip the artifact to inspect the web bundle.

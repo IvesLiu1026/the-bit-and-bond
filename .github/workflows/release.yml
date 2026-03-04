@@ -1,0 +1,76 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing git tag to release (for manual trigger)
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Rust tests
+        run: cargo test -p chen_leveling_server --locked
+
+      - name: Build Rust release binary
+        run: cargo build -p chen_leveling_server --release --locked
+
+      - name: Package Rust binary
+        run: |
+          mkdir -p dist
+          cp target/release/chen_leveling_server dist/chen_leveling_server
+          tar -C dist -czf dist/chen-leveling-server-linux-x64.tar.gz chen_leveling_server
+
+      - name: Flutter pub get
+        working-directory: apps/client_flutter
+        run: flutter pub get
+
+      - name: Flutter tests
+        working-directory: apps/client_flutter
+        run: flutter test
+
+      - name: Build Flutter web release
+        working-directory: apps/client_flutter
+        run: flutter build web --release --web-renderer canvaskit
+
+      - name: Package Flutter web
+        run: |
+          mkdir -p dist
+          cd apps/client_flutter/build/web
+          zip -r ../../../../dist/chen-leveling-web-release.zip .
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          generate_release_notes: true
+          files: |
+            dist/chen-leveling-server-linux-x64.tar.gz
+            dist/chen-leveling-web-release.zip
