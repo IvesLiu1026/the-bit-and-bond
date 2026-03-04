@@ -1,0 +1,64 @@
+name: CD Build Artifacts
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to build (branch, tag, or SHA)
+        required: false
+        default: main
+
+jobs:
+  server-binary:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build server release
+        run: cargo build -p chen_leveling_server --release --locked
+
+      - name: Upload server artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: chen-leveling-server-linux-x64
+          path: target/release/chen_leveling_server
+          if-no-files-found: error
+
+  flutter-web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/client_flutter
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Build web release
+        run: flutter build web --release --web-renderer canvaskit
+
+      - name: Upload web artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: chen-leveling-web-build
+          path: apps/client_flutter/build/web
+          if-no-files-found: error

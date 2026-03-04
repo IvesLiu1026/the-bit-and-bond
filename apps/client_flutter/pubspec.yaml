@@ -1,0 +1,36 @@
+name: chen_leveling_client
+description: Gamified task RPG client for chen-leveling
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.11.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  flutter_riverpod: ^2.6.1
+  flutter_secure_storage: ^9.2.4
+  flame: ^1.20.0
+  http: ^1.2.2
+  uuid: ^4.5.1
+  web_socket_channel: ^3.0.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/sprites/hero/Free Pixel Character Base Pack/character.png
+    - assets/sprites/hero/LICENSE.txt
+    - assets/sprites/hero/Free Pixel Character Base Pack/licence.txt.txt
+  fonts:
+    - family: Nunito
+      fonts:
+        - asset: assets/fonts/Nunito-Variable.ttf
+        - asset: assets/fonts/Nunito-Italic-Variable.ttf
+          style: italic

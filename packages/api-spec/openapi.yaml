@@ -1,0 +1,297 @@
+openapi: 3.1.0
+info:
+  title: chen-leveling API
+  version: 0.1.0
+servers:
+  - url: http://localhost:8080
+paths:
+  /api/v1/health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  now:
+                    type: string
+                    format: date-time
+  /api/v1/quest-templates:
+    get:
+      summary: List quest templates for household
+      parameters:
+        - $ref: '#/components/parameters/AuthMemberIdHeader'
+        - in: query
+          name: household_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: active
+          required: false
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: list of templates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/QuestTemplate'
+  /api/v1/quests:
+    get:
+      summary: List quest instances for child member
+      parameters:
+        - $ref: '#/components/parameters/AuthMemberIdHeader'
+        - in: query
+          name: assignee_member_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+            enum: [available, submitted, approved, rejected]
+      responses:
+        '200':
+          description: list of quests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/QuestInstance'
+  /api/v1/quests/{quest_instance_id}/submissions:
+    post:
+      summary: Submit quest completion evidence
+      parameters:
+        - $ref: '#/components/parameters/AuthMemberIdHeader'
+        - in: path
+          name: quest_instance_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSubmissionRequest'
+      responses:
+        '200':
+          description: idempotent return of existing submission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Submission'
+        '201':
+          description: created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Submission'
+  /api/v1/submissions/{submission_id}/review:
+    post:
+      summary: Guardian approve/reject submission
+      parameters:
+        - $ref: '#/components/parameters/AuthMemberIdHeader'
+        - in: path
+          name: submission_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewSubmissionRequest'
+      responses:
+        '200':
+          description: review result and reward outcome
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewSubmissionResponse'
+  /api/v1/submissions/pending:
+    get:
+      summary: List guardian pending submissions in a household
+      parameters:
+        - $ref: '#/components/parameters/AuthMemberIdHeader'
+        - in: query
+          name: household_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: pending submissions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PendingSubmission'
+  /api/v1/children/{child_member_id}/progression:
+    get:
+      summary: Get child progression summary
+      parameters:
+        - $ref: '#/components/parameters/AuthMemberIdHeader'
+        - in: path
+          name: child_member_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: progression data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Progression'
+  /api/v1/children/{child_member_id}/ledger:
+    get:
+      summary: Get child point ledger
+      parameters:
+        - $ref: '#/components/parameters/AuthMemberIdHeader'
+        - in: path
+          name: child_member_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: ledger entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LedgerEntry'
+components:
+  parameters:
+    AuthMemberIdHeader:
+      in: header
+      name: x-member-id
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Authenticated member identity used for role and household checks.
+  schemas:
+    QuestTemplate:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        household_id: { type: string, format: uuid }
+        title: { type: string }
+        description: { type: string, nullable: true }
+        category: { type: string, enum: [chore, study, exam, habit] }
+        base_xp: { type: integer }
+        base_coins: { type: integer }
+        active: { type: boolean }
+        created_at: { type: string, format: date-time }
+    QuestInstance:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        template_id: { type: string, format: uuid }
+        template_title: { type: string, nullable: true }
+        category: { type: string, nullable: true }
+        base_xp: { type: integer, nullable: true }
+        base_coins: { type: integer, nullable: true }
+        status: { type: string, enum: [available, submitted, approved, rejected] }
+        due_at: { type: string, format: date-time, nullable: true }
+        updated_at: { type: string, format: date-time }
+    CreateSubmissionRequest:
+      type: object
+      properties:
+        note: { type: string, nullable: true }
+        evidence_url: { type: string, nullable: true }
+        idempotency_key: { type: string, nullable: true }
+    Submission:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        quest_instance_id: { type: string, format: uuid }
+        submitted_by_member_id: { type: string, format: uuid }
+        status: { type: string, enum: [pending, approved, rejected] }
+        note: { type: string, nullable: true }
+        evidence_url: { type: string, nullable: true }
+        submitted_at: { type: string, format: date-time }
+    ReviewSubmissionRequest:
+      type: object
+      required: [approve]
+      properties:
+        approve: { type: boolean }
+        review_note: { type: string, nullable: true }
+    ReviewSubmissionResponse:
+      type: object
+      properties:
+        submission_id: { type: string, format: uuid }
+        status: { type: string, enum: [pending, approved, rejected] }
+        quest_status: { type: string, enum: [available, submitted, approved, rejected] }
+        xp_delta: { type: integer }
+        coin_delta: { type: integer }
+        child_level: { type: integer, nullable: true }
+        child_xp: { type: integer, nullable: true }
+        child_coins: { type: integer, nullable: true }
+    PendingSubmission:
+      type: object
+      properties:
+        submission_id: { type: string, format: uuid }
+        quest_instance_id: { type: string, format: uuid }
+        assignee_member_id: { type: string, format: uuid }
+        template_title: { type: string, nullable: true }
+        note: { type: string, nullable: true }
+        evidence_url: { type: string, nullable: true }
+        submitted_at: { type: string, format: date-time }
+    Progression:
+      type: object
+      properties:
+        child_member_id: { type: string, format: uuid }
+        level: { type: integer }
+        xp: { type: integer }
+        coins: { type: integer }
+        available_quests: { type: integer }
+        submitted_quests: { type: integer }
+    LedgerEntry:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        source_type: { type: string, enum: [quest_approval, manual_adjust, reward_spend] }
+        source_id: { type: string, format: uuid, nullable: true }
+        xp_delta: { type: integer }
+        coin_delta: { type: integer }
+        note: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }

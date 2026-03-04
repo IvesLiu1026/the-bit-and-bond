@@ -1,0 +1,29 @@
+[package]
+name = "chen_leveling_server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+axum.workspace = true
+chrono.workspace = true
+entity = { path = "entity" }
+migration = { path = "migration" }
+sea-orm.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+uuid.workspace = true
+
+argon2 = "0.5"
+dotenvy = "0.15"
+jsonwebtoken = "9"
+rand = "0.8"
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+
+[dev-dependencies]
+tower = "0.5"
