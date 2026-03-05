@@ -375,14 +375,14 @@ extension _GameShellPresence on _GameShellPageState {
         _latestAuthSession ??
         ref.read(authSessionProvider);
 
-    huntersState.whenData((hunters) {
-      final roster = List<HunterProfile>.from(hunters);
-      final controlledHunterId =
-          authSession == null || authSession.hunterId.isEmpty
-          ? null
-          : authSession.hunterId;
-
-      _game.syncHunters(roster, controlledHunterId: controlledHunterId);
-    });
+    final roster = huntersState.maybeWhen(
+      data: (hunters) => List<HunterProfile>.from(hunters),
+      orElse: () => <HunterProfile>[],
+    );
+    final controlledHunterId =
+        authSession == null || authSession.hunterId.isEmpty
+        ? null
+        : authSession.hunterId;
+    _game.syncHunters(roster, controlledHunterId: controlledHunterId);
   }
 }
