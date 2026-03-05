@@ -41,6 +41,8 @@ class AuthController extends StateNotifier<AsyncValue<AuthSession?>> {
         final validated = await _authApi.me(
           parsed.accessToken,
           inviteCode: parsed.inviteCode,
+          playerId: parsed.playerId,
+          displayName: parsed.displayName,
         );
         await _persist(validated);
         state = AsyncValue.data(validated);
@@ -59,17 +61,19 @@ class AuthController extends StateNotifier<AsyncValue<AuthSession?>> {
     }
   }
 
-  Future<AuthSession> registerMaster({
-    required String email,
-    required String password,
-    required String guildName,
+  Future<AuthSession> registerPlayer({
+    required String playerId,
+    required String pinCode,
+    required String displayName,
+    String? avatarType,
   }) async {
     state = const AsyncValue.loading();
     try {
-      final session = await _authApi.registerMaster(
-        email: email,
-        password: password,
-        guildName: guildName,
+      final session = await _authApi.registerPlayer(
+        playerId: playerId,
+        pinCode: pinCode,
+        displayName: displayName,
+        avatarType: avatarType,
       );
       await _persist(session);
       state = AsyncValue.data(session);
@@ -80,33 +84,14 @@ class AuthController extends StateNotifier<AsyncValue<AuthSession?>> {
     }
   }
 
-  Future<AuthSession> loginMaster({
-    required String email,
-    required String password,
-  }) async {
-    state = const AsyncValue.loading();
-    try {
-      final session = await _authApi.loginMaster(
-        email: email,
-        password: password,
-      );
-      await _persist(session);
-      state = AsyncValue.data(session);
-      return session;
-    } catch (error, stackTrace) {
-      state = AsyncValue.error(error, stackTrace);
-      rethrow;
-    }
-  }
-
-  Future<AuthSession> loginHunter({
-    required String inviteCode,
+  Future<AuthSession> loginPlayer({
+    required String playerId,
     required String pinCode,
   }) async {
     state = const AsyncValue.loading();
     try {
-      final session = await _authApi.loginHunter(
-        inviteCode: inviteCode,
+      final session = await _authApi.loginPlayer(
+        playerId: playerId,
         pinCode: pinCode,
       );
       await _persist(session);

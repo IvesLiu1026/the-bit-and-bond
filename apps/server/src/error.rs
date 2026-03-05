@@ -20,6 +20,8 @@ pub enum AppError {
     NotFound(String),
     #[error("conflict: {0}")]
     Conflict(String),
+    #[error("too many requests: {0}")]
+    TooManyRequests(String),
     #[error("database error: {0}")]
     Database(#[from] DbErr),
 }
@@ -37,11 +39,16 @@ impl IntoResponse for AppError {
             AppError::BadRequest(_) => StatusCode::BAD_REQUEST,
             AppError::NotFound(_) => StatusCode::NOT_FOUND,
             AppError::Conflict(_) => StatusCode::CONFLICT,
+            AppError::TooManyRequests(_) => StatusCode::TOO_MANY_REQUESTS,
             AppError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
 
+        let error_message = match &self {
+            AppError::Database(_) => "internal server error".to_string(),
+            _ => self.to_string(),
+        };
         let body = Json(ErrorResponse {
-            error: self.to_string(),
+            error: error_message,
         });
 
         (status, body).into_response()

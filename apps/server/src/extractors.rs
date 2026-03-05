@@ -2,10 +2,12 @@ use axum::{
     extract::{FromRef, FromRequestParts},
     http::{header::AUTHORIZATION, request::Parts},
 };
+use entity::hunter;
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
 use crate::{
     error::{AppError, AppResult},
-    jwt::{AuthRole, Claims},
+    jwt::{Claims, GuildRole},
     state::AppState,
 };
 
@@ -22,7 +24,27 @@ where
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         let token = bearer_token(parts)?;
         let app_state = AppState::from_ref(state);
-        let claims = app_state.jwt.decode(token)?;
+        let mut claims = app_state.jwt.decode(token)?;
+
+        let hunter_id = claims
+            .hunter_id
+            .ok_or_else(|| AppError::Unauthorized("token missing hunter_id".into()))?;
+        let model = hunter::Entity::find_by_id(hunter_id)
+            .filter(hunter::Column::GuildId.eq(claims.guild_id))
+            .one(&app_state.db)
+            .await?
+            .ok_or_else(|| AppError::Unauthorized("hunter identity no longer exists".into()))?;
+
+        claims.sub = model.id;
+        claims.hunter_id = Some(model.id);
+        claims.guild_id = model.guild_id;
+        claims.role = crate::jwt::AuthRole::Player;
+        claims.guild_role = if model.guild_role == "master" {
+            GuildRole::Master
+        } else {
+            GuildRole::Member
+        };
+
         Ok(Self(claims))
     }
 }
@@ -39,9 +61,9 @@ where
 
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         let claims = AuthClaims::from_request_parts(parts, state).await?.0;
-        if claims.role != AuthRole::GuildMaster {
+        if claims.guild_role != GuildRole::Master {
             return Err(AppError::Forbidden(
-                "guild_master role required for this endpoint".into(),
+                "guild owner role required for this endpoint".into(),
             ));
         }
         Ok(Self(claims))
@@ -59,14 +81,17 @@ where
     type Rejection = AppError;
 
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
-        let claims = AuthClaims::from_request_parts(parts, state).await?.0;
-        if claims.role != AuthRole::Hunter {
-            return Err(AppError::Forbidden(
-                "hunter role required for this endpoint".into(),
-            ));
-        }
-        Ok(Self(claims))
+        Ok(Self(AuthClaims::from_request_parts(parts, state).await?.0))
     }
+}
+
+pub fn require_guild_owner(claims: &Claims) -> AppResult<()> {
+    if claims.guild_role != GuildRole::Master {
+        return Err(AppError::Forbidden(
+            "guild owner role required for this endpoint".into(),
+        ));
+    }
+    Ok(())
 }
 
 fn bearer_token(parts: &Parts) -> AppResult<&str> {

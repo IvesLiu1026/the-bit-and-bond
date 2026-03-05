@@ -6,8 +6,12 @@ use tower_http::{
 
 use crate::{api, error::AppResult, state::AppState};
 
-pub fn build_router(state: AppState, allowed_origin: &str) -> AppResult<Router> {
-    let cors = build_cors_layer(allowed_origin)?;
+pub fn build_router(
+    state: AppState,
+    allowed_origin: &str,
+    allow_wildcard_origin: bool,
+) -> AppResult<Router> {
+    let cors = build_cors_layer(allowed_origin, allow_wildcard_origin)?;
 
     Ok(Router::new()
         .merge(api::router(state))
@@ -15,12 +19,14 @@ pub fn build_router(state: AppState, allowed_origin: &str) -> AppResult<Router> 
         .layer(cors))
 }
 
-fn build_cors_layer(allowed_origin: &str) -> AppResult<CorsLayer> {
+fn build_cors_layer(allowed_origin: &str, allow_wildcard_origin: bool) -> AppResult<CorsLayer> {
     let cors = CorsLayer::new()
         .allow_methods([
             axum::http::Method::GET,
             axum::http::Method::POST,
             axum::http::Method::PATCH,
+            axum::http::Method::PUT,
+            axum::http::Method::DELETE,
             axum::http::Method::OPTIONS,
         ])
         .allow_headers([
@@ -29,6 +35,11 @@ fn build_cors_layer(allowed_origin: &str) -> AppResult<CorsLayer> {
         ]);
 
     if allowed_origin.trim() == "*" {
+        if !allow_wildcard_origin {
+            return Err(crate::error::AppError::BadRequest(
+                "ALLOWED_ORIGIN=\"*\" is forbidden in production; set explicit origins".into(),
+            ));
+        }
         return Ok(cors.allow_origin(Any));
     }
 
@@ -48,4 +59,21 @@ fn build_cors_layer(allowed_origin: &str) -> AppResult<CorsLayer> {
     }
 
     Ok(cors.allow_origin(origins))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::build_cors_layer;
+
+    #[test]
+    fn wildcard_origin_requires_explicit_opt_in() {
+        let err = build_cors_layer("*", false).expect_err("wildcard should be rejected");
+        assert!(matches!(err, crate::error::AppError::BadRequest(_)));
+    }
+
+    #[test]
+    fn wildcard_origin_allowed_when_opted_in() {
+        let _ = build_cors_layer("*", true)
+            .expect("wildcard is allowed in development or with override");
+    }
 }

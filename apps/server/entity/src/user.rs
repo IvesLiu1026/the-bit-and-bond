@@ -8,6 +8,8 @@ pub struct Model {
     pub id: Uuid,
     pub email: String,
     pub password_hash: String,
+    pub hunter_tag: String,
+    pub current_role: String,
     pub created_at: DateTimeUtc,
 }
 

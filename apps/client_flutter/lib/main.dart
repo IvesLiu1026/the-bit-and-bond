@@ -1,3 +1,5 @@
+import 'package:device_preview/device_preview.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -5,5 +7,19 @@ import 'app/app.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const ProviderScope(child: ChenLevelingApp()));
+  const enableDevicePreview = bool.fromEnvironment(
+    'ENABLE_DEVICE_PREVIEW',
+    defaultValue: false,
+  );
+
+  runApp(
+    enableDevicePreview && !kReleaseMode
+        ? DevicePreview(
+            enabled: true,
+            builder: (_) => const ProviderScope(
+              child: ChenLevelingApp(enableDevicePreview: true),
+            ),
+          )
+        : const ProviderScope(child: ChenLevelingApp()),
+  );
 }

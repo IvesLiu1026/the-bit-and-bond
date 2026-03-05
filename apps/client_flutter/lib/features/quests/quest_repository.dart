@@ -1,5 +1,3 @@
-import 'package:uuid/uuid.dart';
-
 import '../../core/network/api_client.dart';
 import 'models.dart';
 
@@ -7,28 +5,32 @@ class QuestRepository {
   QuestRepository(this._apiClient);
 
   final ApiClient _apiClient;
-  final Uuid _uuid = const Uuid();
-
-  Future<List<QuestTemplate>> fetchTemplates(String guildId) {
-    return _apiClient.listQuestTemplates(guildId: guildId, active: true);
-  }
 
   Future<List<QuestInstance>> fetchQuests() {
     return _apiClient.listQuests();
   }
 
-  Future<Submission> submitQuest({
-    required String questInstanceId,
-    String? note,
+  Future<QuestInstance> createQuest({
+    required String title,
+    String? description,
+    required int rewardXp,
+    required int rewardCoins,
+    required QuestStatCategory statCategory,
   }) {
-    return _apiClient.submitQuest(
-      questInstanceId: questInstanceId,
-      note: note,
-      idempotencyKey: _uuid.v4(),
+    return _apiClient.createQuest(
+      title: title,
+      description: description,
+      rewardXp: rewardXp,
+      rewardCoins: rewardCoins,
+      statCategory: statCategory,
     );
   }
 
-  Future<ReviewSubmissionResult> reviewSubmission({
+  Future<void> submitQuest({required String questInstanceId}) {
+    return _apiClient.submitQuest(questInstanceId: questInstanceId);
+  }
+
+  Future<QuestReviewResult> reviewSubmission({
     required String submissionId,
     required bool approve,
     String? hunterId,
@@ -44,14 +46,6 @@ class QuestRepository {
 
   Future<Progression> fetchProgression({String? hunterId}) {
     return _apiClient.getProgression(hunterId: hunterId);
-  }
-
-  Future<List<LedgerEntry>> fetchLedger(String childMemberId) {
-    return _apiClient.listLedger(childMemberId: childMemberId, limit: 20);
-  }
-
-  Future<List<PendingSubmission>> fetchGuardianPending({int limit = 30}) {
-    return _apiClient.listPendingSubmissions(limit: limit);
   }
 
   Future<List<HunterProfile>> fetchHunters() {
@@ -79,5 +73,61 @@ class QuestRepository {
     required String pinCode,
   }) {
     return _apiClient.resetHunterPin(hunterId: hunterId, pinCode: pinCode);
+  }
+
+  Future<List<GuildShopItem>> fetchShopItems({bool includeInactive = false}) {
+    return _apiClient.listShopItems(includeInactive: includeInactive);
+  }
+
+  Future<ShopPurchaseResult> buyShopItem({
+    required String itemId,
+    required String idempotencyKey,
+  }) {
+    return _apiClient.buyShopItem(
+      itemId: itemId,
+      idempotencyKey: idempotencyKey,
+    );
+  }
+
+  Future<GuildShopItem> createShopItem({
+    required String name,
+    String? description,
+    required int costCoins,
+    required String iconTag,
+  }) {
+    return _apiClient.createShopItem(
+      name: name,
+      description: description,
+      costCoins: costCoins,
+      iconTag: iconTag,
+    );
+  }
+
+  Future<GuildShopItem> updateShopItem({
+    required String itemId,
+    required String name,
+    String? description,
+    required int costCoins,
+    required String iconTag,
+  }) {
+    return _apiClient.updateShopItem(
+      itemId: itemId,
+      name: name,
+      description: description,
+      costCoins: costCoins,
+      iconTag: iconTag,
+    );
+  }
+
+  Future<GuildShopItem> deactivateShopItem({required String itemId}) {
+    return _apiClient.deactivateShopItem(itemId: itemId);
+  }
+
+  Future<List<InventoryItem>> fetchInventoryItems() {
+    return _apiClient.listInventory();
+  }
+
+  Future<InventoryUseResult> useInventoryItem({required String itemId}) {
+    return _apiClient.useInventoryItem(itemId: itemId);
   }
 }

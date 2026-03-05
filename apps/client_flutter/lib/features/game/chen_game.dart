@@ -6,9 +6,25 @@ import 'package:flame/game.dart';
 import 'package:flame/input.dart';
 import 'package:flame/sprite.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../quests/models.dart';
+
+part 'chen_game_environment.part.dart';
+part 'chen_game_furniture.part.dart';
+part 'chen_game_character.part.dart';
+part 'chen_game_joystick.part.dart';
+
+enum TavernFurnitureType {
+  noticeBoard,
+  masterDesk,
+  guildChest,
+  campfireBar,
+  guildMerchant,
+}
+
+enum TavernVisualTheme { cozyWood, technoMinimal, hotbloodAdventure }
 
 class HunterRealtimePose {
   HunterRealtimePose({
@@ -65,8 +81,8 @@ class HunterRealtimePose {
   }
 }
 
-class ChenLevelingGame extends FlameGame with PanDetector {
-  ChenLevelingGame();
+class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
+  ChenLevelingGame({this.onFurnitureInteracted});
 
   static const String _heroSpriteSheetPath =
       'sprites/hero/Free Pixel Character Base Pack/character.png';
@@ -74,22 +90,46 @@ class ChenLevelingGame extends FlameGame with PanDetector {
   static const double _joystickDeadZone = 0.08;
   static const double _joystickBaseRadius = 88;
   static const double _joystickKnobRadius = 38;
-  static const int _remoteActorTtlMs = 45000;
+  static const int _remoteActorTtlMs = 15000;
+  static const double _topWallHeight = 118;
+  static const double _playHorizontalPadding = 14;
+  static const double _playBottomPadding = 14;
+  static const double _furnitureInteractDistance = 10;
 
   RectangleComponent? _background;
   SpriteSheet? _heroSpriteSheet;
   _FloatingJoystickOverlay? _floatingJoystick;
+  _TavernEnvironmentLayer? _environmentLayer;
+  final Map<TavernFurnitureType, InteractiveFurniture> _furnitures = {};
   final Vector2 _joystickInput = Vector2.zero();
   final Map<String, _HeroCharacterComponent> _hunterSprites = {};
   final Set<String> _initializedHunterPositions = <String>{};
-  final Map<String, int> _lastPoseTsByHunter = {};
+  final Map<String, int> _lastServerPoseTsByHunter = {};
+  final Map<String, int> _lastPoseSeenAtMsByHunter = {};
   final Set<String> _realtimeOnlyHunterIds = <String>{};
+  final List<Rect> _obstacleRects = <Rect>[];
   List<String> _hunterOrder = const [];
   String? _controlledHunterId;
   String? _pendingControlledHunterId;
   int _lastRealtimeGcMs = 0;
+  TavernVisualTheme _theme = TavernVisualTheme.cozyWood;
+  String? _lastInteractionHint;
+  bool _campfireConnected = false;
+  bool _campfireHasActiveSpeaker = false;
+  double _campfirePulseTick = 0;
 
   final List<QuestInstance> _quests = [];
+  final ValueNotifier<String?> interactionHintListenable =
+      ValueNotifier<String?>(null);
+  final ValueNotifier<Set<String>> activeHunterIdsListenable =
+      ValueNotifier<Set<String>>(<String>{});
+  final ValueNotifier<TavernFurnitureType?> nearbyFurnitureListenable =
+      ValueNotifier<TavernFurnitureType?>(null);
+
+  int get actorCount => _hunterSprites.length;
+  int get realtimeActorCount => _realtimeOnlyHunterIds.length;
+  TavernVisualTheme get theme => _theme;
+  final void Function(TavernFurnitureType furniture)? onFurnitureInteracted;
 
   @override
   Future<void> onLoad() async {
@@ -98,11 +138,13 @@ class ChenLevelingGame extends FlameGame with PanDetector {
     final background = RectangleComponent(
       position: Vector2.zero(),
       size: Vector2(1280, 800),
-      paint: Paint()..color = AppColors.grassBase,
+      paint: Paint()..color = const Color(0xFF4A2E24),
     );
     _background = background;
     add(background);
-    add(_GroundTextureLayer());
+    final environmentLayer = _TavernEnvironmentLayer(theme: _theme);
+    _environmentLayer = environmentLayer;
+    add(environmentLayer);
 
     final spriteImage = await images.load(_heroSpriteSheetPath);
     final spriteSheet = SpriteSheet(
@@ -119,6 +161,9 @@ class ChenLevelingGame extends FlameGame with PanDetector {
     _floatingJoystick = floatingJoystick;
     camera.viewport.add(floatingJoystick);
 
+    _spawnFurniture();
+    _applyThemePalette();
+    _layoutFurniture();
     _applyRoster();
   }
 
@@ -127,7 +172,80 @@ class ChenLevelingGame extends FlameGame with PanDetector {
     super.onGameResize(size);
     _background?.size = size;
     _floatingJoystick?.resizeTo(size);
+    _environmentLayer?.markDirty();
+    _layoutFurniture();
     _layoutHunters();
+  }
+
+  void setVisualTheme(TavernVisualTheme theme) {
+    if (_theme == theme) {
+      return;
+    }
+    _theme = theme;
+    _applyThemePalette();
+    _environmentLayer?.setTheme(theme);
+    _environmentLayer?.markDirty();
+  }
+
+  void setCampfireVoiceActivity({
+    required bool connected,
+    required bool hasActiveSpeaker,
+  }) {
+    _campfireConnected = connected;
+    _campfireHasActiveSpeaker = hasActiveSpeaker;
+  }
+
+  void _applyThemePalette() {
+    final backgroundColor = switch (_theme) {
+      TavernVisualTheme.cozyWood => const Color(0xFF4A2E24),
+      TavernVisualTheme.technoMinimal => const Color(0xFF0F1B2D),
+      TavernVisualTheme.hotbloodAdventure => const Color(0xFF402014),
+    };
+    _background?.paint.color = backgroundColor;
+    _applyFurniturePalette();
+  }
+
+  void _applyFurniturePalette() {
+    final palette = switch (_theme) {
+      TavernVisualTheme.cozyWood => const {
+        TavernFurnitureType.noticeBoard: (Color(0xFF8D6E63), Color(0xFFD4AF37)),
+        TavernFurnitureType.masterDesk: (Color(0xFF6D4C41), Color(0xFF9E7D5A)),
+        TavernFurnitureType.guildChest: (Color(0xFF5D4037), Color(0xFFC9A227)),
+        TavernFurnitureType.campfireBar: (Color(0xFF4E342E), Color(0xFFFFB74D)),
+        TavernFurnitureType.guildMerchant: (
+          Color(0xFF5E3F2A),
+          Color(0xFFCF9E2D),
+        ),
+      },
+      TavernVisualTheme.technoMinimal => const {
+        TavernFurnitureType.noticeBoard: (Color(0xFF263238), Color(0xFF26C6DA)),
+        TavernFurnitureType.masterDesk: (Color(0xFF37474F), Color(0xFF4FC3F7)),
+        TavernFurnitureType.guildChest: (Color(0xFF1E2A36), Color(0xFF80DEEA)),
+        TavernFurnitureType.campfireBar: (Color(0xFF102027), Color(0xFF00B8D4)),
+        TavernFurnitureType.guildMerchant: (
+          Color(0xFF1D3557),
+          Color(0xFF00B4D8),
+        ),
+      },
+      TavernVisualTheme.hotbloodAdventure => const {
+        TavernFurnitureType.noticeBoard: (Color(0xFF6D2C22), Color(0xFFFFB74D)),
+        TavernFurnitureType.masterDesk: (Color(0xFF5D1F18), Color(0xFFE57373)),
+        TavernFurnitureType.guildChest: (Color(0xFF7B3F00), Color(0xFFFFD54F)),
+        TavernFurnitureType.campfireBar: (Color(0xFF6A1B1A), Color(0xFFFF8A65)),
+        TavernFurnitureType.guildMerchant: (
+          Color(0xFF8D3F1E),
+          Color(0xFFFFCA28),
+        ),
+      },
+    };
+    for (final entry in palette.entries) {
+      final furniture = _furnitures[entry.key];
+      if (furniture == null) {
+        continue;
+      }
+      final (tint, accent) = entry.value;
+      furniture.applyPalette(tint: tint, accent: accent);
+    }
   }
 
   void syncQuests(List<QuestInstance> quests) {
@@ -142,6 +260,196 @@ class ChenLevelingGame extends FlameGame with PanDetector {
   }) {
     _pendingControlledHunterId = controlledHunterId;
     _applyRoster();
+  }
+
+  void _spawnFurniture() {
+    if (_furnitures.isNotEmpty) {
+      return;
+    }
+
+    final noticeBoard = InteractiveFurniture(
+      type: TavernFurnitureType.noticeBoard,
+      label: '任務佈告欄',
+      size: Vector2(186, 94),
+      tint: const Color(0xFF8D6E63),
+      accent: const Color(0xFFD4AF37),
+    );
+    final masterDesk = InteractiveFurniture(
+      type: TavernFurnitureType.masterDesk,
+      label: '公會長書桌',
+      size: Vector2(160, 86),
+      tint: const Color(0xFF6D4C41),
+      accent: const Color(0xFF9E7D5A),
+    );
+    final guildChest = InteractiveFurniture(
+      type: TavernFurnitureType.guildChest,
+      label: '公會儲物箱',
+      size: Vector2(118, 82),
+      tint: const Color(0xFF5D4037),
+      accent: const Color(0xFFC9A227),
+    );
+    final campfireBar = InteractiveFurniture(
+      type: TavernFurnitureType.campfireBar,
+      label: '營火語音吧台',
+      size: Vector2(126, 90),
+      tint: const Color(0xFF4E342E),
+      accent: const Color(0xFFFFB74D),
+    );
+    final guildMerchant = InteractiveFurniture(
+      type: TavernFurnitureType.guildMerchant,
+      label: '公會商人',
+      size: Vector2(128, 86),
+      tint: const Color(0xFF5E3F2A),
+      accent: const Color(0xFFCF9E2D),
+    );
+
+    _furnitures[TavernFurnitureType.noticeBoard] = noticeBoard;
+    _furnitures[TavernFurnitureType.masterDesk] = masterDesk;
+    _furnitures[TavernFurnitureType.guildChest] = guildChest;
+    _furnitures[TavernFurnitureType.campfireBar] = campfireBar;
+    _furnitures[TavernFurnitureType.guildMerchant] = guildMerchant;
+
+    add(noticeBoard);
+    add(masterDesk);
+    add(guildChest);
+    add(campfireBar);
+    add(guildMerchant);
+  }
+
+  void _layoutFurniture() {
+    if (size.x <= 0 || size.y <= 0) {
+      return;
+    }
+    final noticeBoard = _furnitures[TavernFurnitureType.noticeBoard];
+    final masterDesk = _furnitures[TavernFurnitureType.masterDesk];
+    final guildChest = _furnitures[TavernFurnitureType.guildChest];
+    final campfireBar = _furnitures[TavernFurnitureType.campfireBar];
+    final guildMerchant = _furnitures[TavernFurnitureType.guildMerchant];
+    if (noticeBoard == null ||
+        masterDesk == null ||
+        guildChest == null ||
+        campfireBar == null ||
+        guildMerchant == null) {
+      return;
+    }
+
+    noticeBoard.position = Vector2(30, _topWallHeight + 12);
+    masterDesk.position = Vector2(
+      size.x - masterDesk.size.x - 28,
+      _topWallHeight + 28,
+    );
+    guildChest.position = Vector2(26, size.y - guildChest.size.y - 28);
+    campfireBar.position = Vector2(
+      size.x - campfireBar.size.x - 190,
+      size.y - campfireBar.size.y - 26,
+    );
+    guildMerchant.position = Vector2(
+      size.x - guildMerchant.size.x - 24,
+      size.y - guildMerchant.size.y - 28,
+    );
+    _rebuildObstacleRects();
+  }
+
+  void _rebuildObstacleRects() {
+    _obstacleRects.clear();
+    for (final furniture in _furnitures.values) {
+      _obstacleRects.add(furniture.collisionRect);
+    }
+
+    final table = _centerTableRect();
+    _obstacleRects.add(table);
+    _obstacleRects.add(
+      Rect.fromLTWH(table.left - 46, table.center.dy - 22, 36, 44),
+    );
+    _obstacleRects.add(
+      Rect.fromLTWH(table.right + 10, table.center.dy - 22, 36, 44),
+    );
+    _obstacleRects.add(Rect.fromLTWH(size.x - 106, _topWallHeight + 8, 70, 78));
+  }
+
+  Rect _centerTableRect() {
+    final width = math.max(160, size.x * 0.18).toDouble();
+    final height = 74.0;
+    return Rect.fromCenter(
+      center: Offset(size.x / 2, (size.y / 2) + 52),
+      width: width,
+      height: height,
+    );
+  }
+
+  bool _tryInteractFurniture(Vector2 touchPoint) {
+    if (onFurnitureInteracted == null) {
+      return false;
+    }
+    final player = _controlledHunter;
+    if (player == null) {
+      return false;
+    }
+
+    for (final furniture in _furnitures.values) {
+      if (!furniture.hit(touchPoint)) {
+        continue;
+      }
+      final distance = furniture.distanceToInteractionZone(player.position);
+      if (distance > _furnitureInteractDistance) {
+        return false;
+      }
+      onFurnitureInteracted?.call(furniture.type);
+      return true;
+    }
+    return false;
+  }
+
+  bool _tryInteractClosestFurniture() {
+    if (onFurnitureInteracted == null) {
+      return false;
+    }
+    final candidate = _closestFurnitureForInteraction();
+    if (candidate == null) {
+      return false;
+    }
+    onFurnitureInteracted?.call(candidate.type);
+    return true;
+  }
+
+  InteractiveFurniture? _closestFurnitureForInteraction() {
+    final player = _controlledHunter;
+    if (player == null) {
+      return null;
+    }
+    InteractiveFurniture? nearest;
+    var minDistance = double.infinity;
+    for (final furniture in _furnitures.values) {
+      final distance = furniture.distanceToInteractionZone(player.position);
+      if (distance > _furnitureInteractDistance) {
+        continue;
+      }
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearest = furniture;
+      }
+    }
+    return nearest;
+  }
+
+  void _updateInteractionHint() {
+    final nearest = _closestFurnitureForInteraction();
+    if (nearbyFurnitureListenable.value != nearest?.type) {
+      nearbyFurnitureListenable.value = nearest?.type;
+    }
+    final hint = switch (nearest?.type) {
+      TavernFurnitureType.noticeBoard => '已接近任務佈告欄，點右下互動鍵',
+      TavernFurnitureType.masterDesk => '已接近公會長書桌，點右下互動鍵',
+      TavernFurnitureType.guildChest => '已接近公會儲物箱，點右下互動鍵',
+      TavernFurnitureType.campfireBar => '已接近營火語音吧台，點右下互動鍵',
+      TavernFurnitureType.guildMerchant => '已接近公會商人，點右下互動鍵',
+      null => '拖曳任意位置，叫出搖桿移動',
+    };
+    if (hint == _lastInteractionHint) {
+      return;
+    }
+    _lastInteractionHint = hint;
+    interactionHintListenable.value = hint;
   }
 
   HunterRealtimePose? controlledPoseForSync() {
@@ -160,6 +468,29 @@ class ChenLevelingGame extends FlameGame with PanDetector {
     );
   }
 
+  Offset? hunterHeadScreenAnchor(String hunterId, {double verticalLift = 34}) {
+    if (size.x <= 0 || size.y <= 0) {
+      return null;
+    }
+    final hunter = _hunterSprites[hunterId];
+    if (hunter == null) {
+      return null;
+    }
+    final x = hunter.position.x;
+    final y = hunter.position.y - (hunter.size.y * 0.58) - verticalLift;
+    final clampedX = x.clamp(18, size.x - 18).toDouble();
+    final clampedY = y.clamp(_topWallHeight + 10, size.y - 18).toDouble();
+    return Offset(clampedX, clampedY);
+  }
+
+  Offset? controlledHunterHeadScreenAnchor({double verticalLift = 34}) {
+    final controlledId = _controlledHunterId;
+    if (controlledId == null) {
+      return null;
+    }
+    return hunterHeadScreenAnchor(controlledId, verticalLift: verticalLift);
+  }
+
   void applyRemotePose(HunterRealtimePose pose) {
     if (pose.hunterId == _controlledHunterId) {
       return;
@@ -169,15 +500,16 @@ class ChenLevelingGame extends FlameGame with PanDetector {
       return;
     }
 
-    final lastTs = _lastPoseTsByHunter[pose.hunterId];
+    final lastTs = _lastServerPoseTsByHunter[pose.hunterId];
     if (lastTs != null && pose.updatedAtMs <= lastTs) {
       return;
     }
-    _lastPoseTsByHunter[pose.hunterId] = pose.updatedAtMs;
+    _lastServerPoseTsByHunter[pose.hunterId] = pose.updatedAtMs;
+    _lastPoseSeenAtMsByHunter[pose.hunterId] =
+        DateTime.now().millisecondsSinceEpoch;
 
-    sprite.position.setValues(pose.x, pose.y);
-    _clampPlayerToCanvas(sprite);
-    sprite.applyNetworkPose(pose);
+    final isFirstPose = !_initializedHunterPositions.contains(pose.hunterId);
+    sprite.applyNetworkPose(pose, snapToTarget: isFirstPose, canvasSize: size);
     _initializedHunterPositions.add(pose.hunterId);
   }
 
@@ -185,6 +517,14 @@ class ChenLevelingGame extends FlameGame with PanDetector {
   void update(double dt) {
     super.update(dt);
     _evictStaleRealtimeActors();
+    _updateInteractionHint();
+    _campfirePulseTick += dt;
+    final campfire = _furnitures[TavernFurnitureType.campfireBar];
+    campfire?.setCampfireVisualState(
+      connected: _campfireConnected,
+      speaking: _campfireHasActiveSpeaker,
+      pulse: ((math.sin(_campfirePulseTick * 8) + 1) * 0.5),
+    );
 
     final player = _controlledHunter;
     if (player == null) {
@@ -196,10 +536,25 @@ class ChenLevelingGame extends FlameGame with PanDetector {
       return;
     }
 
+    final previous = player.position.clone();
     final velocity = _joystickInput.normalized() * _heroSpeed;
     player.position += velocity * dt;
     _clampPlayerToCanvas(player);
+    _resolvePlayerObstacleCollision(player, previous);
     player.setMotion(velocity, moving: true);
+  }
+
+  @override
+  KeyEventResult onKeyEvent(
+    KeyEvent event,
+    Set<LogicalKeyboardKey> keysPressed,
+  ) {
+    if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.keyE) {
+      if (_tryInteractClosestFurniture()) {
+        return KeyEventResult.handled;
+      }
+    }
+    return KeyEventResult.ignored;
   }
 
   @override
@@ -208,13 +563,20 @@ class ChenLevelingGame extends FlameGame with PanDetector {
     if (_controlledHunter == null) {
       return;
     }
+    final touchPoint = Vector2(
+      details.localPosition.dx,
+      details.localPosition.dy,
+    );
+    if (_tryInteractFurniture(touchPoint)) {
+      _joystickInput.setZero();
+      _floatingJoystick?.deactivate();
+      return;
+    }
     final floatingJoystick = _floatingJoystick;
     if (floatingJoystick == null) {
       return;
     }
-    floatingJoystick.activate(
-      Vector2(details.localPosition.dx, details.localPosition.dy),
-    );
+    floatingJoystick.activate(touchPoint);
     _joystickInput.setZero();
   }
 
@@ -274,7 +636,8 @@ class ChenLevelingGame extends FlameGame with PanDetector {
       final sprite = _hunterSprites.remove(id);
       sprite?.removeFromParent();
       _initializedHunterPositions.remove(id);
-      _lastPoseTsByHunter.remove(id);
+      _lastServerPoseTsByHunter.remove(id);
+      _lastPoseSeenAtMsByHunter.remove(id);
       _realtimeOnlyHunterIds.remove(id);
     }
 
@@ -287,6 +650,7 @@ class ChenLevelingGame extends FlameGame with PanDetector {
     _hunterOrder = targetIds.toList(growable: false)..sort();
     _resolveControlledHunter();
     _layoutHunters();
+    _publishActiveHunterIds();
   }
 
   void _resolveControlledHunter() {
@@ -319,7 +683,11 @@ class ChenLevelingGame extends FlameGame with PanDetector {
       final controlled = _hunterSprites[controlledId];
       if (controlled != null &&
           !_initializedHunterPositions.contains(controlledId)) {
-        controlled.position = size / 2;
+        final preferred = Vector2(size.x / 2, (_topWallHeight + size.y) / 2);
+        controlled.position = _findNearestWalkablePosition(
+          preferred,
+          controlled.radius,
+        );
         _initializedHunterPositions.add(controlledId);
       }
       if (controlled != null) {
@@ -334,7 +702,7 @@ class ChenLevelingGame extends FlameGame with PanDetector {
       return;
     }
 
-    final center = size / 2;
+    final center = Vector2(size.x / 2, (_topWallHeight + size.y) / 2);
     final radius = math.max(56, math.min(size.x, size.y) * 0.28);
     final total = others.length;
     for (var index = 0; index < total; index++) {
@@ -347,12 +715,13 @@ class ChenLevelingGame extends FlameGame with PanDetector {
         continue;
       }
       final angle = ((2 * math.pi) * index / total) - (math.pi / 2);
-      sprite.position =
+      final preferred =
           center +
           Vector2(
             math.cos(angle).toDouble() * radius,
             math.sin(angle) * radius,
           );
+      sprite.position = _findNearestWalkablePosition(preferred, sprite.radius);
       _clampPlayerToCanvas(sprite);
       _initializedHunterPositions.add(id);
       sprite.setMotion(Vector2.zero(), moving: false);
@@ -389,6 +758,7 @@ class ChenLevelingGame extends FlameGame with PanDetector {
       _realtimeOnlyHunterIds.remove(hunterId);
     }
     add(sprite);
+    _publishActiveHunterIds();
     return sprite;
   }
 
@@ -401,406 +771,146 @@ class ChenLevelingGame extends FlameGame with PanDetector {
 
     final staleIds = _realtimeOnlyHunterIds
         .where(
-          (id) => nowMs - (_lastPoseTsByHunter[id] ?? 0) > _remoteActorTtlMs,
+          (id) =>
+              nowMs - (_lastPoseSeenAtMsByHunter[id] ?? 0) > _remoteActorTtlMs,
         )
         .toList(growable: false);
     for (final id in staleIds) {
       _realtimeOnlyHunterIds.remove(id);
-      _lastPoseTsByHunter.remove(id);
+      _lastServerPoseTsByHunter.remove(id);
+      _lastPoseSeenAtMsByHunter.remove(id);
       _initializedHunterPositions.remove(id);
       final sprite = _hunterSprites.remove(id);
       sprite?.removeFromParent();
     }
+    if (staleIds.isNotEmpty) {
+      _publishActiveHunterIds();
+    }
   }
 
   void _clampPlayerToCanvas(_HeroCharacterComponent player) {
-    final minX = player.radius;
-    final maxX = math.max(minX, size.x - player.radius);
-    final minY = player.radius;
-    final maxY = math.max(minY, size.y - player.radius);
+    final minX = _playHorizontalPadding + player.radius;
+    final maxX = math.max(
+      minX,
+      size.x - _playHorizontalPadding - player.radius,
+    );
+    final minY = _topWallHeight + player.radius + 6;
+    final maxY = math.max(minY, size.y - _playBottomPadding - player.radius);
 
     player.position
       ..x = player.position.x.clamp(minX, maxX)
       ..y = player.position.y.clamp(minY, maxY);
   }
-}
 
-class _GroundTextureLayer extends Component
-    with HasGameReference<ChenLevelingGame> {
-  static const double _tile = 56;
-  ui.Picture? _cachedGround;
-  Size _cachedSize = Size.zero;
-
-  @override
-  void render(Canvas canvas) {
-    super.render(canvas);
-
-    final width = game.size.x.floorToDouble();
-    final height = game.size.y.floorToDouble();
-    if (width <= 0 || height <= 0) {
+  void _resolvePlayerObstacleCollision(
+    _HeroCharacterComponent player,
+    Vector2 previous,
+  ) {
+    if (_obstacleRects.isEmpty) {
+      return;
+    }
+    if (!_collidesAt(player.position, player.radius)) {
       return;
     }
 
-    final targetSize = Size(width, height);
-    final picture = _ensureGroundPicture(targetSize);
-    if (picture != null) {
-      canvas.drawPicture(picture);
+    final candidateX = Vector2(previous.x, player.position.y);
+    final candidateY = Vector2(player.position.x, previous.y);
+    final canUseX = !_collidesAt(candidateX, player.radius);
+    final canUseY = !_collidesAt(candidateY, player.radius);
+    if (canUseX && !canUseY) {
+      player.position.x = previous.x;
+      return;
     }
+    if (canUseY && !canUseX) {
+      player.position.y = previous.y;
+      return;
+    }
+    if (canUseX) {
+      player.position.x = previous.x;
+      return;
+    }
+    if (canUseY) {
+      player.position.y = previous.y;
+      return;
+    }
+    if (_collidesAt(previous, player.radius)) {
+      player.position = _findNearestWalkablePosition(
+        player.position,
+        player.radius,
+      );
+      return;
+    }
+    player.position.setFrom(previous);
   }
 
-  ui.Picture? _ensureGroundPicture(Size size) {
-    if (_cachedGround != null && _cachedSize == size) {
-      return _cachedGround;
+  bool _collidesAt(Vector2 center, double radius) {
+    final bounds = Rect.fromCircle(
+      center: Offset(center.x, center.y),
+      radius: math.max(8, radius - 4),
+    );
+    for (final obstacle in _obstacleRects) {
+      if (obstacle.overlaps(bounds)) {
+        return true;
+      }
     }
-
-    final recorder = ui.PictureRecorder();
-    final cachedCanvas = Canvas(recorder);
-    _paintGround(cachedCanvas, width: size.width, height: size.height);
-    _cachedGround = recorder.endRecording();
-    _cachedSize = size;
-    return _cachedGround;
+    return false;
   }
 
-  void _paintGround(
-    Canvas canvas, {
-    required double width,
-    required double height,
-  }) {
-    final paintA = Paint()..color = const Color(0x224E8B3D);
-    final paintB = Paint()..color = const Color(0x1B5E9E4A);
-    final gridLine = Paint()
-      ..color = const Color(0x2B2E5D27)
-      ..strokeWidth = 1;
-    final speckA = Paint()..color = const Color(0x2B355D24);
-    final speckB = Paint()..color = const Color(0x225D8D44);
-    final rows = (height / _tile).ceil();
-    final cols = (width / _tile).ceil();
+  bool interactWithNearbyFurniture() {
+    return _tryInteractClosestFurniture();
+  }
 
-    for (var row = 0; row < rows; row++) {
-      for (var col = 0; col < cols; col++) {
-        final paint = (row + col).isEven ? paintA : paintB;
-        final rect = Rect.fromLTWH(col * _tile, row * _tile, _tile, _tile);
-        canvas.drawRect(rect, paint);
-        final speckX = rect.left + ((row * 17 + col * 29) % 35);
-        final speckY = rect.top + ((row * 13 + col * 11) % 35);
-        canvas.drawCircle(
-          Offset(speckX.toDouble(), speckY.toDouble()),
-          1.2,
-          speckA,
+  Vector2 _findNearestWalkablePosition(Vector2 preferred, double radius) {
+    final probe = preferred.clone();
+    _clampProbeToCanvas(probe, radius);
+    if (!_collidesAt(probe, radius)) {
+      return probe;
+    }
+
+    const ringCount = 8;
+    const samplesPerRing = 16;
+    for (var ring = 1; ring <= ringCount; ring++) {
+      final distance = ring * 28.0;
+      for (var i = 0; i < samplesPerRing; i++) {
+        final angle = (2 * math.pi * i) / samplesPerRing;
+        final candidate = Vector2(
+          preferred.x + (math.cos(angle) * distance),
+          preferred.y + (math.sin(angle) * distance),
         );
-        canvas.drawCircle(
-          Offset((speckX + 13).toDouble(), (speckY + 9).toDouble()),
-          0.9,
-          speckB,
-        );
+        _clampProbeToCanvas(candidate, radius);
+        if (!_collidesAt(candidate, radius)) {
+          return candidate;
+        }
       }
     }
 
-    for (var x = 0.0; x <= width; x += _tile) {
-      canvas.drawLine(Offset(x, 0), Offset(x, height), gridLine);
+    return Vector2(size.x / 2, size.y - 120);
+  }
+
+  void _clampProbeToCanvas(Vector2 probe, double radius) {
+    final minX = _playHorizontalPadding + radius;
+    final maxX = math.max(minX, size.x - _playHorizontalPadding - radius);
+    final minY = _topWallHeight + radius + 6;
+    final maxY = math.max(minY, size.y - _playBottomPadding - radius);
+    probe
+      ..x = probe.x.clamp(minX, maxX).toDouble()
+      ..y = probe.y.clamp(minY, maxY).toDouble();
+  }
+
+  void _publishActiveHunterIds() {
+    final next = Set<String>.from(_hunterSprites.keys);
+    final current = activeHunterIdsListenable.value;
+    if (next.length == current.length && next.containsAll(current)) {
+      return;
     }
-    for (var y = 0.0; y <= height; y += _tile) {
-      canvas.drawLine(Offset(0, y), Offset(width, y), gridLine);
-    }
+    activeHunterIdsListenable.value = next;
   }
 
   @override
   void onRemove() {
-    _cachedGround = null;
-    _cachedSize = Size.zero;
+    interactionHintListenable.dispose();
+    activeHunterIdsListenable.dispose();
+    nearbyFurnitureListenable.dispose();
     super.onRemove();
-  }
-}
-
-enum _HeroFacing { down, up, left, right }
-
-enum _HeroAnimState {
-  idleDown,
-  walkDown,
-  idleUp,
-  walkUp,
-  idleLeft,
-  walkLeft,
-  idleRight,
-  walkRight,
-}
-
-class _HeroCharacterComponent
-    extends SpriteAnimationGroupComponent<_HeroAnimState> {
-  _HeroCharacterComponent({
-    required super.position,
-    required Map<_HeroAnimState, SpriteAnimation> animations,
-  }) : super(
-         size: Vector2.all(72),
-         anchor: Anchor.center,
-         animations: animations,
-         current: _HeroAnimState.idleDown,
-       ) {
-    paint.filterQuality = FilterQuality.none;
-  }
-
-  static const double _frameStep = 0.1;
-  static const int _downRow = 13;
-  static const int _rightRow = 14;
-  static const int _leftRow = 15;
-  static const int _upRow = 16;
-
-  final double radius = 22;
-  _HeroFacing _facing = _HeroFacing.down;
-  bool _controlled = false;
-  bool _walking = false;
-
-  static Map<_HeroAnimState, SpriteAnimation> buildAnimations(
-    SpriteSheet spriteSheet,
-  ) {
-    return {
-      _HeroAnimState.idleDown: _buildAnimation(
-        spriteSheet: spriteSheet,
-        row: _downRow,
-        columns: const [0],
-      ),
-      _HeroAnimState.walkDown: _buildAnimation(
-        spriteSheet: spriteSheet,
-        row: _downRow,
-        columns: const [1, 2, 3, 4],
-      ),
-      _HeroAnimState.idleUp: _buildAnimation(
-        spriteSheet: spriteSheet,
-        row: _upRow,
-        columns: const [0],
-      ),
-      _HeroAnimState.walkUp: _buildAnimation(
-        spriteSheet: spriteSheet,
-        row: _upRow,
-        columns: const [1, 2, 3, 4],
-      ),
-      _HeroAnimState.idleLeft: _buildAnimation(
-        spriteSheet: spriteSheet,
-        row: _leftRow,
-        columns: const [0],
-      ),
-      _HeroAnimState.walkLeft: _buildAnimation(
-        spriteSheet: spriteSheet,
-        row: _leftRow,
-        columns: const [1, 2, 3, 4],
-      ),
-      _HeroAnimState.idleRight: _buildAnimation(
-        spriteSheet: spriteSheet,
-        row: _rightRow,
-        columns: const [0],
-      ),
-      _HeroAnimState.walkRight: _buildAnimation(
-        spriteSheet: spriteSheet,
-        row: _rightRow,
-        columns: const [1, 2, 3, 4],
-      ),
-    };
-  }
-
-  static SpriteAnimation _buildAnimation({
-    required SpriteSheet spriteSheet,
-    required int row,
-    required List<int> columns,
-  }) {
-    final frameData = columns
-        .map(
-          (column) =>
-              spriteSheet.createFrameData(row, column, stepTime: _frameStep),
-        )
-        .toList();
-
-    return SpriteAnimation.fromFrameData(
-      spriteSheet.image,
-      SpriteAnimationData(frameData),
-    );
-  }
-
-  void setMotion(Vector2 velocity, {required bool moving}) {
-    if (!velocity.isZero()) {
-      _updateFacing(velocity);
-    }
-    _walking = moving;
-    _applyAnimation();
-  }
-
-  bool get isWalking => _walking;
-
-  String get facingWire {
-    return switch (_facing) {
-      _HeroFacing.down => 'down',
-      _HeroFacing.up => 'up',
-      _HeroFacing.left => 'left',
-      _HeroFacing.right => 'right',
-    };
-  }
-
-  void applyNetworkPose(HunterRealtimePose pose) {
-    _facing = _fromWireFacing(pose.facing);
-    _walking = pose.moving;
-    _applyAnimation();
-  }
-
-  void _applyAnimation() {
-    current = switch ((_facing, _walking)) {
-      (_HeroFacing.down, true) => _HeroAnimState.walkDown,
-      (_HeroFacing.down, false) => _HeroAnimState.idleDown,
-      (_HeroFacing.up, true) => _HeroAnimState.walkUp,
-      (_HeroFacing.up, false) => _HeroAnimState.idleUp,
-      (_HeroFacing.left, true) => _HeroAnimState.walkLeft,
-      (_HeroFacing.left, false) => _HeroAnimState.idleLeft,
-      (_HeroFacing.right, true) => _HeroAnimState.walkRight,
-      (_HeroFacing.right, false) => _HeroAnimState.idleRight,
-    };
-  }
-
-  void setControlled(bool value) {
-    if (_controlled == value) {
-      return;
-    }
-    _controlled = value;
-    scale = value ? Vector2.all(1.0) : Vector2.all(0.92);
-  }
-
-  void _updateFacing(Vector2 velocity) {
-    if (velocity.y.abs() >= velocity.x.abs()) {
-      _facing = velocity.y < 0 ? _HeroFacing.up : _HeroFacing.down;
-      return;
-    }
-    _facing = velocity.x < 0 ? _HeroFacing.left : _HeroFacing.right;
-  }
-
-  _HeroFacing _fromWireFacing(String facing) {
-    return switch (facing) {
-      'up' => _HeroFacing.up,
-      'left' => _HeroFacing.left,
-      'right' => _HeroFacing.right,
-      _ => _HeroFacing.down,
-    };
-  }
-}
-
-class _FloatingJoystickOverlay extends PositionComponent {
-  _FloatingJoystickOverlay({required this.baseRadius, required this.knobRadius})
-    : super(position: Vector2.zero(), anchor: Anchor.topLeft, priority: 9000);
-
-  final double baseRadius;
-  final double knobRadius;
-
-  bool _active = false;
-  final Vector2 _center = Vector2.zero();
-  final Vector2 _knob = Vector2.zero();
-  final Vector2 _delta = Vector2.zero();
-
-  void resizeTo(Vector2 canvasSize) {
-    size = canvasSize;
-  }
-
-  void activate(Vector2 rawPosition) {
-    _active = true;
-    final clamped = _clampToCanvas(rawPosition);
-    _center.setFrom(clamped);
-    _knob.setFrom(clamped);
-  }
-
-  void updateTouch(Vector2 rawPosition, Vector2 outInput) {
-    if (!_active) {
-      outInput.setZero();
-      return;
-    }
-
-    _delta
-      ..setFrom(rawPosition)
-      ..sub(_center);
-
-    final limit = baseRadius;
-    final limit2 = limit * limit;
-    if (_delta.length2 > limit2) {
-      _delta.scaleTo(limit);
-    }
-
-    _knob
-      ..setFrom(_center)
-      ..add(_delta);
-
-    outInput
-      ..setFrom(_delta)
-      ..scale(1 / limit);
-  }
-
-  void deactivate() {
-    _active = false;
-    _center.setZero();
-    _knob.setZero();
-    _delta.setZero();
-  }
-
-  Vector2 _clampToCanvas(Vector2 rawPosition) {
-    final x = _clampAxis(rawPosition.x, size.x);
-    final y = _clampAxis(rawPosition.y, size.y);
-    return Vector2(x, y);
-  }
-
-  double _clampAxis(double value, double extent) {
-    if (extent <= 0) {
-      return value;
-    }
-    final min = baseRadius + 8;
-    final max = extent - baseRadius - 8;
-    if (max <= min) {
-      return extent / 2;
-    }
-    return value.clamp(min, max).toDouble();
-  }
-
-  @override
-  void render(Canvas canvas) {
-    super.render(canvas);
-    if (!_active) {
-      return;
-    }
-
-    final center = Offset(_center.x, _center.y);
-    final knobCenter = Offset(_knob.x, _knob.y);
-    final dropShadow = Paint()..color = const Color(0x5A1A100C);
-    final outer = Paint()
-      ..color = AppColors.joystickBase.withValues(alpha: 0.72);
-    final cavity = Paint()..color = const Color(0xA62A1A14);
-    final innerShadow = Paint()
-      ..shader = ui.Gradient.radial(center, baseRadius - 6, const [
-        Color(0x00000000),
-        Color(0x55000000),
-      ]);
-    final baseRing = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.2
-      ..color = const Color(0x996D4C41);
-
-    final knobShadow = Paint()..color = const Color(0x880D315A);
-    final knobGem = Paint()
-      ..shader =
-          ui.Gradient.radial(knobCenter.translate(-5, -6), knobRadius - 1.5, [
-            AppColors.joystickGemLight.withValues(alpha: 0.96),
-            AppColors.joystickGem.withValues(alpha: 0.92),
-          ]);
-    final knobRing = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.2
-      ..color = const Color(0xAAEAF4FF);
-    final knobHighlight = Paint()..color = const Color(0xCCFFFFFF);
-
-    canvas.drawCircle(center.translate(0, 5), baseRadius - 1, dropShadow);
-    canvas.drawCircle(center, baseRadius, outer);
-    canvas.drawCircle(center, baseRadius - 6, cavity);
-    canvas.drawCircle(center, baseRadius - 6, innerShadow);
-    canvas.drawCircle(center, baseRadius - 9, baseRing);
-
-    canvas.drawCircle(
-      knobCenter.translate(2.5, 2.5),
-      knobRadius - 1,
-      knobShadow,
-    );
-    canvas.drawCircle(knobCenter, knobRadius, knobGem);
-    canvas.drawCircle(knobCenter, knobRadius - 2.3, knobRing);
-    canvas.drawCircle(knobCenter.translate(-6.5, -7), 4.3, knobHighlight);
   }
 }

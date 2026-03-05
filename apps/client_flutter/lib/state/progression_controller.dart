@@ -5,15 +5,8 @@ import '../features/quests/quest_repository.dart';
 import 'hunter_directory_controller.dart';
 import 'providers.dart';
 
-class ProgressionBundle {
-  const ProgressionBundle({required this.progression, required this.ledger});
-
-  final Progression progression;
-  final List<LedgerEntry> ledger;
-}
-
 final progressionControllerProvider =
-    StateNotifierProvider<ProgressionController, AsyncValue<ProgressionBundle>>(
+    StateNotifierProvider<ProgressionController, AsyncValue<Progression>>(
       (ref) {
         final repo = ref.watch(questRepositoryProvider);
         final selectedHunterId = ref.watch(activeHunterIdProvider);
@@ -25,7 +18,7 @@ final progressionControllerProvider =
     );
 
 class ProgressionController
-    extends StateNotifier<AsyncValue<ProgressionBundle>> {
+    extends StateNotifier<AsyncValue<Progression>> {
   ProgressionController({
     required QuestRepository repo,
     required String? selectedHunterId,
@@ -45,11 +38,7 @@ class ProgressionController
     state = await AsyncValue.guard(_loadBundle);
   }
 
-  Future<ProgressionBundle> _loadBundle() async {
-    final progression = await _repo.fetchProgression(
-      hunterId: _selectedHunterId,
-    );
-    final ledger = await _repo.fetchLedger(progression.childMemberId);
-    return ProgressionBundle(progression: progression, ledger: ledger);
+  Future<Progression> _loadBundle() async {
+    return _repo.fetchProgression(hunterId: _selectedHunterId);
   }
 }

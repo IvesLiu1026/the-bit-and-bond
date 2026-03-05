@@ -1,0 +1,33 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: chen_leveling_voice_redis
+    restart: unless-stopped
+    ports:
+      - "${VOICE_REDIS_PORT:-6380}:6379"
+
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: chen_leveling_livekit
+    restart: unless-stopped
+    depends_on:
+      - redis
+    command: ["--config", "/etc/livekit.yaml"]
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+    ports:
+      - "${LIVEKIT_SIGNAL_PORT:-7880}:7880"
+      - "${LIVEKIT_RTC_TCP_PORT:-7881}:7881"
+      - "${LIVEKIT_RTC_UDP_START:-50000}-${LIVEKIT_RTC_UDP_END:-50100}:${LIVEKIT_RTC_UDP_START:-50000}-${LIVEKIT_RTC_UDP_END:-50100}/udp"
+
+  coturn:
+    image: coturn/coturn:4.6.3-r3
+    container_name: chen_leveling_coturn
+    restart: unless-stopped
+    command: ["-c", "/etc/coturn/turnserver.conf"]
+    volumes:
+      - ./turnserver.conf:/etc/coturn/turnserver.conf:ro
+    ports:
+      - "${TURN_PORT:-3478}:3478/tcp"
+      - "${TURN_PORT:-3478}:3478/udp"
+      - "${TURN_RELAY_PORT_START:-49160}-${TURN_RELAY_PORT_END:-49200}:${TURN_RELAY_PORT_START:-49160}-${TURN_RELAY_PORT_END:-49200}/udp"

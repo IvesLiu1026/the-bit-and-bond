@@ -10,14 +10,23 @@ use crate::error::{AppError, AppResult};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AuthRole {
-    GuildMaster,
-    Hunter,
+    Player,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum GuildRole {
+    Master,
+    #[default]
+    Member,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Claims {
     pub sub: Uuid,
     pub role: AuthRole,
+    #[serde(default)]
+    pub guild_role: GuildRole,
     pub guild_id: Uuid,
     pub hunter_id: Option<Uuid>,
     pub iat: i64,
@@ -66,31 +75,18 @@ impl JwtService {
         }
     }
 
-    pub fn issue_guild_master_token(
+    pub fn issue_player_token(
         &self,
-        user_id: Uuid,
+        hunter_id: Uuid,
         guild_id: Uuid,
+        guild_role: GuildRole,
     ) -> AppResult<IssuedToken> {
         let now = Utc::now();
         let exp = now + Duration::seconds(self.ttl_seconds);
         let claims = Claims {
-            sub: user_id,
-            role: AuthRole::GuildMaster,
-            guild_id,
-            hunter_id: None,
-            iat: now.timestamp(),
-            exp: exp.timestamp(),
-        };
-
-        self.issue(claims)
-    }
-
-    pub fn issue_hunter_token(&self, hunter_id: Uuid, guild_id: Uuid) -> AppResult<IssuedToken> {
-        let now = Utc::now();
-        let exp = now + Duration::seconds(self.ttl_seconds);
-        let claims = Claims {
             sub: hunter_id,
-            role: AuthRole::Hunter,
+            role: AuthRole::Player,
+            guild_role,
             guild_id,
             hunter_id: Some(hunter_id),
             iat: now.timestamp(),
@@ -126,18 +122,22 @@ impl JwtService {
 mod tests {
     use uuid::Uuid;
 
-    use super::JwtService;
+    use super::{GuildRole, JwtService};
 
     #[test]
     fn roundtrip_claims() {
         let svc = JwtService::new(b"0123456789abcdef0123456789abcdef", 3600);
         let user = Uuid::new_v4();
         let guild = Uuid::new_v4();
-        let issued = svc.issue_guild_master_token(user, guild).expect("issue");
+        let issued = svc
+            .issue_player_token(user, guild, GuildRole::Master)
+            .expect("issue");
         let decoded = svc.decode(&issued.access_token).expect("decode");
 
         assert_eq!(decoded.sub, user);
         assert_eq!(decoded.guild_id, guild);
-        assert!(decoded.hunter_id.is_none());
+        assert_eq!(decoded.role, super::AuthRole::Player);
+        assert_eq!(decoded.hunter_id, Some(user));
+        assert_eq!(decoded.guild_role, GuildRole::Master);
     }
 }

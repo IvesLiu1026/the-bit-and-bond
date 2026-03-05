@@ -2,6 +2,24 @@ use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize)]
+#[sea_orm(rs_type = "String", db_type = "Enum", enum_name = "stat_category")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum QuestStatCategory {
+    #[sea_orm(string_value = "STR")]
+    Str,
+    #[sea_orm(string_value = "INT")]
+    Int,
+    #[sea_orm(string_value = "AGI")]
+    Agi,
+    #[sea_orm(string_value = "VIT")]
+    Vit,
+    #[sea_orm(string_value = "CHA")]
+    Cha,
+    #[sea_orm(string_value = "NONE")]
+    None,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize)]
 #[sea_orm(rs_type = "String", db_type = "String(StringLen::N(24))")]
 pub enum QuestStatus {
     #[sea_orm(string_value = "available")]
@@ -22,6 +40,7 @@ pub struct Model {
     pub description: Option<String>,
     pub reward_xp: i32,
     pub reward_coins: i32,
+    pub stat_category: QuestStatCategory,
     pub status: QuestStatus,
 }
 

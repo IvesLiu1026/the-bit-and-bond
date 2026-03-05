@@ -12,13 +12,13 @@ import 'package:chen_leveling_client/core/network/auth_api_client.dart';
 import 'package:chen_leveling_client/features/quests/models.dart';
 import 'package:chen_leveling_client/features/quests/quest_repository.dart';
 import 'package:chen_leveling_client/state/auth_controller.dart';
-import 'package:chen_leveling_client/state/guardian_review_controller.dart';
 import 'package:chen_leveling_client/state/progression_controller.dart';
 import 'package:chen_leveling_client/state/providers.dart';
 import 'package:chen_leveling_client/state/quest_controller.dart';
+import 'package:chen_leveling_client/state/social_controller.dart';
 
 void main() {
-  testWidgets('Game shell renders cozy guild map layout', (
+  testWidgets('Game shell renders tavern HUD and profile dialog', (
     WidgetTester tester,
   ) async {
     tester.view.devicePixelRatio = 1.0;
@@ -36,8 +36,8 @@ void main() {
           progressionControllerProvider.overrideWith(
             (ref) => _TestProgressionController(),
           ),
-          guardianReviewControllerProvider.overrideWith(
-            (ref) => _TestGuardianReviewController(),
+          socialControllerProvider.overrideWith(
+            (ref) => _TestSocialController(),
           ),
         ],
         child: const ChenLevelingApp(),
@@ -47,10 +47,52 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.text('Cozy Guild Board'), findsOneWidget);
-    expect(find.text('Guild Map'), findsOneWidget);
-    expect(find.text('Quest Cards'), findsOneWidget);
-    expect(find.text('Adventure Summary'), findsOneWidget);
+    expect(find.text('溫馨公會看板'), findsOneWidget);
+    expect(find.text('拖曳任意位置，叫出搖桿移動'), findsOneWidget);
+    expect(find.text('玩家通行證'), findsNothing);
+
+    await tester.tap(find.text('Lv.2'));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('玩家通行證'), findsOneWidget);
+    expect(find.textContaining('公會：'), findsOneWidget);
+  });
+
+  testWidgets('Game shell dialogs stay stable on phone-sized viewport', (
+    WidgetTester tester,
+  ) async {
+    tester.view.devicePixelRatio = 1.0;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authControllerProvider.overrideWith((ref) => _TestAuthController()),
+          questControllerProvider.overrideWith((ref) => _TestQuestController()),
+          progressionControllerProvider.overrideWith(
+            (ref) => _TestProgressionController(),
+          ),
+          socialControllerProvider.overrideWith(
+            (ref) => _TestSocialController(),
+          ),
+        ],
+        child: const ChenLevelingApp(),
+      ),
+    );
+
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.text('Lv.2'));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('玩家通行證'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }
 
@@ -65,6 +107,7 @@ class _TestQuestController extends QuestController {
       templateId: 't-1',
       templateTitle: 'Spellbook Study',
       category: QuestCategory.study,
+      statCategory: QuestStatCategory.intelligence,
       baseXp: 20,
       baseCoins: 10,
       status: QuestStatus.available,
@@ -76,6 +119,7 @@ class _TestQuestController extends QuestController {
       templateId: 't-2',
       templateTitle: 'Room Cleanup',
       category: QuestCategory.chore,
+      statCategory: QuestStatCategory.strength,
       baseXp: 25,
       baseCoins: 12,
       status: QuestStatus.available,
@@ -91,33 +135,20 @@ class _TestQuestController extends QuestController {
   Future<void> refresh() async {}
 
   @override
-  Future<void> submitQuest(String questInstanceId, {String? note}) async {}
+  Future<void> submitQuest(String questInstanceId) async {}
 }
 
 class _TestProgressionController extends ProgressionController {
   _TestProgressionController()
     : super(repo: _NoopQuestRepository(), selectedHunterId: _childId) {
     state = AsyncValue.data(
-      ProgressionBundle(
-        progression: Progression(
-          childMemberId: _childId,
-          level: 2,
-          xp: 140,
-          coins: 35,
-          availableQuests: 2,
-          submittedQuests: 0,
-        ),
-        ledger: [
-          LedgerEntry(
-            id: 'l-1',
-            sourceType: LedgerSourceType.questApproval,
-            sourceId: 's-1',
-            xpDelta: 25,
-            coinDelta: 10,
-            note: 'Great work',
-            createdAt: DateTime(2026, 3, 4),
-          ),
-        ],
+      Progression(
+        childMemberId: _childId,
+        level: 2,
+        xp: 140,
+        coins: 35,
+        availableQuests: 2,
+        submittedQuests: 0,
       ),
     );
   }
@@ -131,10 +162,28 @@ class _TestProgressionController extends ProgressionController {
   Future<void> refresh() async {}
 }
 
-class _TestGuardianReviewController extends GuardianReviewController {
-  _TestGuardianReviewController()
-    : super(repo: _NoopQuestRepository(), authSession: null) {
-    state = const AsyncValue.data([]);
+class _TestSocialController extends SocialController {
+  _TestSocialController()
+    : super(
+        api: ApiClient(
+          baseUrl: 'http://127.0.0.1:18080',
+          authSession: const AuthSession(
+            accessToken: 'test-token',
+            guildId: '00000000-0000-0000-0000-000000000001',
+            hunterId: '00000000-0000-0000-0000-000000000011',
+            guildRole: GuildRole.member,
+          ),
+          httpClient: _NeverHttpClient(),
+        ),
+      ) {
+    state = AsyncValue.data(
+      SocialSnapshot(
+        friends: const [],
+        pendingInvites: const [],
+        incomingFriendRequests: const [],
+        profile: null,
+      ),
+    );
   }
 
   @override
@@ -142,16 +191,6 @@ class _TestGuardianReviewController extends GuardianReviewController {
 
   @override
   Future<void> refresh() async {}
-
-  @override
-  Future<void> approve(
-    String submissionId, {
-    required String hunterId,
-    String? reviewNote,
-  }) async {}
-
-  @override
-  Future<void> reject(String submissionId, {String? reviewNote}) async {}
 }
 
 // The test controllers inject state directly and never call into the
@@ -164,9 +203,9 @@ class _NoopQuestRepository extends QuestRepository {
           baseUrl: 'http://127.0.0.1:18080',
           authSession: const AuthSession(
             accessToken: 'test-token',
-            role: AuthUserRole.hunter,
             guildId: '00000000-0000-0000-0000-000000000001',
             hunterId: '00000000-0000-0000-0000-000000000011',
+            guildRole: GuildRole.member,
           ),
           httpClient: _NeverHttpClient(),
         ),
@@ -193,9 +232,9 @@ class _TestAuthController extends AuthController {
     state = const AsyncValue.data(
       AuthSession(
         accessToken: 'test-token',
-        role: AuthUserRole.hunter,
         guildId: '00000000-0000-0000-0000-000000000001',
         hunterId: '00000000-0000-0000-0000-000000000011',
+        guildRole: GuildRole.member,
       ),
     );
   }

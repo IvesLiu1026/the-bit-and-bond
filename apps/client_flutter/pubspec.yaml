@@ -10,10 +10,13 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
+  device_preview: ^1.2.0
   flutter_riverpod: ^2.6.1
   flutter_secure_storage: ^9.2.4
   flame: ^1.20.0
   http: ^1.2.2
+  livekit_client: ^2.5.1
+  audioplayers: ^6.1.0
   uuid: ^4.5.1
   web_socket_channel: ^3.0.1
 
@@ -28,6 +31,8 @@ flutter:
     - assets/sprites/hero/Free Pixel Character Base Pack/character.png
     - assets/sprites/hero/LICENSE.txt
     - assets/sprites/hero/Free Pixel Character Base Pack/licence.txt.txt
+    - assets/audio/coin.wav
+    - assets/audio/use_success.wav
   fonts:
     - family: Nunito
       fonts:

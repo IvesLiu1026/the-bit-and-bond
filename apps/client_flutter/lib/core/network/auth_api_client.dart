@@ -10,20 +10,23 @@ class AuthApiClient {
 
   final String baseUrl;
   final http.Client _httpClient;
+  static const int _maxErrorSnippetLength = 180;
 
-  Future<AuthSession> registerMaster({
-    required String email,
-    required String password,
-    required String guildName,
+  Future<AuthSession> registerPlayer({
+    required String playerId,
+    required String pinCode,
+    required String displayName,
+    String? avatarType,
   }) async {
     final response = await _httpClient
         .post(
-          Uri.parse('$baseUrl/api/v1/auth/master/register'),
+          Uri.parse('$baseUrl/api/v1/auth/register'),
           headers: _jsonHeaders(),
           body: jsonEncode({
-            'email': email,
-            'password': password,
-            'guild_name': guildName,
+            'account': playerId,
+            'secret': pinCode,
+            'display_name': displayName,
+            'avatar_type': avatarType,
           }),
         )
         .timeout(const Duration(seconds: 10));
@@ -31,37 +34,27 @@ class AuthApiClient {
     return _sessionFromAuthJson(data);
   }
 
-  Future<AuthSession> loginMaster({
-    required String email,
-    required String password,
-  }) async {
-    final response = await _httpClient
-        .post(
-          Uri.parse('$baseUrl/api/v1/auth/master/login'),
-          headers: _jsonHeaders(),
-          body: jsonEncode({'email': email, 'password': password}),
-        )
-        .timeout(const Duration(seconds: 10));
-    final data = _parseResponse(response) as Map<String, dynamic>;
-    return _sessionFromAuthJson(data);
-  }
-
-  Future<AuthSession> loginHunter({
-    required String inviteCode,
+  Future<AuthSession> loginPlayer({
+    required String playerId,
     required String pinCode,
   }) async {
     final response = await _httpClient
         .post(
-          Uri.parse('$baseUrl/api/v1/auth/hunter/login'),
+          Uri.parse('$baseUrl/api/v1/auth/login'),
           headers: _jsonHeaders(),
-          body: jsonEncode({'invite_code': inviteCode, 'pin_code': pinCode}),
+          body: jsonEncode({'account': playerId, 'secret': pinCode}),
         )
         .timeout(const Duration(seconds: 10));
     final data = _parseResponse(response) as Map<String, dynamic>;
     return _sessionFromAuthJson(data);
   }
 
-  Future<AuthSession> me(String accessToken, {String? inviteCode}) async {
+  Future<AuthSession> me(
+    String accessToken, {
+    String? inviteCode,
+    String? playerId,
+    String? displayName,
+  }) async {
     final response = await _httpClient
         .get(
           Uri.parse('$baseUrl/api/v1/auth/me'),
@@ -69,27 +62,55 @@ class AuthApiClient {
         )
         .timeout(const Duration(seconds: 10));
     final data = _parseResponse(response) as Map<String, dynamic>;
+    final hunterId = (data['hunter_id'] as String?)?.trim();
+    if (hunterId == null || hunterId.isEmpty) {
+      throw AuthApiException('session missing hunter_id, please login again', 401);
+    }
     return AuthSession(
       accessToken: accessToken,
-      role: _parseRole((data['role'] ?? 'hunter') as String),
       guildId: (data['guild_id'] ?? '') as String,
-      hunterId: data['hunter_id'] as String?,
+      hunterId: hunterId,
+      guildRole: _parseGuildRole(
+        guildRoleRaw: data['guild_role'] as String?,
+      ),
       inviteCode: inviteCode,
+      playerId: (data['player_id'] as String?) ?? playerId,
+      displayName: (data['display_name'] as String?) ?? displayName,
     );
   }
 
   Map<String, String> _jsonHeaders() => const {
     'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    'ngrok-skip-browser-warning': 'true',
   };
 
   Map<String, String> _bearerHeaders(String token) => {
     'Authorization': 'Bearer $token',
+    'Accept': 'application/json',
+    'ngrok-skip-browser-warning': 'true',
   };
 
   dynamic _parseResponse(http.Response response) {
-    final body = response.body.isEmpty
-        ? <String, dynamic>{}
-        : jsonDecode(response.body) as dynamic;
+    final rawBody = response.body;
+    dynamic body = <String, dynamic>{};
+    if (rawBody.isNotEmpty) {
+      try {
+        body = jsonDecode(rawBody) as dynamic;
+      } on FormatException {
+        final snippet = _compactSnippet(rawBody);
+        if (snippet.contains('ERR_NGROK_6024')) {
+          throw AuthApiException(
+            'ngrok warning page intercepted auth API response; please refresh and retry',
+            response.statusCode,
+          );
+        }
+        throw AuthApiException(
+          'expected JSON auth response but received: $snippet',
+          response.statusCode,
+        );
+      }
+    }
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return body;
@@ -100,29 +121,47 @@ class AuthApiClient {
     }
 
     throw AuthApiException(
-      'auth request failed with status ${response.statusCode}',
+      'auth request failed with status ${response.statusCode}'
+      '${rawBody.isEmpty ? '' : ' (${_compactSnippet(rawBody)})'}',
       response.statusCode,
     );
   }
 
+  String _compactSnippet(String body) {
+    final compact = body.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (compact.length <= _maxErrorSnippetLength) {
+      return compact;
+    }
+    return '${compact.substring(0, _maxErrorSnippetLength)}...';
+  }
+
   AuthSession _sessionFromAuthJson(Map<String, dynamic> json) {
+    final hunterId = (json['hunter_id'] as String?)?.trim();
+    if (hunterId == null || hunterId.isEmpty) {
+      throw AuthApiException('auth response missing hunter_id', 500);
+    }
     return AuthSession(
       accessToken: (json['access_token'] ?? '') as String,
-      role: _parseRole((json['role'] ?? 'hunter') as String),
       guildId: (json['guild_id'] ?? '') as String,
-      hunterId: json['hunter_id'] as String?,
+      hunterId: hunterId,
+      guildRole: _parseGuildRole(
+        guildRoleRaw: json['guild_role'] as String?,
+      ),
       inviteCode: json['invite_code'] as String?,
+      playerId: json['player_id'] as String?,
+      displayName: json['display_name'] as String?,
     );
   }
 
-  AuthUserRole _parseRole(String raw) {
-    switch (raw.trim().toLowerCase()) {
-      case 'guild_master':
-        return AuthUserRole.guildMaster;
-      case 'hunter':
-      default:
-        return AuthUserRole.hunter;
+  GuildRole _parseGuildRole({String? guildRoleRaw}) {
+    final normalizedGuildRole = guildRoleRaw?.trim().toLowerCase();
+    if (normalizedGuildRole == 'master') {
+      return GuildRole.master;
     }
+    if (normalizedGuildRole == 'member') {
+      return GuildRole.member;
+    }
+    return GuildRole.member;
   }
 }
 

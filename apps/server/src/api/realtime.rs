@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 
 use axum::{
+    Json,
     extract::{
         Query, State,
         ws::{Message, WebSocket, WebSocketUpgrade},
@@ -15,14 +16,32 @@ use uuid::Uuid;
 
 use crate::{
     error::{AppError, AppResult},
-    jwt::{AuthRole, Claims},
+    extractors::AuthClaims,
+    jwt::Claims,
     presence::{HunterFacing, HunterPose, PresenceEvent},
     state::AppState,
 };
 
 #[derive(Debug, Deserialize)]
 pub struct RealtimeWsQuery {
-    pub token: String,
+    pub ticket: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct RealtimeTicketResponse {
+    pub ticket: String,
+    pub expires_in: i64,
+}
+
+pub async fn issue_ws_ticket(
+    AuthClaims(claims): AuthClaims,
+    State(state): State<AppState>,
+) -> AppResult<Json<RealtimeTicketResponse>> {
+    let issued = state.realtime_tickets.issue(&claims).await;
+    Ok(Json(RealtimeTicketResponse {
+        ticket: issued.ticket,
+        expires_in: issued.expires_in,
+    }))
 }
 
 #[derive(Debug, Deserialize)]
@@ -42,6 +61,7 @@ enum ClientRealtimeMessage {
 enum ServerRealtimeMessage {
     Snapshot { positions: Vec<HunterPose> },
     Pose { pose: HunterPose },
+    ChatNotice { room_id: String, message_id: Uuid },
 }
 
 pub async fn ws_upgrade(
@@ -49,7 +69,11 @@ pub async fn ws_upgrade(
     Query(query): Query<RealtimeWsQuery>,
     ws: WebSocketUpgrade,
 ) -> AppResult<Response> {
-    let claims = state.jwt.decode(query.token.trim())?;
+    let claims = state
+        .realtime_tickets
+        .consume(query.ticket.trim())
+        .await
+        .ok_or_else(|| AppError::Unauthorized("invalid or expired realtime ticket".into()))?;
     let allowed_hunters = resolve_allowed_hunters(&state, &claims).await?;
 
     Ok(ws.on_upgrade(move |socket| async move {
@@ -58,28 +82,20 @@ pub async fn ws_upgrade(
 }
 
 async fn resolve_allowed_hunters(state: &AppState, claims: &Claims) -> AppResult<HashSet<Uuid>> {
-    let mut guild_hunters = hunter::Entity::find()
+    let hunter_id = claims
+        .hunter_id
+        .ok_or_else(|| AppError::Unauthorized("token missing hunter_id".into()))?;
+    let exists = hunter::Entity::find_by_id(hunter_id)
         .filter(hunter::Column::GuildId.eq(claims.guild_id))
-        .all(&state.db)
+        .one(&state.db)
         .await?
-        .into_iter()
-        .map(|row| row.id)
-        .collect::<HashSet<_>>();
-
-    if claims.role == AuthRole::Hunter {
-        let hunter_id = claims
-            .hunter_id
-            .ok_or_else(|| AppError::Unauthorized("hunter token missing hunter_id".into()))?;
-        if !guild_hunters.contains(&hunter_id) {
-            return Err(AppError::Unauthorized(
-                "hunter does not belong to this guild".into(),
-            ));
-        }
-        return Ok(HashSet::from([hunter_id]));
+        .is_some();
+    if !exists {
+        return Err(AppError::Unauthorized(
+            "hunter does not belong to this guild".into(),
+        ));
     }
-
-    guild_hunters.insert(claims.sub);
-    Ok(guild_hunters)
+    Ok(HashSet::from([hunter_id]))
 }
 
 async fn handle_socket(
@@ -130,14 +146,29 @@ async fn handle_socket(
             evt = guild_rx.recv() => {
                 match evt {
                     Ok(event) => {
-                        if event.session_id == session_id {
-                            continue;
-                        }
-                        if send_json(
-                            &mut socket,
-                            &ServerRealtimeMessage::Pose { pose: event.pose },
-                        ).await.is_err() {
-                            break;
+                        match event {
+                            PresenceEvent::Pose { session_id: event_session_id, pose } => {
+                                if event_session_id == session_id {
+                                    continue;
+                                }
+                                if send_json(
+                                    &mut socket,
+                                    &ServerRealtimeMessage::Pose { pose },
+                                ).await.is_err() {
+                                    break;
+                                }
+                            }
+                            PresenceEvent::ChatNotice { room_id, message_id } => {
+                                if send_json(
+                                    &mut socket,
+                                    &ServerRealtimeMessage::ChatNotice {
+                                        room_id,
+                                        message_id,
+                                    },
+                                ).await.is_err() {
+                                    break;
+                                }
+                            }
                         }
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
@@ -187,7 +218,7 @@ async fn handle_incoming_text(
 
     state
         .presence
-        .publish_pose(guild_id, PresenceEvent { session_id, pose })
+        .publish_pose(guild_id, session_id, pose)
         .await;
     Ok(())
 }

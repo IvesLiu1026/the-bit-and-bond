@@ -6,6 +6,7 @@
 - `BIND_ADDR` default: `127.0.0.1:18080`
 - `ALLOWED_ORIGIN` default: `*` (for local dev; set explicit origins in production)
 - `AUTO_MIGRATE` default: `true`
+- `REDIS_URL` optional: enable multi-node realtime presence pub/sub
 
 ## Data model
 
@@ -13,36 +14,35 @@
 - `guilds`: family scope container (owned by user)
 - `hunters`: child player profile inside a guild
 - `quests`: guild scoped tasks with lifecycle status
+  - `stat_category`: `STR | INT | AGI | CHA | VIT | NONE`
 
 ## API flow
 
-1. Guild master registers (`POST /api/v1/auth/master/register`)
-2. Guild master logs in (`POST /api/v1/auth/master/login`)
-3. Guild master manages hunters (`POST/GET /api/v1/hunters`, `PATCH /api/v1/hunters/{id}/pin`)
-4. Guild master creates quests (`POST /api/v1/quests`)
-5. Hunter/master list quests in same guild (`GET /api/v1/quests`)
-6. Hunter submits quest (`POST /api/v1/quests/{id}/submit`)
-7. Guild master reviews quest (`POST /api/v1/quests/{id}/review`)
-8. Hunter logs in (`POST /api/v1/auth/hunter/login`)
+1. 玩家註冊（建立玩家 + 個人公會）(`POST /api/v1/auth/register`)
+2. 玩家登入（`account` 可為 `player_id` 或 `email`）(`POST /api/v1/auth/login`)
+3. 取得當前登入身份 (`GET /api/v1/auth/me`)
+4. 公會長管理獵人 (`POST/GET /api/v1/hunters`, `PATCH /api/v1/hunters/{id}/pin`)
+5. 公會任務流程 (`POST/GET /api/v1/quests`, `POST /api/v1/quests/{id}/submit`, `POST /api/v1/quests/{id}/review`)
 
 ## Auth model
 
 - Protected endpoints use `Authorization: Bearer <jwt>`.
 - Role checks:
-  - `guild_master`: manage hunters and guild resources.
-  - `hunter`: limited gameplay permissions.
+  - `master`: manage hunters and guild resources.
+  - `member`: limited gameplay permissions.
+- 密碼與 PIN 皆以 Argon2 雜湊儲存。
 
-## Guild Auth cURL examples
+## Unified Auth cURL examples
 
-### 1) Register guild master (auto-login response)
+### 1) Register player (auto-login response)
 
 ```bash
-curl -i -X POST http://127.0.0.1:18080/api/v1/auth/master/register \
+curl -i -X POST http://127.0.0.1:18080/api/v1/auth/register \
   -H 'Content-Type: application/json' \
   -d '{
-    "email": "guildmaster@example.com",
-    "password": "Passw0rd!",
-    "guild_name": "諶家專屬公會"
+    "account": "chen001",
+    "secret": "1234",
+    "display_name": "阿諶"
   }'
 ```
 
@@ -53,19 +53,22 @@ Example success payload:
   "access_token": "<jwt>",
   "token_type": "Bearer",
   "expires_in": 28800,
-  "role": "guild_master",
+  "role": "player",
+  "guild_role": "master",
   "guild_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-  "invite_code": "ABCD23"
+  "hunter_id": "yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy",
+  "player_id": "chen001",
+  "display_name": "阿諶"
 }
 ```
 
-### 2) Login guild master
+### 2) Login player (player_id + pin)
 
 ```bash
-curl -i -X POST http://127.0.0.1:18080/api/v1/auth/master/login \
+curl -i -X POST http://127.0.0.1:18080/api/v1/auth/login \
   -H 'Content-Type: application/json' \
   -d '{
-    "email": "guildmaster@example.com",
-    "password": "Passw0rd!"
+    "account": "chen001",
+    "secret": "1234"
   }'
 ```

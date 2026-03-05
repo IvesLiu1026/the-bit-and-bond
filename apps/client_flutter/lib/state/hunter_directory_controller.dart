@@ -20,8 +20,8 @@ final selectedHunterIdProvider = StateProvider<String?>((ref) => null);
 
 final activeHunterIdProvider = Provider<String?>((ref) {
   final authSession = ref.watch(authSessionProvider);
-  if (authSession?.isHunter == true) {
-    return authSession?.hunterId;
+  if (authSession != null && authSession.hunterId.isNotEmpty) {
+    return authSession.hunterId;
   }
 
   final manual = ref.watch(selectedHunterIdProvider);
@@ -65,10 +65,8 @@ class HunterDirectoryController
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
       final hunters = await _repo.fetchGuildHunters();
-      if (session.isHunter &&
-          session.hunterId != null &&
-          session.hunterId!.isNotEmpty) {
-        final meId = session.hunterId!;
+      if (session.hunterId.isNotEmpty) {
+        final meId = session.hunterId;
         final hasMe = hunters.any((hunter) => hunter.id == meId);
         if (!hasMe) {
           return [
@@ -76,7 +74,7 @@ class HunterDirectoryController
             HunterProfile(
               id: meId,
               guildId: session.guildId,
-              name: 'Current Hunter',
+              name: '目前玩家',
               avatarType: 'default',
               level: 1,
               xp: 0,

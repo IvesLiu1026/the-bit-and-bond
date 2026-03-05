@@ -3,7 +3,7 @@ use axum::{
     extract::{Path, State},
     http::StatusCode,
 };
-use entity::hunter;
+use entity::{hunter, hunter_reward_ledger, quest::QuestStatCategory};
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, DbErr, EntityTrait, QueryFilter, QueryOrder,
     SqlErr,
@@ -14,6 +14,8 @@ use uuid::Uuid;
 use crate::{
     error::{AppError, AppResult},
     extractors::{AuthClaims, GuildMasterClaims, HunterClaims},
+    jwt::GuildRole,
+    security::{hash_pin_code, validate_pin_code, verify_pin_code},
     state::AppState,
 };
 
@@ -22,6 +24,7 @@ pub struct CreateHunterRequest {
     pub name: String,
     pub avatar_type: String,
     pub pin_code: String,
+    pub player_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -33,11 +36,32 @@ pub struct ResetHunterPinRequest {
 pub struct HunterResponse {
     pub id: Uuid,
     pub guild_id: Uuid,
+    pub player_id: String,
     pub name: String,
     pub avatar_type: String,
     pub level: i32,
     pub xp: i32,
     pub coins: i32,
+}
+
+#[derive(Debug, Serialize, Default, Clone)]
+pub struct HunterStatsBreakdown {
+    pub str_xp: i64,
+    pub int_xp: i64,
+    pub agi_xp: i64,
+    pub cha_xp: i64,
+    pub vit_xp: i64,
+    pub none_xp: i64,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct HunterStatsResponse {
+    pub hunter_id: Uuid,
+    pub guild_id: Uuid,
+    pub stat_xp: HunterStatsBreakdown,
+    pub total_xp: i64,
+    pub total_coins: i64,
+    pub entry_count: i64,
 }
 
 pub async fn create_hunter(
@@ -55,23 +79,52 @@ pub async fn create_hunter(
         return Err(AppError::BadRequest("avatar_type must not be empty".into()));
     }
 
-    validate_pin_code(&payload.pin_code)?;
-
-    let model = hunter::ActiveModel {
-        id: Set(Uuid::new_v4()),
-        guild_id: Set(claims.guild_id),
-        name: Set(name.to_string()),
-        avatar_type: Set(avatar_type.to_string()),
-        level: Set(1),
-        xp: Set(0),
-        coins: Set(0),
-        pin_code: Set(payload.pin_code),
+    let normalized_pin = validate_pin_code(&payload.pin_code)?;
+    if pin_in_use_in_guild(&state.db, claims.guild_id, &normalized_pin, None).await? {
+        return Err(AppError::Conflict(format!(
+            "pin_code is already used in guild {}",
+            claims.guild_id
+        )));
     }
-    .insert(&state.db)
-    .await
-    .map_err(|err| map_hunter_write_error(err, claims.guild_id))?;
+    let provided_player_id = match payload.player_id.as_deref() {
+        Some(raw) if !raw.trim().is_empty() => Some(normalize_player_id(raw)?),
+        _ => None,
+    };
 
-    Ok((StatusCode::CREATED, Json(map_hunter(model))))
+    for _ in 0..8 {
+        let candidate_player_id = provided_player_id
+            .clone()
+            .unwrap_or_else(generate_random_player_id);
+        let model = hunter::ActiveModel {
+            id: Set(Uuid::new_v4()),
+            guild_id: Set(claims.guild_id),
+            user_id: Set(None),
+            player_id: Set(candidate_player_id),
+            name: Set(name.to_string()),
+            avatar_type: Set(avatar_type.to_string()),
+            level: Set(1),
+            xp: Set(0),
+            coins: Set(0),
+            pin_code: Set(hash_pin_code(&normalized_pin)?),
+            guild_role: Set("member".to_string()),
+            motto: Set(None),
+        }
+        .insert(&state.db)
+        .await;
+        match model {
+            Ok(model) => return Ok((StatusCode::CREATED, Json(map_hunter(model)))),
+            Err(err) => {
+                if is_hunter_player_id_unique_violation(&err) && provided_player_id.is_none() {
+                    continue;
+                }
+                return Err(map_hunter_write_error(err, claims.guild_id));
+            }
+        }
+    }
+
+    Err(AppError::Conflict(
+        "failed to allocate player_id, please retry".into(),
+    ))
 }
 
 pub async fn list_hunters(
@@ -119,13 +172,64 @@ pub async fn hunter_me(
     Ok(Json(map_hunter(row)))
 }
 
+pub async fn hunter_stats(
+    AuthClaims(claims): AuthClaims,
+    State(state): State<AppState>,
+    Path(hunter_id): Path<Uuid>,
+) -> AppResult<Json<HunterStatsResponse>> {
+    let target = hunter::Entity::find_by_id(hunter_id)
+        .filter(hunter::Column::GuildId.eq(claims.guild_id))
+        .one(&state.db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("hunter not found".into()))?;
+
+    if claims.guild_role != GuildRole::Master && claims.sub != target.id {
+        return Err(AppError::Forbidden(
+            "cannot read another member's stats".into(),
+        ));
+    }
+
+    let rows = hunter_reward_ledger::Entity::find()
+        .filter(hunter_reward_ledger::Column::HunterId.eq(target.id))
+        .order_by_desc(hunter_reward_ledger::Column::CreatedAt)
+        .all(&state.db)
+        .await?;
+
+    let mut stat_xp = HunterStatsBreakdown::default();
+    let mut total_xp = 0_i64;
+    let mut total_coins = 0_i64;
+    for row in &rows {
+        let gained_xp = i64::from(row.gained_xp);
+        let gained_coins = i64::from(row.gained_coins);
+        total_xp += gained_xp;
+        total_coins += gained_coins;
+        match row.stat_category {
+            QuestStatCategory::Str => stat_xp.str_xp += gained_xp,
+            QuestStatCategory::Int => stat_xp.int_xp += gained_xp,
+            QuestStatCategory::Agi => stat_xp.agi_xp += gained_xp,
+            QuestStatCategory::Cha => stat_xp.cha_xp += gained_xp,
+            QuestStatCategory::Vit => stat_xp.vit_xp += gained_xp,
+            QuestStatCategory::None => stat_xp.none_xp += gained_xp,
+        }
+    }
+
+    Ok(Json(HunterStatsResponse {
+        hunter_id: target.id,
+        guild_id: target.guild_id,
+        stat_xp,
+        total_xp,
+        total_coins,
+        entry_count: rows.len() as i64,
+    }))
+}
+
 pub async fn reset_hunter_pin(
     GuildMasterClaims(claims): GuildMasterClaims,
     State(state): State<AppState>,
     Path(hunter_id): Path<Uuid>,
     Json(payload): Json<ResetHunterPinRequest>,
 ) -> AppResult<Json<HunterResponse>> {
-    validate_pin_code(&payload.pin_code)?;
+    let normalized_pin = validate_pin_code(&payload.pin_code)?;
 
     let existing = hunter::Entity::find_by_id(hunter_id)
         .one(&state.db)
@@ -137,9 +241,15 @@ pub async fn reset_hunter_pin(
             "cannot modify hunter in another guild".into(),
         ));
     }
+    if pin_in_use_in_guild(&state.db, claims.guild_id, &normalized_pin, Some(hunter_id)).await? {
+        return Err(AppError::Conflict(format!(
+            "pin_code is already used in guild {}",
+            claims.guild_id
+        )));
+    }
 
     let mut model: hunter::ActiveModel = existing.into();
-    model.pin_code = Set(payload.pin_code);
+    model.pin_code = Set(hash_pin_code(&normalized_pin)?);
     let updated = model
         .update(&state.db)
         .await
@@ -152,6 +262,7 @@ fn map_hunter(model: hunter::Model) -> HunterResponse {
     HunterResponse {
         id: model.id,
         guild_id: model.guild_id,
+        player_id: model.player_id,
         name: model.name,
         avatar_type: model.avatar_type,
         level: model.level,
@@ -160,20 +271,38 @@ fn map_hunter(model: hunter::Model) -> HunterResponse {
     }
 }
 
-fn validate_pin_code(pin_code: &str) -> AppResult<()> {
-    if pin_code.len() != 4 || !pin_code.chars().all(|ch| ch.is_ascii_digit()) {
-        return Err(AppError::BadRequest(
-            "pin_code must be exactly 4 digits".into(),
-        ));
-    }
-    Ok(())
-}
-
 fn map_hunter_write_error(err: DbErr, guild_id: Uuid) -> AppError {
     if is_hunter_pin_unique_violation(&err) {
         return AppError::Conflict(format!("pin_code is already used in guild {guild_id}"));
     }
+    if is_hunter_player_id_unique_violation(&err) {
+        return AppError::Conflict("player_id is already used".into());
+    }
     AppError::Database(err)
+}
+
+async fn pin_in_use_in_guild<C>(
+    db: &C,
+    guild_id: Uuid,
+    candidate_pin: &str,
+    exclude_hunter_id: Option<Uuid>,
+) -> AppResult<bool>
+where
+    C: sea_orm::ConnectionTrait,
+{
+    let rows = hunter::Entity::find()
+        .filter(hunter::Column::GuildId.eq(guild_id))
+        .all(db)
+        .await?;
+    for row in rows {
+        if Some(row.id) == exclude_hunter_id {
+            continue;
+        }
+        if verify_pin_code(candidate_pin, &row.pin_code) {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 fn is_hunter_pin_unique_violation(err: &DbErr) -> bool {
@@ -189,321 +318,42 @@ fn is_hunter_pin_unique_violation(err: &DbErr) -> bool {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use std::error::Error;
-
-    use axum::{
-        Json,
-        extract::{Path, State},
-        http::StatusCode,
-    };
-    use chrono::Utc;
-    use entity::{guild, user};
-    use migration::MigratorTrait;
-    use sea_orm::{
-        ActiveModelTrait, ActiveValue::Set, ConnectionTrait, Database, DatabaseBackend, Statement,
-    };
-    use uuid::Uuid;
-
-    use crate::{
-        error::AppError,
-        extractors::{AuthClaims, GuildMasterClaims, HunterClaims},
-        jwt::{AuthRole, Claims, JwtService},
-        state::AppState,
-    };
-
-    use super::{
-        CreateHunterRequest, ResetHunterPinRequest, create_hunter, hunter_me, list_guild_hunters,
-        list_hunters, reset_hunter_pin,
-    };
-
-    #[tokio::test]
-    async fn create_and_list_hunters_only_within_guild_scope() -> Result<(), Box<dyn Error>> {
-        let ctx = TestDbContext::create().await?;
-        let (state, claims_a, _guild_a_user) = ctx.seed_master("a").await?;
-        let (_state_ignored, claims_b, _guild_b_user) = ctx.seed_master("b").await?;
-
-        let (status, created) = create_hunter(
-            claims_a.clone(),
-            State(state.clone()),
-            Json(CreateHunterRequest {
-                name: "Alice".to_string(),
-                avatar_type: "mage".to_string(),
-                pin_code: "1234".to_string(),
-            }),
-        )
-        .await?;
-        assert_eq!(status, StatusCode::CREATED);
-        assert_eq!(created.guild_id, claims_a.0.guild_id);
-
-        let _ = create_hunter(
-            claims_b,
-            State(state.clone()),
-            Json(CreateHunterRequest {
-                name: "Bob".to_string(),
-                avatar_type: "warrior".to_string(),
-                pin_code: "5678".to_string(),
-            }),
-        )
-        .await?;
-
-        let list = list_hunters(claims_a, State(state)).await?;
-        assert_eq!(list.len(), 1);
-        assert_eq!(list[0].name, "Alice");
-
-        ctx.cleanup().await?;
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn reset_pin_is_forbidden_for_other_guild() -> Result<(), Box<dyn Error>> {
-        let ctx = TestDbContext::create().await?;
-        let (state, claims_a, _guild_a_user) = ctx.seed_master("a").await?;
-        let (_state_ignored, claims_b, _guild_b_user) = ctx.seed_master("b").await?;
-
-        let (_, hunter_b) = create_hunter(
-            claims_b,
-            State(state.clone()),
-            Json(CreateHunterRequest {
-                name: "GuildB".to_string(),
-                avatar_type: "archer".to_string(),
-                pin_code: "8888".to_string(),
-            }),
-        )
-        .await?;
-
-        let err = reset_hunter_pin(
-            claims_a,
-            State(state),
-            Path(hunter_b.id),
-            Json(ResetHunterPinRequest {
-                pin_code: "9999".to_string(),
-            }),
-        )
-        .await
-        .expect_err("must be forbidden cross guild");
-
-        assert!(matches!(err, AppError::Forbidden(_)));
-
-        ctx.cleanup().await?;
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn create_hunter_rejects_pin_collision_within_same_guild() -> Result<(), Box<dyn Error>> {
-        let ctx = TestDbContext::create().await?;
-        let (state, claims, _guild_user) = ctx.seed_master("solo").await?;
-
-        let _ = create_hunter(
-            claims.clone(),
-            State(state.clone()),
-            Json(CreateHunterRequest {
-                name: "First".to_string(),
-                avatar_type: "mage".to_string(),
-                pin_code: "2222".to_string(),
-            }),
-        )
-        .await?;
-
-        let err = create_hunter(
-            claims,
-            State(state),
-            Json(CreateHunterRequest {
-                name: "Second".to_string(),
-                avatar_type: "warrior".to_string(),
-                pin_code: "2222".to_string(),
-            }),
-        )
-        .await
-        .expect_err("same pin in same guild should conflict");
-
-        assert!(matches!(err, AppError::Conflict(_)));
-
-        ctx.cleanup().await?;
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn hunter_me_returns_hunter_profile() -> Result<(), Box<dyn Error>> {
-        let ctx = TestDbContext::create().await?;
-        let (state, master_claims, _guild_user) = ctx.seed_master("me").await?;
-
-        let (_, created) = create_hunter(
-            master_claims.clone(),
-            State(state.clone()),
-            Json(CreateHunterRequest {
-                name: "LittleMe".to_string(),
-                avatar_type: "mage".to_string(),
-                pin_code: "1357".to_string(),
-            }),
-        )
-        .await?;
-
-        let hunter_claims = HunterClaims(Claims {
-            sub: created.id,
-            role: AuthRole::Hunter,
-            guild_id: created.guild_id,
-            hunter_id: Some(created.id),
-            iat: 0,
-            exp: 9_999_999_999,
-        });
-
-        let me = hunter_me(hunter_claims, State(state)).await?;
-        assert_eq!(me.id, created.id);
-        assert_eq!(me.guild_id, created.guild_id);
-        assert_eq!(me.name, "LittleMe");
-
-        ctx.cleanup().await?;
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn roster_is_available_for_hunter_and_still_guild_scoped() -> Result<(), Box<dyn Error>> {
-        let ctx = TestDbContext::create().await?;
-        let (state, claims_a, _guild_a_user) = ctx.seed_master("a").await?;
-        let (_state_ignored, claims_b, _guild_b_user) = ctx.seed_master("b").await?;
-
-        let (_, hunter_a) = create_hunter(
-            claims_a.clone(),
-            State(state.clone()),
-            Json(CreateHunterRequest {
-                name: "Alice".to_string(),
-                avatar_type: "mage".to_string(),
-                pin_code: "2468".to_string(),
-            }),
-        )
-        .await?;
-        let _ = create_hunter(
-            claims_b,
-            State(state.clone()),
-            Json(CreateHunterRequest {
-                name: "Bob".to_string(),
-                avatar_type: "warrior".to_string(),
-                pin_code: "8642".to_string(),
-            }),
-        )
-        .await?;
-
-        let hunter_claims = AuthClaims(Claims {
-            sub: hunter_a.id,
-            role: AuthRole::Hunter,
-            guild_id: hunter_a.guild_id,
-            hunter_id: Some(hunter_a.id),
-            iat: 0,
-            exp: 9_999_999_999,
-        });
-
-        let roster = list_guild_hunters(hunter_claims, State(state)).await?;
-        assert_eq!(roster.len(), 1);
-        assert_eq!(roster[0].name, "Alice");
-
-        ctx.cleanup().await?;
-        Ok(())
-    }
-
-    struct TestDbContext {
-        admin_db: sea_orm::DatabaseConnection,
-        app_db: sea_orm::DatabaseConnection,
-        db_name: String,
-    }
-
-    impl TestDbContext {
-        async fn create() -> Result<Self, Box<dyn Error>> {
-            dotenvy::dotenv().ok();
-            let base_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
-                "postgres://chen:chen@127.0.0.1:5433/chen_leveling".to_string()
-            });
-            let db_name = format!("chen_leveling_it_hunters_{}", Uuid::new_v4().simple());
-            let admin_url = replace_database_name(&base_url, "postgres")?;
-            let test_url = replace_database_name(&base_url, &db_name)?;
-
-            let admin_db = Database::connect(admin_url).await?;
-            admin_db
-                .execute(Statement::from_string(
-                    DatabaseBackend::Postgres,
-                    format!("CREATE DATABASE \"{db_name}\""),
-                ))
-                .await?;
-
-            let app_db = Database::connect(test_url).await?;
-            migration::Migrator::up(&app_db, None).await?;
-
-            Ok(Self {
-                admin_db,
-                app_db,
-                db_name,
-            })
-        }
-
-        async fn seed_master(
-            &self,
-            suffix: &str,
-        ) -> Result<(AppState, GuildMasterClaims, user::Model), Box<dyn Error>> {
-            let user_id = Uuid::new_v4();
-            let guild_id = Uuid::new_v4();
-
-            let user = user::ActiveModel {
-                id: Set(user_id),
-                email: Set(format!("master-{suffix}@example.com")),
-                password_hash: Set("$argon2id$fake$hash".to_string()),
-                created_at: Set(Utc::now()),
-            }
-            .insert(&self.app_db)
-            .await?;
-
-            guild::ActiveModel {
-                id: Set(guild_id),
-                name: Set(format!("guild-{suffix}")),
-                owner_id: Set(user_id),
-                invite_code: Set(format!("A{suffix}B2C").chars().take(6).collect()),
-            }
-            .insert(&self.app_db)
-            .await?;
-
-            let state = AppState::new(
-                self.app_db.clone(),
-                JwtService::new(b"0123456789abcdef0123456789abcdef", 3600),
-            );
-            let claims = GuildMasterClaims(Claims {
-                sub: user_id,
-                role: AuthRole::GuildMaster,
-                guild_id,
-                hunter_id: None,
-                iat: 0,
-                exp: 9_999_999_999,
-            });
-
-            Ok((state, claims, user))
-        }
-
-        async fn cleanup(self) -> Result<(), Box<dyn Error>> {
-            self.app_db.close().await?;
-            self.admin_db
-                .execute(Statement::from_string(
-                    DatabaseBackend::Postgres,
-                    format!("DROP DATABASE IF EXISTS \"{}\" WITH (FORCE)", self.db_name),
-                ))
-                .await?;
-            self.admin_db.close().await?;
-            Ok(())
-        }
-    }
-
-    fn replace_database_name(url: &str, db_name: &str) -> Result<String, Box<dyn Error>> {
-        let (head, query) = match url.split_once('?') {
-            Some((head, query)) => (head, Some(query)),
-            None => (url, None),
-        };
-
-        let (prefix, _) = head
-            .rsplit_once('/')
-            .ok_or("DATABASE_URL must include a database name")?;
-        let mut replaced = format!("{prefix}/{db_name}");
-        if let Some(query) = query {
-            replaced.push('?');
-            replaced.push_str(query);
-        }
-        Ok(replaced)
+fn is_hunter_player_id_unique_violation(err: &DbErr) -> bool {
+    match err.sql_err() {
+        Some(SqlErr::UniqueConstraintViolation(message)) => [
+            "idx_hunters_player_id_unique",
+            "hunters_player_id_key",
+            "(player_id)",
+        ]
+        .iter()
+        .any(|candidate| message.contains(candidate)),
+        _ => false,
     }
 }
+
+fn normalize_player_id(raw: &str) -> AppResult<String> {
+    let normalized = raw.trim().to_ascii_lowercase();
+    if normalized.len() < 4 || normalized.len() > 24 {
+        return Err(AppError::BadRequest(
+            "player_id length must be between 4 and 24".into(),
+        ));
+    }
+    if !normalized
+        .chars()
+        .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '_')
+    {
+        return Err(AppError::BadRequest(
+            "player_id may only contain a-z, 0-9, _".into(),
+        ));
+    }
+    Ok(normalized)
+}
+
+fn generate_random_player_id() -> String {
+    let suffix = Uuid::new_v4().simple().to_string();
+    format!("p{}", &suffix[..10])
+}
+
+#[cfg(test)]
+#[path = "hunters_tests.rs"]
+mod tests;
