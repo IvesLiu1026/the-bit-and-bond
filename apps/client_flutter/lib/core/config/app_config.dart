@@ -41,11 +41,20 @@ class AppConfig {
     required bool isWeb,
     required String webScheme,
     required String webHost,
+    int? webPort,
     required TargetPlatform platform,
     String mobileApiBaseUrl = '',
   }) {
     if (isWeb) {
-      return '$webScheme://$webHost:18080';
+      // In production/tunnel deployments we want same-origin API calls so that
+      // web + API can be reverse-proxied under one host (e.g. ngrok).
+      if (webPort != null && webPort > 0) {
+        if (webPort == 18081) {
+          return '$webScheme://$webHost:18080';
+        }
+        return '$webScheme://$webHost:$webPort';
+      }
+      return '$webScheme://$webHost';
     }
 
     final normalizedMobileBaseUrl = mobileApiBaseUrl.trim();
@@ -60,10 +69,12 @@ class AppConfig {
   }
 
   static String _defaultApiBaseUrl(String mobileApiBaseUrl) {
+    final uri = Uri.base;
     return defaultApiBaseUrlFor(
       isWeb: kIsWeb,
-      webScheme: Uri.base.scheme,
-      webHost: Uri.base.host,
+      webScheme: uri.scheme,
+      webHost: uri.host,
+      webPort: uri.hasPort ? uri.port : null,
       platform: defaultTargetPlatform,
       mobileApiBaseUrl: mobileApiBaseUrl,
     );

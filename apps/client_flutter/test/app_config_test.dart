@@ -4,7 +4,25 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:chen_leveling_client/core/config/app_config.dart';
 
 void main() {
-  test('web default api base url follows current host', () {
+  test('web default api base url follows current host/port', () {
+    final sameOrigin = AppConfig.defaultApiBaseUrlFor(
+      isWeb: true,
+      webScheme: 'https',
+      webHost: 'example.com',
+      webPort: 443,
+      platform: TargetPlatform.android,
+    );
+    expect(sameOrigin, 'https://example.com:443');
+
+    final proxiedLocal = AppConfig.defaultApiBaseUrlFor(
+      isWeb: true,
+      webScheme: 'http',
+      webHost: '127.0.0.1',
+      webPort: 18081,
+      platform: TargetPlatform.android,
+    );
+    expect(proxiedLocal, 'http://127.0.0.1:18080');
+
     final url = AppConfig.defaultApiBaseUrlFor(
       isWeb: true,
       webScheme: 'https',
@@ -12,7 +30,7 @@ void main() {
       platform: TargetPlatform.android,
     );
 
-    expect(url, 'https://example.com:18080');
+    expect(url, 'https://example.com');
   });
 
   test('mobile override wins on native targets', () {
