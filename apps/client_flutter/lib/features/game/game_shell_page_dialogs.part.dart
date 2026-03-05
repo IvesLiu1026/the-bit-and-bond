@@ -18,6 +18,10 @@ extension _GameShellDialogs on _GameShellPageState {
       case TavernFurnitureType.guildMerchant:
         _openGuildShopDialog();
         break;
+      case TavernFurnitureType.wallBookshelf:
+      case TavernFurnitureType.honorBanner:
+      case TavernFurnitureType.trainingDummy:
+        break;
     }
   }
 

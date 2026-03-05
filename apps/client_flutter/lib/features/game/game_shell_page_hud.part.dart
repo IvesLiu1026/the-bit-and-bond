@@ -1,9 +1,10 @@
 part of 'game_shell_page.dart';
 
 class _TitleBadge extends StatefulWidget {
-  const _TitleBadge({required this.lowFxMode});
+  const _TitleBadge({required this.lowFxMode, required this.compact});
 
   final bool lowFxMode;
+  final bool compact;
 
   @override
   State<_TitleBadge> createState() => _TitleBadgeState();
@@ -93,7 +94,10 @@ class _TitleBadgeState extends State<_TitleBadge>
     required bool lowFxMode,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: EdgeInsets.symmetric(
+        horizontal: widget.compact ? 10 : 16,
+        vertical: widget.compact ? 8 : 10,
+      ),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFFF2E6C8), Color(0xFFE6D4AE)],
@@ -114,18 +118,19 @@ class _TitleBadgeState extends State<_TitleBadge>
         mainAxisSize: MainAxisSize.min,
         children: [
           _PixelTorch(flicker: leftFlicker, lowFxMode: lowFxMode),
-          const SizedBox(width: 10),
+          SizedBox(width: widget.compact ? 6 : 10),
           const _PixelLabelGlyph(glyph: 'BRD'),
-          const SizedBox(width: 8),
-          const Text(
+          SizedBox(width: widget.compact ? 5 : 8),
+          Text(
             '溫馨公會看板',
             style: TextStyle(
               fontWeight: FontWeight.w900,
-              fontSize: 24,
+              fontSize: widget.compact ? 16 : 24,
               color: AppColors.inkBrown,
             ),
+            overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(width: 10),
+          SizedBox(width: widget.compact ? 6 : 10),
           _PixelTorch(flicker: rightFlicker, lowFxMode: lowFxMode),
         ],
       ),
@@ -218,11 +223,13 @@ class _TopIconButton extends StatefulWidget {
     required this.glyph,
     required this.tooltip,
     required this.onPressed,
+    this.compact = false,
   });
 
   final String glyph;
   final String tooltip;
   final VoidCallback onPressed;
+  final bool compact;
 
   @override
   State<_TopIconButton> createState() => _TopIconButtonState();
@@ -245,7 +252,10 @@ class _TopIconButtonState extends State<_TopIconButton> {
           offset: _pressed ? const Offset(0, 0.06) : Offset.zero,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 70),
-            padding: const EdgeInsets.all(10),
+            padding: EdgeInsets.symmetric(
+              horizontal: widget.compact ? 8 : 10,
+              vertical: widget.compact ? 8 : 10,
+            ),
             decoration: BoxDecoration(
               color: _pressed ? const Color(0xFFE8DAC1) : AppColors.parchment,
               borderRadius: BorderRadius.circular(12),
@@ -264,7 +274,7 @@ class _TopIconButtonState extends State<_TopIconButton> {
               widget.glyph,
               style: const TextStyle(
                 color: AppColors.inkBrown,
-                fontSize: 12,
+                fontSize: 11,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 0.3,
               ),

@@ -115,14 +115,14 @@ class _HeroCharacterComponent
   void applyNetworkPose(
     HunterRealtimePose pose, {
     required bool snapToTarget,
-    required Vector2 canvasSize,
+    required Vector2 worldSize,
   }) {
     _facing = _fromWireFacing(pose.facing);
     _walking = pose.moving;
     final minX = radius;
-    final maxX = math.max(minX, canvasSize.x - radius);
+    final maxX = math.max(minX, worldSize.x - radius);
     final minY = ChenLevelingGame._topWallHeight + radius + 6;
-    final maxY = math.max(minY, canvasSize.y - radius);
+    final maxY = math.max(minY, worldSize.y - radius);
 
     _remoteTarget.setValues(
       pose.x.clamp(minX, maxX).toDouble(),

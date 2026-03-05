@@ -330,6 +330,19 @@ extension _GameShellActions on _GameShellPageState {
     await ref.read(authControllerProvider.notifier).logout();
   }
 
+  Future<void> _leaveVoiceQuick() async {
+    await ref.read(voiceChatControllerProvider.notifier).leaveVoice();
+    if (!mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('已離開營火語音'),
+        duration: Duration(milliseconds: 900),
+      ),
+    );
+  }
+
   Future<void> _savePlayerMotto(String motto) async {
     await _runAction(
       action: () async {
@@ -374,6 +387,9 @@ extension _GameShellActions on _GameShellPageState {
       TavernFurnitureType.guildChest => '打開儲物箱',
       TavernFurnitureType.campfireBar => '營火連線',
       TavernFurnitureType.guildMerchant => '打開商店',
+      TavernFurnitureType.wallBookshelf ||
+      TavernFurnitureType.honorBanner ||
+      TavernFurnitureType.trainingDummy => '互動',
       null => '互動',
     };
   }

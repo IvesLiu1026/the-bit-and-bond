@@ -292,7 +292,22 @@ class _GameShellPageState extends ConsumerState<GameShellPage> {
         builder: (context, constraints) {
           final mediaPadding = MediaQuery.paddingOf(context);
           final topInset = mediaPadding.top + 12;
-          final hudCompactWidth = math.min(230.0, constraints.maxWidth * 0.38);
+          final isPhoneLayout =
+              constraints.maxWidth < 760 || constraints.maxHeight < 560;
+          final hudCompactWidth = isPhoneLayout
+              ? math.min(220.0, constraints.maxWidth * 0.52)
+              : math.min(230.0, constraints.maxWidth * 0.38);
+          final actionButtonWidth = isPhoneLayout
+              ? math.min(152.0, constraints.maxWidth * 0.36)
+              : 170.0;
+          final actionGap = isPhoneLayout ? 8.0 : 10.0;
+          final sideInset = isPhoneLayout ? 10.0 : 16.0;
+          final bottomInset = mediaPadding.bottom + 12;
+          final hintMaxWidth = isPhoneLayout
+              ? constraints.maxWidth * 0.58
+              : 360.0;
+          final topActionY = isPhoneLayout ? topInset + 52 : topInset + 4;
+          final avatarTop = isPhoneLayout ? topInset + 96 : topInset + 62;
 
           return Stack(
             children: [
@@ -302,45 +317,54 @@ class _GameShellPageState extends ConsumerState<GameShellPage> {
                 left: 0,
                 right: 0,
                 child: IgnorePointer(
-                  child: Center(child: _TitleBadge(lowFxMode: lowFxMode)),
+                  child: Center(
+                    child: _TitleBadge(
+                      lowFxMode: lowFxMode,
+                      compact: isPhoneLayout,
+                    ),
+                  ),
                 ),
               ),
               Positioned(
-                top: topInset + 4,
-                right: 16,
+                top: topActionY,
+                right: sideInset,
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     _TopIconButton(
-                      glyph: 'OUT',
+                      glyph: '退',
                       tooltip: '登出',
+                      compact: isPhoneLayout,
                       onPressed: _logout,
                     ),
                     const SizedBox(width: 6),
                     _TopIconButton(
-                      glyph: 'THE',
+                      glyph: '景',
                       tooltip: '切換主題：$_visualThemeLabel',
+                      compact: isPhoneLayout,
                       onPressed: _cycleVisualTheme,
                     ),
-                    const SizedBox(width: 6),
-                    _TopIconButton(
-                      glyph: 'BAG',
-                      tooltip: '背包',
-                      onPressed: _openInventoryDialog,
-                    ),
-                    const SizedBox(width: 6),
-                    _TopIconButton(
-                      glyph: 'COM',
-                      tooltip: '營火語音聊天室',
-                      onPressed: _openCampfireDialog,
-                    ),
+                    if (!isPhoneLayout) ...[
+                      const SizedBox(width: 6),
+                      _TopIconButton(
+                        glyph: '包',
+                        tooltip: '背包',
+                        onPressed: _openInventoryDialog,
+                      ),
+                      const SizedBox(width: 6),
+                      _TopIconButton(
+                        glyph: '聊',
+                        tooltip: '營火語音聊天室',
+                        onPressed: _openCampfireDialog,
+                      ),
+                    ],
                   ],
                 ),
               ),
-              if (kDebugMode)
+              if (kDebugMode && !isPhoneLayout)
                 Positioned(
                   top: topInset + 56,
-                  right: 16,
+                  right: sideInset,
                   child: _RealtimeDebugHud(
                     connected: _presenceConnected,
                     txPerSec: _debugSentPerSec,
@@ -352,7 +376,7 @@ class _GameShellPageState extends ConsumerState<GameShellPage> {
                   ),
                 ),
               Positioned(
-                top: topInset + 62,
+                top: avatarTop,
                 left: 14,
                 width: hudCompactWidth,
                 child: _AvatarHudButton(
@@ -362,8 +386,8 @@ class _GameShellPageState extends ConsumerState<GameShellPage> {
               ),
               if (_scrollNoticeText != null)
                 Positioned(
-                  top: topInset + 112,
-                  right: 16,
+                  top: avatarTop + 50,
+                  right: sideInset,
                   child: AnimatedOpacity(
                     opacity: _scrollNoticeText == null ? 0 : 1,
                     duration: const Duration(milliseconds: 260),
@@ -399,8 +423,8 @@ class _GameShellPageState extends ConsumerState<GameShellPage> {
                 ),
               if (_activeGuildInvite != null)
                 Positioned(
-                  top: topInset + 150,
-                  right: 16,
+                  top: avatarTop + 88,
+                  right: sideInset,
                   child: _SummonScrollOverlay(
                     invite: _activeGuildInvite!,
                     onAccept: () {
@@ -433,58 +457,86 @@ class _GameShellPageState extends ConsumerState<GameShellPage> {
                 ),
               Positioned(
                 left: 14,
-                bottom: 16,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.parchment.withValues(alpha: 0.9),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.woodFrame, width: 2),
-                  ),
-                  child: Text(
-                    _interactionHintText,
-                    style: const TextStyle(
-                      color: AppColors.inkBrown,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 12,
+                bottom: bottomInset,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: hintMaxWidth),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.parchment.withValues(alpha: 0.9),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.woodFrame, width: 2),
+                    ),
+                    child: Text(
+                      _interactionHintText,
+                      style: const TextStyle(
+                        color: AppColors.inkBrown,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                      ),
                     ),
                   ),
                 ),
               ),
               Positioned(
-                right: 16,
-                bottom: _nearbyFurniture != null ? 84 : 16,
-                child: SizedBox(
-                  width: 170,
-                  child: _StampButton(
-                    label: voiceState.connected ? '營火中' : '營火聊天',
-                    iconWidget: _PixelMicStoneIcon(
-                      enabled: voiceState.micEnabled,
+                right: sideInset,
+                bottom: bottomInset,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    if (isPhoneLayout)
+                      SizedBox(
+                        width: actionButtonWidth,
+                        child: _StampButton(
+                          label: '背包',
+                          icon: Icons.backpack_outlined,
+                          tone: _StampTone.wood,
+                          onPressed: _openInventoryDialog,
+                        ),
+                      ),
+                    if (isPhoneLayout) SizedBox(height: actionGap),
+                    SizedBox(
+                      width: actionButtonWidth,
+                      child: _StampButton(
+                        label: '營火聊天',
+                        iconWidget: _PixelMicStoneIcon(
+                          enabled: voiceState.micEnabled,
+                        ),
+                        tone: voiceState.connected
+                            ? _StampTone.blue
+                            : _StampTone.wood,
+                        onPressed: _openCampfireDialog,
+                      ),
                     ),
-                    tone: voiceState.connected
-                        ? _StampTone.blue
-                        : _StampTone.wood,
-                    onPressed: _openCampfireDialog,
-                  ),
+                    if (voiceState.connected) SizedBox(height: actionGap),
+                    if (voiceState.connected)
+                      SizedBox(
+                        width: actionButtonWidth,
+                        child: _StampButton(
+                          label: '離開營火',
+                          icon: Icons.logout_rounded,
+                          tone: _StampTone.ruby,
+                          onPressed: _leaveVoiceQuick,
+                        ),
+                      ),
+                    if (_nearbyFurniture != null) SizedBox(height: actionGap),
+                    if (_nearbyFurniture != null)
+                      SizedBox(
+                        width: actionButtonWidth,
+                        child: _StampButton(
+                          label: _interactButtonLabel,
+                          icon: Icons.touch_app_rounded,
+                          tone: _StampTone.green,
+                          onPressed: _interactNearbyFurniture,
+                        ),
+                      ),
+                  ],
                 ),
               ),
-              if (_nearbyFurniture != null)
-                Positioned(
-                  right: 16,
-                  bottom: 16,
-                  child: SizedBox(
-                    width: 170,
-                    child: _StampButton(
-                      label: _interactButtonLabel,
-                      icon: Icons.touch_app_rounded,
-                      tone: _StampTone.green,
-                      onPressed: _interactNearbyFurniture,
-                    ),
-                  ),
-                ),
             ],
           );
         },

@@ -7,12 +7,16 @@ class InteractiveFurniture extends PositionComponent {
     required Color tint,
     required Color accent,
     required super.size,
+    this.interactive = true,
+    this.collidable = true,
   }) : _tint = tint,
        _accent = accent,
        super(anchor: Anchor.topLeft, priority: 500);
 
   final TavernFurnitureType type;
   final String label;
+  final bool interactive;
+  final bool collidable;
   Color _tint;
   Color _accent;
   bool _campfireConnected = false;
@@ -62,10 +66,22 @@ class InteractiveFurniture extends PositionComponent {
         rect.width - 20,
         rect.height - 22,
       ),
+      TavernFurnitureType.wallBookshelf => rect.deflate(8),
+      TavernFurnitureType.honorBanner => rect.deflate(12),
+      TavernFurnitureType.trainingDummy => Rect.fromLTWH(
+        rect.left + 12,
+        rect.top + 20,
+        rect.width - 24,
+        rect.height - 20,
+      ),
     };
   }
 
   Vector2 get interactionPoint {
+    if (!interactive) {
+      final rect = boundsRect;
+      return Vector2(rect.center.dx, rect.center.dy);
+    }
     final rect = boundsRect;
     return switch (type) {
       TavernFurnitureType.noticeBoard => Vector2(
@@ -82,20 +98,35 @@ class InteractiveFurniture extends PositionComponent {
         rect.center.dx,
         rect.top - 8,
       ),
+      TavernFurnitureType.wallBookshelf ||
+      TavernFurnitureType.honorBanner ||
+      TavernFurnitureType.trainingDummy => Vector2(
+        rect.center.dx,
+        rect.center.dy,
+      ),
     };
   }
 
   double get interactionRadius {
+    if (!interactive) {
+      return 0;
+    }
     return switch (type) {
       TavernFurnitureType.noticeBoard => 30,
       TavernFurnitureType.masterDesk => 32,
       TavernFurnitureType.guildChest => 42,
       TavernFurnitureType.campfireBar => 46,
       TavernFurnitureType.guildMerchant => 42,
+      TavernFurnitureType.wallBookshelf ||
+      TavernFurnitureType.honorBanner ||
+      TavernFurnitureType.trainingDummy => 0,
     };
   }
 
   Rect get interactionZoneRect {
+    if (!interactive) {
+      return Rect.zero;
+    }
     final rect = boundsRect;
     return switch (type) {
       TavernFurnitureType.noticeBoard => Rect.fromLTWH(
@@ -113,6 +144,9 @@ class InteractiveFurniture extends PositionComponent {
       TavernFurnitureType.guildChest => rect.inflate(30),
       TavernFurnitureType.campfireBar => rect.inflate(32),
       TavernFurnitureType.guildMerchant => rect.inflate(30),
+      TavernFurnitureType.wallBookshelf ||
+      TavernFurnitureType.honorBanner ||
+      TavernFurnitureType.trainingDummy => Rect.zero,
     };
   }
 
@@ -121,11 +155,22 @@ class InteractiveFurniture extends PositionComponent {
   }
 
   double distanceToInteractionZone(Vector2 point) {
-    final center = interactionPoint;
-    final dx = point.x - center.x;
-    final dy = point.y - center.y;
-    final distance = math.sqrt((dx * dx) + (dy * dy));
-    return math.max(0, distance - interactionRadius);
+    if (!interactive) {
+      return double.infinity;
+    }
+    final rect = interactionZoneRect;
+    if (rect.isEmpty) {
+      return double.infinity;
+    }
+    final px = point.x;
+    final py = point.y;
+    final dx = px < rect.left
+        ? rect.left - px
+        : (px > rect.right ? px - rect.right : 0.0);
+    final dy = py < rect.top
+        ? rect.top - py
+        : (py > rect.bottom ? py - rect.bottom : 0.0);
+    return math.sqrt((dx * dx) + (dy * dy));
   }
 
   @override
@@ -154,6 +199,15 @@ class InteractiveFurniture extends PositionComponent {
         break;
       case TavernFurnitureType.guildMerchant:
         _renderGuildMerchant(canvas, rect, border);
+        break;
+      case TavernFurnitureType.wallBookshelf:
+        _renderWallBookshelf(canvas, rect, border);
+        break;
+      case TavernFurnitureType.honorBanner:
+        _renderHonorBanner(canvas, rect, border);
+        break;
+      case TavernFurnitureType.trainingDummy:
+        _renderTrainingDummy(canvas, rect, border);
         break;
     }
     _renderFloatingLabel(canvas, rect);
@@ -357,6 +411,95 @@ class InteractiveFurniture extends PositionComponent {
     canvas.drawRect(
       Rect.fromLTWH(rect.center.dx + 8, rect.top + 34, 10, 10),
       coin,
+    );
+  }
+
+  void _renderWallBookshelf(Canvas canvas, Rect rect, Paint border) {
+    final body = Paint()..color = _tint;
+    final shelf = Paint()..color = const Color(0xFF4E342E);
+    final bookA = Paint()..color = _accent;
+    final bookB = Paint()..color = const Color(0xFF64B5F6);
+    final bookC = Paint()..color = const Color(0xFFE57373);
+    canvas.drawRect(rect, body);
+    canvas.drawRect(rect, border);
+    for (var i = 0; i < 3; i++) {
+      final y = rect.top + 10 + (i * 22);
+      canvas.drawRect(
+        Rect.fromLTWH(rect.left + 6, y, rect.width - 12, 5),
+        shelf,
+      );
+      for (var b = 0; b < 5; b++) {
+        final x = rect.left + 10 + (b * 14);
+        final paint = switch ((i + b) % 3) {
+          0 => bookA,
+          1 => bookB,
+          _ => bookC,
+        };
+        canvas.drawRect(Rect.fromLTWH(x, y + 6, 9, 13), paint);
+      }
+    }
+  }
+
+  void _renderHonorBanner(Canvas canvas, Rect rect, Paint border) {
+    final pole = Paint()..color = const Color(0xFF5D4037);
+    final cloth = Paint()..color = _accent;
+    final trim = Paint()..color = _tint;
+    canvas.drawRect(
+      Rect.fromLTWH(rect.left + 4, rect.top, 6, rect.height),
+      pole,
+    );
+    final bannerRect = Rect.fromLTWH(
+      rect.left + 10,
+      rect.top + 8,
+      rect.width - 12,
+      rect.height - 16,
+    );
+    canvas.drawRect(bannerRect, cloth);
+    canvas.drawRect(bannerRect, border);
+    canvas.drawRect(
+      Rect.fromLTWH(
+        bannerRect.left + 5,
+        bannerRect.top + 6,
+        bannerRect.width - 10,
+        5,
+      ),
+      trim,
+    );
+    canvas.drawRect(
+      Rect.fromLTWH(bannerRect.center.dx - 8, bannerRect.center.dy - 8, 16, 16),
+      Paint()..color = const Color(0xFFF4ECE1),
+    );
+  }
+
+  void _renderTrainingDummy(Canvas canvas, Rect rect, Paint border) {
+    final stand = Paint()..color = _tint;
+    final body = Paint()..color = _accent;
+    final highlight = Paint()..color = const Color(0x66FFF8E1);
+    final baseRect = Rect.fromLTWH(
+      rect.left + 20,
+      rect.bottom - 16,
+      rect.width - 40,
+      10,
+    );
+    final postRect = Rect.fromLTWH(
+      rect.center.dx - 4,
+      rect.top + 14,
+      8,
+      rect.height - 24,
+    );
+    final bodyRect = Rect.fromLTWH(
+      rect.left + 16,
+      rect.top + 10,
+      rect.width - 32,
+      32,
+    );
+    canvas.drawRect(baseRect, stand);
+    canvas.drawRect(postRect, stand);
+    canvas.drawRect(bodyRect, body);
+    canvas.drawRect(bodyRect, border);
+    canvas.drawRect(
+      Rect.fromLTWH(bodyRect.left + 4, bodyRect.top + 4, bodyRect.width - 8, 4),
+      highlight,
     );
   }
 

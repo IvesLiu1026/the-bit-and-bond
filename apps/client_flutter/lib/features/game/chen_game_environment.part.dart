@@ -34,8 +34,8 @@ class _TavernEnvironmentLayer extends Component
   @override
   void render(Canvas canvas) {
     super.render(canvas);
-    final width = game.size.x.floorToDouble();
-    final height = game.size.y.floorToDouble();
+    final width = game.worldSize.x.floorToDouble();
+    final height = game.worldSize.y.floorToDouble();
     if (width <= 0 || height <= 0) {
       return;
     }
