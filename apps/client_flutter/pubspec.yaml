@@ -31,6 +31,7 @@ flutter:
     - assets/sprites/hero/Free Pixel Character Base Pack/character.png
     - assets/sprites/hero/LICENSE.txt
     - assets/sprites/hero/Free Pixel Character Base Pack/licence.txt.txt
+    - assets/environment/
     - assets/audio/coin.wav
     - assets/audio/use_success.wav
   fonts:

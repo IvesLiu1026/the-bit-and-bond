@@ -122,7 +122,7 @@ class _TitleBadgeState extends State<_TitleBadge>
           const _PixelLabelGlyph(glyph: 'BRD'),
           SizedBox(width: widget.compact ? 5 : 8),
           Text(
-            '溫馨公會看板',
+            '公會任務板',
             style: TextStyle(
               fontWeight: FontWeight.w900,
               fontSize: widget.compact ? 16 : 24,

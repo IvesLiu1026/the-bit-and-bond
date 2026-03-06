@@ -383,6 +383,7 @@ extension _GameShellPresence on _GameShellPageState {
         authSession == null || authSession.hunterId.isEmpty
         ? null
         : authSession.hunterId;
+    _game.setControlledHunterId(controlledHunterId);
     _game.syncHunters(roster, controlledHunterId: controlledHunterId);
   }
 }

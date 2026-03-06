@@ -34,6 +34,7 @@ extension _GameShellDialogs on _GameShellPageState {
       context: context,
       builder: (dialogContext) {
         final media = MediaQuery.of(dialogContext);
+        final compact = media.size.width < 520 || media.size.height < 760;
         final maxWidth = math.max(300.0, media.size.width - 24);
         final maxHeight = math.max(
           320.0,
@@ -42,7 +43,7 @@ extension _GameShellDialogs on _GameShellPageState {
         final width = math.min(preferredWidth, maxWidth);
         final height = preferredHeight == null
             ? null
-            : math.min(preferredHeight, maxHeight);
+            : math.min(preferredHeight, compact ? maxHeight * 0.88 : maxHeight);
 
         return Dialog(
           backgroundColor: Colors.transparent,

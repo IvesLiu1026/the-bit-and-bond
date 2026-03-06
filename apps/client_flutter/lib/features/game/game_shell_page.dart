@@ -119,11 +119,13 @@ class _GameShellPageState extends ConsumerState<GameShellPage> {
     _syncNearbyFurniture();
     _latestAuthSession = ref.read(authSessionProvider);
     _latestAppConfig = ref.read(appConfigProvider);
+    _game.setControlledHunterId(_latestAuthSession?.hunterId);
 
     _authSessionSubscription = ref.listenManual<AuthSession?>(
       authSessionProvider,
       (previous, next) {
         _latestAuthSession = next;
+        _game.setControlledHunterId(next?.hunterId);
         final apiBaseUrl =
             _latestAppConfig?.apiBaseUrl ??
             ref.read(appConfigProvider).apiBaseUrl;

@@ -9,6 +9,9 @@
 **/android/.gradle
 **/android/local.properties
 **/*.log
+**/__pycache__/
+apps/client_flutter/assets/external/
+output/
 .env
 .env.*
 !.env.example

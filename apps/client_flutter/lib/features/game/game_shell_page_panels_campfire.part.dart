@@ -101,6 +101,9 @@ class _CampfireVoicePanelState extends State<_CampfireVoicePanel> {
   Widget build(BuildContext context) {
     final state = widget.state;
     final speakingCount = state.activeSpeakerIdentities.length;
+    final compact =
+        MediaQuery.of(context).size.width < 520 ||
+        MediaQuery.of(context).size.height < 760;
     final roomLabel = () {
       final room = state.roomId;
       if (room == null || room.isEmpty) {
@@ -121,10 +124,11 @@ class _CampfireVoicePanelState extends State<_CampfireVoicePanel> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Container(
+          if (compact)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
                     vertical: 8,
@@ -151,37 +155,101 @@ class _CampfireVoicePanelState extends State<_CampfireVoicePanel> {
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              _StampButton(
-                label: state.connected
-                    ? (state.micEnabled ? '麥克風開啟' : '麥克風靜音')
-                    : '麥克風',
-                iconWidget: _PixelMicStoneIcon(enabled: state.micEnabled),
-                tone: state.micEnabled ? _StampTone.green : _StampTone.wood,
-                onPressed: state.connected ? widget.onToggleMic : null,
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: _StatTile(
-                  title: '連線人數',
-                  value: '${state.participantCount}',
+                const SizedBox(height: 8),
+                _StampButton(
+                  label: state.connected
+                      ? (state.micEnabled ? '麥克風開啟' : '麥克風靜音')
+                      : '麥克風',
+                  iconWidget: _PixelMicStoneIcon(enabled: state.micEnabled),
+                  tone: state.micEnabled ? _StampTone.green : _StampTone.wood,
+                  onPressed: state.connected ? widget.onToggleMic : null,
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _StatTile(title: '發話中', value: '$speakingCount'),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _StatTile(title: '房間', value: roomLabel),
-              ),
-            ],
-          ),
+              ],
+            )
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF4A2A20),
+                      border: Border.all(
+                        color: const Color(0xFF7B5A3C),
+                        width: 2,
+                      ),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x803E2723),
+                          offset: Offset(0, 2),
+                          blurRadius: 0,
+                        ),
+                      ],
+                    ),
+                    child: Text(
+                      subtitle,
+                      style: const TextStyle(
+                        color: Color(0xFFFDE8C8),
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _StampButton(
+                  label: state.connected
+                      ? (state.micEnabled ? '麥克風開啟' : '麥克風靜音')
+                      : '麥克風',
+                  iconWidget: _PixelMicStoneIcon(enabled: state.micEnabled),
+                  tone: state.micEnabled ? _StampTone.green : _StampTone.wood,
+                  onPressed: state.connected ? widget.onToggleMic : null,
+                ),
+              ],
+            ),
+          const SizedBox(height: 8),
+          if (compact)
+            Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: _StatTile(
+                        title: '連線人數',
+                        value: '${state.participantCount}',
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _StatTile(title: '發話中', value: '$speakingCount'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                _StatTile(title: '房間', value: roomLabel),
+              ],
+            )
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: _StatTile(
+                    title: '連線人數',
+                    value: '${state.participantCount}',
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _StatTile(title: '發話中', value: '$speakingCount'),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _StatTile(title: '房間', value: roomLabel),
+                ),
+              ],
+            ),
           if (state.errorMessage != null) ...[
             const SizedBox(height: 8),
             Container(
@@ -199,8 +267,9 @@ class _CampfireVoicePanelState extends State<_CampfireVoicePanel> {
               ),
             ),
           ],
-          const SizedBox(height: 10),
-          Expanded(
+          SizedBox(height: compact ? 6 : 10),
+          SizedBox(
+            height: compact ? 156 : 248,
             child: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
@@ -295,19 +364,54 @@ class _CampfireVoicePanelState extends State<_CampfireVoicePanel> {
                     ),
             ),
           ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              if (!state.connected) ...[
-                Expanded(
-                  child: _StampButton(
-                    label: state.connecting ? '連線中...' : '加入營火',
-                    icon: Icons.campaign,
-                    tone: _StampTone.green,
-                    onPressed: state.connecting ? null : widget.onJoin,
+          SizedBox(height: compact ? 6 : 10),
+          if (!state.connected)
+            _StampButton(
+              label: state.connecting ? '連線中...' : '加入營火',
+              icon: Icons.campaign,
+              tone: _StampTone.green,
+              onPressed: state.connecting ? null : widget.onJoin,
+            )
+          else if (compact)
+            Column(
+              children: [
+                TextField(
+                  controller: _messageController,
+                  enabled: !_sending,
+                  decoration: const InputDecoration(
+                    labelText: '酒館聊天',
+                    isDense: true,
+                    filled: true,
+                    fillColor: Color(0xFFE7DDC9),
                   ),
                 ),
-              ] else ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _StampButton(
+                        label: _sending ? '送出中...' : '送出',
+                        icon: Icons.send_rounded,
+                        tone: _StampTone.blue,
+                        onPressed: _sending ? null : _send,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _StampButton(
+                        label: '離開營火',
+                        icon: Icons.logout,
+                        tone: _StampTone.ruby,
+                        onPressed: widget.onLeave,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            )
+          else
+            Row(
+              children: [
                 Expanded(
                   child: TextField(
                     controller: _messageController,
@@ -338,8 +442,7 @@ class _CampfireVoicePanelState extends State<_CampfireVoicePanel> {
                   onPressed: widget.onLeave,
                 ),
               ],
-            ],
-          ),
+            ),
         ],
       ),
     );

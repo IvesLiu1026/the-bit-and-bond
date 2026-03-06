@@ -116,12 +116,13 @@ class _HeroCharacterComponent
     HunterRealtimePose pose, {
     required bool snapToTarget,
     required Vector2 worldSize,
+    required double minYBound,
   }) {
     _facing = _fromWireFacing(pose.facing);
     _walking = pose.moving;
     final minX = radius;
     final maxX = math.max(minX, worldSize.x - radius);
-    final minY = ChenLevelingGame._topWallHeight + radius + 6;
+    final minY = minYBound + radius + 6;
     final maxY = math.max(minY, worldSize.y - radius);
 
     _remoteTarget.setValues(

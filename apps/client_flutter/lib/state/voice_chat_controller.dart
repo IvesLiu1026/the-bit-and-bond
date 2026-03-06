@@ -92,6 +92,7 @@ class VoiceChatController extends StateNotifier<VoiceChatState> {
 
   lk.Room? _room;
   lk.EventsListener<lk.RoomEvent>? _listener;
+  int _roomEpoch = 0;
 
   Future<void> joinCampfire() async {
     if (state.connected || state.connecting) {
@@ -102,21 +103,29 @@ class VoiceChatController extends StateNotifier<VoiceChatState> {
       return;
     }
 
+    final epoch = ++_roomEpoch;
     state = state.copyWith(connecting: true, clearError: true);
     try {
       final bundle = await _api.issueVoiceToken();
       await _teardown();
+      if (epoch != _roomEpoch) {
+        return;
+      }
 
       final room = lk.Room();
       final listener = room.createListener();
       listener
         ..on<lk.RoomDisconnectedEvent>((_) {
+          if (epoch != _roomEpoch) {
+            return;
+          }
           state = state.copyWith(
             connected: false,
             connecting: false,
             micEnabled: false,
             participantCount: 0,
             activeSpeakerIdentities: <String>{},
+            clearError: true,
           );
         })
         ..on<lk.ParticipantConnectedEvent>((_) => _syncParticipantStatus())
@@ -125,6 +134,11 @@ class VoiceChatController extends StateNotifier<VoiceChatState> {
         ..on<lk.DataReceivedEvent>(_onDataReceived);
 
       await room.connect(bundle.url, bundle.token);
+      if (epoch != _roomEpoch) {
+        await room.disconnect();
+        await room.dispose();
+        return;
+      }
 
       _room = room;
       _listener = listener;
@@ -147,6 +161,9 @@ class VoiceChatController extends StateNotifier<VoiceChatState> {
       _syncParticipantStatus();
     } catch (error) {
       await _teardown();
+      if (epoch != _roomEpoch) {
+        return;
+      }
       state = state.copyWith(
         connecting: false,
         connected: false,
@@ -157,6 +174,7 @@ class VoiceChatController extends StateNotifier<VoiceChatState> {
   }
 
   Future<void> leaveVoice() async {
+    _roomEpoch++;
     await _teardown();
     state = state.copyWith(
       connecting: false,
@@ -165,6 +183,7 @@ class VoiceChatController extends StateNotifier<VoiceChatState> {
       participantCount: 0,
       activeSpeakerIdentities: <String>{},
       clearRoomId: true,
+      clearError: true,
     );
   }
 
@@ -194,6 +213,21 @@ class VoiceChatController extends StateNotifier<VoiceChatState> {
 
     final clientMessageId = _uuid.v4();
     final sentAtMs = DateTime.now().millisecondsSinceEpoch;
+    final optimistic = ChatMessage(
+      id: 'local:$clientMessageId',
+      guildId: _session?.guildId ?? '',
+      roomId: roomId,
+      senderHunterId: _session?.hunterId ?? '',
+      senderName:
+          _session?.displayName ??
+          _session?.playerId ??
+          '目前玩家',
+      clientMessageId: clientMessageId,
+      content: content,
+      sentAt: DateTime.fromMillisecondsSinceEpoch(sentAtMs),
+      sentAtMs: sentAtMs,
+    );
+    _mergeMessage(optimistic);
     final payload = {
       'type': 'chat.message',
       'content': content,
@@ -201,14 +235,18 @@ class VoiceChatController extends StateNotifier<VoiceChatState> {
       'sent_at_ms': sentAtMs,
     };
 
-    await _publishData(payload);
-    final persisted = await _api.persistChatMessage(
-      content: content,
-      roomId: roomId,
-      clientMessageId: clientMessageId,
-      sentAtMs: sentAtMs,
-    );
-    _mergeMessage(persisted);
+    try {
+      await _publishData(payload);
+      final persisted = await _api.persistChatMessage(
+        content: content,
+        roomId: roomId,
+        clientMessageId: clientMessageId,
+        sentAtMs: sentAtMs,
+      );
+      _mergeMessage(persisted);
+    } catch (error) {
+      state = state.copyWith(errorMessage: '聊天室送出失敗：$error');
+    }
   }
 
   Future<void> refreshChatHistory({int limit = 80}) async {
@@ -287,13 +325,21 @@ class VoiceChatController extends StateNotifier<VoiceChatState> {
   }
 
   void _mergeMessage(ChatMessage message) {
-    final existing = state.messages;
-    final already = existing.any((item) => item.id == message.id);
-    if (already) {
-      return;
+    final merged = [...state.messages];
+    final sameIdIndex = merged.indexWhere((item) => item.id == message.id);
+    if (sameIdIndex != -1) {
+      merged[sameIdIndex] = message;
+    } else {
+      final sameClientMessageIndex = merged.indexWhere(
+        (item) => item.clientMessageId == message.clientMessageId,
+      );
+      if (sameClientMessageIndex != -1) {
+        merged[sameClientMessageIndex] = message;
+      } else {
+        merged.add(message);
+      }
     }
-    final merged = [...existing, message]
-      ..sort((a, b) => a.sentAtMs.compareTo(b.sentAtMs));
+    merged.sort((a, b) => a.sentAtMs.compareTo(b.sentAtMs));
     state = state.copyWith(messages: merged, clearError: true);
   }
 

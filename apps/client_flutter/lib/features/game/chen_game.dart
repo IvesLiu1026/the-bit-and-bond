@@ -89,20 +89,25 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
 
   static const String _heroSpriteSheetPath =
       'sprites/hero/Free Pixel Character Base Pack/character.png';
+  static const String _tavernBackdropPath = 'environment/tavern_main_room.png';
+  static const String _campfireSpriteSheetPath =
+      'environment/campfire_sprite_sheet.png';
   static const double _heroSpeed = 210;
   static const double _joystickDeadZone = 0.08;
   static const double _joystickBaseRadius = 88;
   static const double _joystickKnobRadius = 38;
   static const int _remoteActorTtlMs = 15000;
-  static const double _topWallHeight = 118;
+  static const double _baseTopWallHeight = 118;
   static const double _baseWorldWidth = 1920;
   static const double _baseWorldHeight = 1200;
+  static const double _cozyBackdropAspectRatio = 623 / 294;
   static const double _playHorizontalPadding = 14;
   static const double _playBottomPadding = 14;
   static const double _furnitureInteractDistance = 10;
 
   RectangleComponent? _background;
   SpriteSheet? _heroSpriteSheet;
+  ui.Image? _campfireSpriteSheetImage;
   _FloatingJoystickOverlay? _floatingJoystick;
   _TavernEnvironmentLayer? _environmentLayer;
   final Map<TavernFurnitureType, InteractiveFurniture> _furnitures = {};
@@ -112,6 +117,7 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
   final Map<String, int> _lastServerPoseTsByHunter = {};
   final Map<String, int> _lastPoseSeenAtMsByHunter = {};
   final Set<String> _realtimeOnlyHunterIds = <String>{};
+  final Set<String> _rosterHunterIds = <String>{};
   final List<Rect> _obstacleRects = <Rect>[];
   Vector2 _worldSize = Vector2(_baseWorldWidth, _baseWorldHeight);
   List<String> _hunterOrder = const [];
@@ -138,6 +144,14 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
   Vector2 get worldSize => _worldSize;
   final void Function(TavernFurnitureType furniture)? onFurnitureInteracted;
 
+  double get _playAreaTopInset {
+    return switch (_theme) {
+      TavernVisualTheme.cozyWood => _worldSize.y * 0.33,
+      TavernVisualTheme.technoMinimal ||
+      TavernVisualTheme.hotbloodAdventure => _baseTopWallHeight,
+    };
+  }
+
   @override
   Future<void> onLoad() async {
     images.prefix = 'assets/';
@@ -151,16 +165,23 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
     _background = background;
     add(background);
     camera.viewfinder.position = Vector2(_worldSize.x / 2, _worldSize.y / 2);
-    final environmentLayer = _TavernEnvironmentLayer(theme: _theme);
-    _environmentLayer = environmentLayer;
-    add(environmentLayer);
 
     final spriteImage = await images.load(_heroSpriteSheetPath);
+    final tavernBackdropImage = await images.load(_tavernBackdropPath);
+    final campfireSpriteSheetImage = await images.load(_campfireSpriteSheetPath);
     final spriteSheet = SpriteSheet(
       image: spriteImage,
       srcSize: Vector2.all(32),
     );
     _heroSpriteSheet = spriteSheet;
+    _campfireSpriteSheetImage = campfireSpriteSheetImage;
+
+    final environmentLayer = _TavernEnvironmentLayer(
+      theme: _theme,
+      tavernBackdropImage: tavernBackdropImage,
+    );
+    _environmentLayer = environmentLayer;
+    add(environmentLayer);
 
     final floatingJoystick = _FloatingJoystickOverlay(
       baseRadius: _joystickBaseRadius,
@@ -193,6 +214,21 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
     if (viewportSize.x <= 0 || viewportSize.y <= 0) {
       return;
     }
+    if (_theme == TavernVisualTheme.cozyWood) {
+      final minHeight = viewportSize.y * 1.05;
+      var targetWidth = math.max(_baseWorldWidth, viewportSize.x * 1.45);
+      var targetHeight = targetWidth / _cozyBackdropAspectRatio;
+      if (targetHeight < minHeight) {
+        targetHeight = minHeight;
+        targetWidth = targetHeight * _cozyBackdropAspectRatio;
+      }
+      _worldSize = Vector2(
+        targetWidth.floorToDouble(),
+        targetHeight.floorToDouble(),
+      );
+      return;
+    }
+
     final targetWidth = math.max(_baseWorldWidth, viewportSize.x * 1.7);
     final targetHeight = math.max(_baseWorldHeight, viewportSize.y * 1.7);
     _worldSize = Vector2(
@@ -306,10 +342,29 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
   }
 
   void syncHunters(
-    List<HunterProfile> _, {
+    List<HunterProfile> hunters, {
     required String? controlledHunterId,
   }) {
-    _pendingControlledHunterId = controlledHunterId;
+    _rosterHunterIds
+      ..clear()
+      ..addAll(
+        hunters
+            .map((hunter) => hunter.id.trim())
+            .where((hunterId) => hunterId.isNotEmpty),
+      );
+    final normalizedControlledId = _normalizeHunterId(controlledHunterId);
+    if (normalizedControlledId != null) {
+      _pendingControlledHunterId = normalizedControlledId;
+    }
+    _applyRoster();
+  }
+
+  void setControlledHunterId(String? hunterId) {
+    final normalized = _normalizeHunterId(hunterId);
+    if (normalized == null || _pendingControlledHunterId == normalized) {
+      return;
+    }
+    _pendingControlledHunterId = normalized;
     _applyRoster();
   }
 
@@ -324,6 +379,8 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
       size: Vector2(186, 94),
       tint: const Color(0xFF8D6E63),
       accent: const Color(0xFFD4AF37),
+      collidable: false,
+      renderMode: FurnitureRenderMode.hotspot,
     );
     final masterDesk = InteractiveFurniture(
       type: TavernFurnitureType.masterDesk,
@@ -331,6 +388,7 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
       size: Vector2(160, 86),
       tint: const Color(0xFF6D4C41),
       accent: const Color(0xFF9E7D5A),
+      renderMode: FurnitureRenderMode.hotspot,
     );
     final guildChest = InteractiveFurniture(
       type: TavernFurnitureType.guildChest,
@@ -345,6 +403,8 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
       size: Vector2(126, 90),
       tint: const Color(0xFF4E342E),
       accent: const Color(0xFFFFB74D),
+      spriteImage: _campfireSpriteSheetImage,
+      renderMode: FurnitureRenderMode.flameOverlay,
     );
     final guildMerchant = InteractiveFurniture(
       type: TavernFurnitureType.guildMerchant,
@@ -352,6 +412,7 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
       size: Vector2(128, 86),
       tint: const Color(0xFF5E3F2A),
       accent: const Color(0xFFCF9E2D),
+      renderMode: FurnitureRenderMode.hotspot,
     );
     final wallBookshelf = InteractiveFurniture(
       type: TavernFurnitureType.wallBookshelf,
@@ -360,6 +421,9 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
       tint: const Color(0xFF6D4C41),
       accent: const Color(0xFFD7B56D),
       interactive: false,
+      collidable: false,
+      renderMode: FurnitureRenderMode.hotspot,
+      showLabel: false,
     );
     final honorBanner = InteractiveFurniture(
       type: TavernFurnitureType.honorBanner,
@@ -369,6 +433,8 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
       accent: const Color(0xFF2E7D32),
       interactive: false,
       collidable: false,
+      renderMode: FurnitureRenderMode.hotspot,
+      showLabel: false,
     );
     final trainingDummy = InteractiveFurniture(
       type: TavernFurnitureType.trainingDummy,
@@ -377,6 +443,9 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
       tint: const Color(0xFF795548),
       accent: const Color(0xFFE6B04A),
       interactive: false,
+      collidable: false,
+      renderMode: FurnitureRenderMode.hotspot,
+      showLabel: false,
     );
 
     _furnitures[TavernFurnitureType.noticeBoard] = noticeBoard;
@@ -421,10 +490,49 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
       return;
     }
 
-    noticeBoard.position = Vector2(34, _topWallHeight + 14);
+    if (_theme == TavernVisualTheme.cozyWood) {
+      final noticeBoardRect = _cozyWorldRect(0.29, 0.16, 0.18, 0.18);
+      final masterDeskRect = _cozyWorldRect(0.53, 0.29, 0.19, 0.13);
+      final guildChestRect = _cozyWorldRect(0.05, 0.82, 0.1, 0.1);
+      final campfireRect = _cozyWorldRect(0.44, 0.56, 0.13, 0.11);
+      final merchantRect = _cozyWorldRect(0.82, 0.19, 0.12, 0.18);
+      final bookshelfRect = _cozyWorldRect(0.77, 0.13, 0.17, 0.17);
+      final bannerRect = _cozyWorldRect(0.58, 0.09, 0.11, 0.15);
+      final loungePropRect = _cozyWorldRect(0.08, 0.7, 0.12, 0.12);
+
+      noticeBoard
+        ..position = Vector2(noticeBoardRect.left, noticeBoardRect.top)
+        ..size = Vector2(noticeBoardRect.width, noticeBoardRect.height);
+      masterDesk
+        ..position = Vector2(masterDeskRect.left, masterDeskRect.top)
+        ..size = Vector2(masterDeskRect.width, masterDeskRect.height);
+      guildChest
+        ..position = Vector2(guildChestRect.left, guildChestRect.top)
+        ..size = Vector2(guildChestRect.width, guildChestRect.height);
+      campfireBar
+        ..position = Vector2(campfireRect.left, campfireRect.top)
+        ..size = Vector2(campfireRect.width, campfireRect.height);
+      guildMerchant
+        ..position = Vector2(merchantRect.left, merchantRect.top)
+        ..size = Vector2(merchantRect.width, merchantRect.height);
+      wallBookshelf
+        ..position = Vector2(bookshelfRect.left, bookshelfRect.top)
+        ..size = Vector2(bookshelfRect.width, bookshelfRect.height);
+      honorBanner
+        ..position = Vector2(bannerRect.left, bannerRect.top)
+        ..size = Vector2(bannerRect.width, bannerRect.height);
+      trainingDummy
+        ..position = Vector2(loungePropRect.left, loungePropRect.top)
+        ..size = Vector2(loungePropRect.width, loungePropRect.height);
+
+      _rebuildObstacleRects();
+      return;
+    }
+
+    noticeBoard.position = Vector2(34, _baseTopWallHeight + 14);
     masterDesk.position = Vector2(
       _worldSize.x - masterDesk.size.x - 34,
-      _topWallHeight + 24,
+      _baseTopWallHeight + 24,
     );
     guildChest.position = Vector2(34, _worldSize.y - guildChest.size.y - 36);
     campfireBar.position = Vector2(
@@ -437,9 +545,9 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
     );
     wallBookshelf.position = Vector2(
       _worldSize.x - wallBookshelf.size.x - 38,
-      _topWallHeight + 8,
+      _baseTopWallHeight + 8,
     );
-    honorBanner.position = Vector2(10, _topWallHeight + 4);
+    honorBanner.position = Vector2(10, _baseTopWallHeight + 4);
     trainingDummy.position = Vector2(
       _worldSize.x * 0.38,
       _worldSize.y - trainingDummy.size.y - 40,
@@ -454,6 +562,17 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
         continue;
       }
       _obstacleRects.add(furniture.collisionRect);
+    }
+
+    if (_theme == TavernVisualTheme.cozyWood) {
+      _obstacleRects.addAll(<Rect>[
+        _cozyWorldRect(0.0, 0.28, 0.17, 0.12),
+        _cozyWorldRect(0.08, 0.43, 0.23, 0.12),
+        _cozyWorldRect(0.48, 0.55, 0.18, 0.16),
+        _cozyWorldRect(0.82, 0.49, 0.16, 0.15),
+        _cozyWorldRect(0.84, 0.77, 0.14, 0.12),
+      ]);
+      return;
     }
 
     final table = _centerTableRect().deflate(8);
@@ -624,6 +743,7 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
       pose,
       snapToTarget: isFirstPose,
       worldSize: _worldSize,
+      minYBound: _playAreaTopInset,
     );
     _initializedHunterPositions.add(pose.hunterId);
   }
@@ -631,6 +751,7 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
   @override
   void update(double dt) {
     super.update(dt);
+    _stabilizeControlledHunter();
     _evictStaleRealtimeActors();
     _updateInteractionHint();
     _campfirePulseTick += dt;
@@ -741,8 +862,8 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
       return;
     }
 
-    final controlledCandidate = _pendingControlledHunterId?.trim();
-    final targetIds = <String>{..._realtimeOnlyHunterIds};
+    final controlledCandidate = _normalizeHunterId(_pendingControlledHunterId);
+    final targetIds = <String>{..._rosterHunterIds, ..._realtimeOnlyHunterIds};
     if (controlledCandidate != null && controlledCandidate.isNotEmpty) {
       targetIds.add(controlledCandidate);
     }
@@ -778,8 +899,8 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
       return;
     }
 
-    final preferred = _pendingControlledHunterId;
-    if (preferred == null || preferred.trim().isEmpty) {
+    final preferred = _normalizeHunterId(_pendingControlledHunterId);
+    if (preferred == null) {
       _controlledHunterId = null;
     } else if (_hunterSprites.containsKey(preferred)) {
       _controlledHunterId = preferred;
@@ -804,7 +925,7 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
           !_initializedHunterPositions.contains(controlledId)) {
         final preferred = Vector2(
           _worldSize.x / 2,
-          (_topWallHeight + _worldSize.y) / 2,
+          (_playAreaTopInset + _worldSize.y) / 2,
         );
         controlled.position = _findNearestWalkablePosition(
           preferred,
@@ -826,7 +947,7 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
 
     final center = Vector2(
       _worldSize.x / 2,
-      (_topWallHeight + _worldSize.y) / 2,
+      (_playAreaTopInset + _worldSize.y) / 2,
     );
     final radius = math.max(72, math.min(_worldSize.x, _worldSize.y) * 0.24);
     final total = others.length;
@@ -887,6 +1008,42 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
     return sprite;
   }
 
+  void _stabilizeControlledHunter() {
+    final preferred = _normalizeHunterId(_pendingControlledHunterId);
+    if (preferred == null || _heroSpriteSheet == null) {
+      return;
+    }
+
+    final sprite = _ensureHunterSprite(preferred, realtimeOnly: false);
+    if (sprite == null) {
+      return;
+    }
+
+    if (!_hunterOrder.contains(preferred)) {
+      _hunterOrder = <String>[..._hunterOrder, preferred];
+    }
+    if (_controlledHunterId != preferred) {
+      _controlledHunterId = preferred;
+      for (final entry in _hunterSprites.entries) {
+        entry.value.setControlled(entry.key == preferred);
+      }
+    }
+    if (!_initializedHunterPositions.contains(preferred)) {
+      final preferredCenter = Vector2(
+        _worldSize.x / 2,
+        (_playAreaTopInset + _worldSize.y) / 2,
+      );
+      sprite.position = _findNearestWalkablePosition(
+        preferredCenter,
+        sprite.radius,
+      );
+      _initializedHunterPositions.add(preferred);
+      sprite.setMotion(Vector2.zero(), moving: false);
+      _syncCameraFollow(snap: true);
+    }
+    _publishActiveHunterIds();
+  }
+
   void _evictStaleRealtimeActors() {
     final nowMs = DateTime.now().millisecondsSinceEpoch;
     if (nowMs - _lastRealtimeGcMs < 2000) {
@@ -904,9 +1061,11 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
       _realtimeOnlyHunterIds.remove(id);
       _lastServerPoseTsByHunter.remove(id);
       _lastPoseSeenAtMsByHunter.remove(id);
-      _initializedHunterPositions.remove(id);
-      final sprite = _hunterSprites.remove(id);
-      sprite?.removeFromParent();
+      if (!_rosterHunterIds.contains(id) && id != _controlledHunterId) {
+        _initializedHunterPositions.remove(id);
+        final sprite = _hunterSprites.remove(id);
+        sprite?.removeFromParent();
+      }
     }
     if (staleIds.isNotEmpty) {
       _publishActiveHunterIds();
@@ -919,7 +1078,7 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
       minX,
       _worldSize.x - _playHorizontalPadding - player.radius,
     );
-    final minY = _topWallHeight + player.radius + 6;
+    final minY = _playAreaTopInset + player.radius + 6;
     final maxY = math.max(
       minY,
       _worldSize.y - _playBottomPadding - player.radius,
@@ -1018,11 +1177,20 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
   void _clampProbeToCanvas(Vector2 probe, double radius) {
     final minX = _playHorizontalPadding + radius;
     final maxX = math.max(minX, _worldSize.x - _playHorizontalPadding - radius);
-    final minY = _topWallHeight + radius + 6;
+    final minY = _playAreaTopInset + radius + 6;
     final maxY = math.max(minY, _worldSize.y - _playBottomPadding - radius);
     probe
       ..x = probe.x.clamp(minX, maxX).toDouble()
       ..y = probe.y.clamp(minY, maxY).toDouble();
+  }
+
+  Rect _cozyWorldRect(double left, double top, double width, double height) {
+    return Rect.fromLTWH(
+      _worldSize.x * left,
+      _worldSize.y * top,
+      _worldSize.x * width,
+      _worldSize.y * height,
+    );
   }
 
   void _syncCameraFollow({bool snap = false}) {
@@ -1052,12 +1220,23 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
   }
 
   void _publishActiveHunterIds() {
-    final next = Set<String>.from(_hunterSprites.keys);
+    final next = <String>{..._realtimeOnlyHunterIds};
+    if (_controlledHunterId != null && _controlledHunterId!.isNotEmpty) {
+      next.add(_controlledHunterId!);
+    }
     final current = activeHunterIdsListenable.value;
     if (next.length == current.length && next.containsAll(current)) {
       return;
     }
     activeHunterIdsListenable.value = next;
+  }
+
+  String? _normalizeHunterId(String? hunterId) {
+    final normalized = hunterId?.trim();
+    if (normalized == null || normalized.isEmpty) {
+      return null;
+    }
+    return normalized;
   }
 
   @override

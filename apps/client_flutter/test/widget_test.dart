@@ -47,7 +47,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.text('溫馨公會看板'), findsOneWidget);
+    expect(find.text('公會任務板'), findsOneWidget);
     expect(find.text('拖曳任意位置，叫出搖桿移動'), findsOneWidget);
     expect(find.text('玩家通行證'), findsNothing);
 
@@ -92,6 +92,43 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('玩家通行證'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Campfire dialog keeps join action visible on phone viewport', (
+    WidgetTester tester,
+  ) async {
+    tester.view.devicePixelRatio = 1.0;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authControllerProvider.overrideWith((ref) => _TestAuthController()),
+          questControllerProvider.overrideWith((ref) => _TestQuestController()),
+          progressionControllerProvider.overrideWith(
+            (ref) => _TestProgressionController(),
+          ),
+          socialControllerProvider.overrideWith(
+            (ref) => _TestSocialController(),
+          ),
+        ],
+        child: const ChenLevelingApp(),
+      ),
+    );
+
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.text('營火聊天'));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('營火語音吧台'), findsOneWidget);
+    expect(find.text('加入營火'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

@@ -51,6 +51,7 @@ void main() {
     await tester.enterText(fields.at(0), 'test@example.com');
     await tester.enterText(fields.at(1), '1234');
     await tester.enterText(fields.at(2), '測試玩家');
+    await tester.ensureVisible(find.text('註冊並開始'));
     await tester.tap(find.text('註冊並開始'));
     await tester.pump();
 
@@ -77,6 +78,7 @@ void main() {
     await tester.enterText(fields.at(0), 'demo_member');
     await tester.enterText(fields.at(1), '1357');
     await tester.enterText(fields.at(2), 'Demo Member');
+    await tester.ensureVisible(find.text('註冊並開始'));
     await tester.tap(find.text('註冊並開始'));
     await tester.pump();
 

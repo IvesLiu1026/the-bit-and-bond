@@ -1,5 +1,7 @@
 part of 'chen_game.dart';
 
+enum FurnitureRenderMode { full, hotspot, flameOverlay }
+
 class InteractiveFurniture extends PositionComponent {
   InteractiveFurniture({
     required this.type,
@@ -7,8 +9,11 @@ class InteractiveFurniture extends PositionComponent {
     required Color tint,
     required Color accent,
     required super.size,
+    this.spriteImage,
     this.interactive = true,
     this.collidable = true,
+    this.renderMode = FurnitureRenderMode.full,
+    this.showLabel = true,
   }) : _tint = tint,
        _accent = accent,
        super(anchor: Anchor.topLeft, priority: 500);
@@ -17,6 +22,9 @@ class InteractiveFurniture extends PositionComponent {
   final String label;
   final bool interactive;
   final bool collidable;
+  final ui.Image? spriteImage;
+  final FurnitureRenderMode renderMode;
+  final bool showLabel;
   Color _tint;
   Color _accent;
   bool _campfireConnected = false;
@@ -177,40 +185,61 @@ class InteractiveFurniture extends PositionComponent {
   void render(Canvas canvas) {
     super.render(canvas);
     final rect = Rect.fromLTWH(position.x, position.y, size.x, size.y);
-    final shadow = Paint()..color = const Color(0x6633221A);
     final border = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3
       ..color = const Color(0xFF3E2723);
-    canvas.drawRect(rect.shift(const Offset(2, 3)), shadow);
 
-    switch (type) {
-      case TavernFurnitureType.noticeBoard:
-        _renderNoticeBoard(canvas, rect, border);
-        break;
-      case TavernFurnitureType.masterDesk:
-        _renderMasterDesk(canvas, rect, border);
-        break;
-      case TavernFurnitureType.guildChest:
-        _renderGuildChest(canvas, rect, border);
-        break;
-      case TavernFurnitureType.campfireBar:
-        _renderCampfireBar(canvas, rect, border);
-        break;
-      case TavernFurnitureType.guildMerchant:
-        _renderGuildMerchant(canvas, rect, border);
-        break;
-      case TavernFurnitureType.wallBookshelf:
-        _renderWallBookshelf(canvas, rect, border);
-        break;
-      case TavernFurnitureType.honorBanner:
-        _renderHonorBanner(canvas, rect, border);
-        break;
-      case TavernFurnitureType.trainingDummy:
-        _renderTrainingDummy(canvas, rect, border);
-        break;
+    switch (renderMode) {
+      case FurnitureRenderMode.full:
+        final shadow = Paint()..color = const Color(0x6633221A);
+        canvas.drawRect(rect.shift(const Offset(2, 3)), shadow);
+        switch (type) {
+          case TavernFurnitureType.noticeBoard:
+            _renderNoticeBoard(canvas, rect, border);
+            break;
+          case TavernFurnitureType.masterDesk:
+            _renderMasterDesk(canvas, rect, border);
+            break;
+          case TavernFurnitureType.guildChest:
+            _renderGuildChest(canvas, rect, border);
+            break;
+          case TavernFurnitureType.campfireBar:
+            _renderCampfireBar(canvas, rect, border);
+            break;
+          case TavernFurnitureType.guildMerchant:
+            _renderGuildMerchant(canvas, rect, border);
+            break;
+          case TavernFurnitureType.wallBookshelf:
+            _renderWallBookshelf(canvas, rect, border);
+            break;
+          case TavernFurnitureType.honorBanner:
+            _renderHonorBanner(canvas, rect, border);
+            break;
+          case TavernFurnitureType.trainingDummy:
+            _renderTrainingDummy(canvas, rect, border);
+            break;
+        }
+      case FurnitureRenderMode.hotspot:
+        if (interactive) {
+          final glow = Paint()
+            ..color = _accent.withValues(alpha: 0.08)
+            ..style = PaintingStyle.fill;
+          final outline = Paint()
+            ..color = _accent.withValues(alpha: 0.35)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2;
+          canvas.drawRect(rect, glow);
+          canvas.drawRect(rect, outline);
+        }
+      case FurnitureRenderMode.flameOverlay:
+        if (type == TavernFurnitureType.campfireBar) {
+          _renderCampfireFlameOverlay(canvas, rect);
+        }
     }
-    _renderFloatingLabel(canvas, rect);
+    if (showLabel) {
+      _renderFloatingLabel(canvas, rect);
+    }
   }
 
   void _renderNoticeBoard(Canvas canvas, Rect rect, Paint border) {
@@ -361,25 +390,76 @@ class InteractiveFurniture extends PositionComponent {
       ember,
     );
 
-    final center = pitRect.center;
-    final frameHeight = switch (frame) {
-      0 => 30,
-      1 => 34,
-      2 => 28,
-      _ => 32,
-    };
-    final flame = Path()
-      ..moveTo(center.dx, pitRect.bottom - frameHeight.toDouble())
-      ..lineTo(center.dx - 16, pitRect.bottom - 14)
-      ..lineTo(center.dx, pitRect.bottom - 32)
-      ..lineTo(center.dx + 16, pitRect.bottom - 14)
-      ..close();
-    canvas.drawPath(flame, flameOuter);
-    canvas.drawCircle(
-      Offset(center.dx, pitRect.bottom - (26 + (frame.isEven ? 1 : -1))),
-      8,
-      flameCore,
-    );
+    final fireImage = spriteImage;
+    if (fireImage != null) {
+      const frameSize = 32.0;
+      final sourceRect = Rect.fromLTWH(frame * frameSize, 0, frameSize, frameSize);
+      final destinationRect = Rect.fromCenter(
+        center: Offset(pitRect.center.dx, pitRect.center.dy - 1),
+        width: 54,
+        height: 54,
+      );
+      canvas.drawImageRect(fireImage, sourceRect, destinationRect, Paint());
+      canvas.drawCircle(
+        Offset(destinationRect.center.dx, destinationRect.bottom - 10),
+        7,
+        flameCore,
+      );
+    } else {
+      final center = pitRect.center;
+      final frameHeight = switch (frame) {
+        0 => 30,
+        1 => 34,
+        2 => 28,
+        _ => 32,
+      };
+      final flame = Path()
+        ..moveTo(center.dx, pitRect.bottom - frameHeight.toDouble())
+        ..lineTo(center.dx - 16, pitRect.bottom - 14)
+        ..lineTo(center.dx, pitRect.bottom - 32)
+        ..lineTo(center.dx + 16, pitRect.bottom - 14)
+        ..close();
+      canvas.drawPath(flame, flameOuter);
+      canvas.drawCircle(
+        Offset(center.dx, pitRect.bottom - (26 + (frame.isEven ? 1 : -1))),
+        8,
+        flameCore,
+      );
+    }
+  }
+
+  void _renderCampfireFlameOverlay(Canvas canvas, Rect rect) {
+    final glowAlpha = _campfireSpeaking
+        ? (0.24 + (_campfirePulse * 0.30))
+        : (_campfireConnected ? 0.18 : 0.10);
+    final glow = Paint()..color = _accent.withValues(alpha: glowAlpha);
+    final aura = Paint()
+      ..color = (_campfireSpeaking ? const Color(0xFFFFD54F) : _accent)
+          .withValues(
+            alpha: _campfireSpeaking ? (0.18 + (_campfirePulse * 0.22)) : 0.08,
+          );
+    final center = Offset(rect.center.dx, rect.center.dy);
+    canvas.drawCircle(center, rect.width * 0.46, glow);
+    if (_campfireConnected) {
+      canvas.drawCircle(
+        Offset(center.dx, center.dy + 8),
+        rect.width * (_campfireSpeaking ? (0.34 + (_campfirePulse * 0.08)) : 0.28),
+        aura,
+      );
+    }
+
+    final fireImage = spriteImage;
+    if (fireImage != null) {
+      const frameSize = 32.0;
+      final frame = (DateTime.now().millisecondsSinceEpoch ~/ 115) % 4;
+      final sourceRect = Rect.fromLTWH(frame * frameSize, 0, frameSize, frameSize);
+      final destinationRect = Rect.fromCenter(
+        center: Offset(center.dx, center.dy - 2),
+        width: rect.width * 0.74,
+        height: rect.height * 0.74,
+      );
+      canvas.drawImageRect(fireImage, sourceRect, destinationRect, Paint());
+    }
   }
 
   void _renderGuildMerchant(Canvas canvas, Rect rect, Paint border) {

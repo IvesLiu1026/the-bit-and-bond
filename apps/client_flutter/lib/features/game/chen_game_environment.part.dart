@@ -2,15 +2,19 @@ part of 'chen_game.dart';
 
 class _TavernEnvironmentLayer extends Component
     with HasGameReference<ChenLevelingGame> {
-  _TavernEnvironmentLayer({required TavernVisualTheme theme}) : _theme = theme;
+  _TavernEnvironmentLayer({
+    required TavernVisualTheme theme,
+    this.tavernBackdropImage,
+  }) : _theme = theme;
 
   static const double _floorTile = 64;
   static const double _torchSpacing = 128;
-  static const double _wallHeight = ChenLevelingGame._topWallHeight;
+  static const double _wallHeight = ChenLevelingGame._baseTopWallHeight;
   ui.Picture? _cachedBase;
   Size _cachedSize = Size.zero;
   double _elapsed = 0;
   TavernVisualTheme _theme;
+  final ui.Image? tavernBackdropImage;
 
   void setTheme(TavernVisualTheme theme) {
     if (_theme == theme) {
@@ -64,6 +68,16 @@ class _TavernEnvironmentLayer extends Component
     required double width,
     required double height,
   }) {
+    if (_theme == TavernVisualTheme.cozyWood && tavernBackdropImage != null) {
+      _paintCozyBackdrop(
+        canvas,
+        width: width,
+        height: height,
+        image: tavernBackdropImage!,
+      );
+      return;
+    }
+
     final (
       floorDarkColor,
       floorAltColor,
@@ -243,6 +257,61 @@ class _TavernEnvironmentLayer extends Component
       flameColor: torchCoreColor,
       stickColor: torchStickColor,
     );
+  }
+
+  void _paintCozyBackdrop(
+    Canvas canvas, {
+    required double width,
+    required double height,
+    required ui.Image image,
+  }) {
+    final sourceSize = Size(
+      image.width.toDouble(),
+      image.height.toDouble(),
+    );
+    final targetRect = Rect.fromLTWH(0, 0, width, height);
+    final sourceRect = _coverSourceRect(sourceSize, targetRect.size);
+    canvas.drawImageRect(image, sourceRect, targetRect, Paint());
+
+    final vignette = Paint()
+      ..shader = ui.Gradient.radial(
+        Offset(width / 2, height * 0.55),
+        math.max(width, height) * 0.72,
+        const [
+          Color(0x00000000),
+          Color(0x2A140D08),
+          Color(0x55140D08),
+        ],
+      );
+    canvas.drawRect(targetRect, vignette);
+
+    final topShade = Paint()
+      ..shader = ui.Gradient.linear(
+        const Offset(0, 0),
+        Offset(0, height * 0.26),
+        const [
+          Color(0x661A0F09),
+          Color(0x221A0F09),
+          Color(0x001A0F09),
+        ],
+      );
+    canvas.drawRect(targetRect, topShade);
+  }
+
+  Rect _coverSourceRect(Size sourceSize, Size destinationSize) {
+    final sourceRatio = sourceSize.width / sourceSize.height;
+    final destinationRatio = destinationSize.width / destinationSize.height;
+    if ((sourceRatio - destinationRatio).abs() < 0.0001) {
+      return Offset.zero & sourceSize;
+    }
+    if (sourceRatio > destinationRatio) {
+      final cropWidth = sourceSize.height * destinationRatio;
+      final dx = (sourceSize.width - cropWidth) / 2;
+      return Rect.fromLTWH(dx, 0, cropWidth, sourceSize.height);
+    }
+    final cropHeight = sourceSize.width / destinationRatio;
+    final dy = (sourceSize.height - cropHeight) / 2;
+    return Rect.fromLTWH(0, dy, sourceSize.width, cropHeight);
   }
 
   void _paintTorches(
