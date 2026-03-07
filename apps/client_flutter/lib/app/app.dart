@@ -7,15 +7,15 @@ import '../features/auth/unified_auth_page.dart';
 import '../features/game/game_shell_page.dart';
 import '../state/providers.dart';
 
-class ChenLevelingApp extends ConsumerWidget {
-  const ChenLevelingApp({super.key, this.enableDevicePreview = false});
+class TheBitAndBondApp extends ConsumerWidget {
+  const TheBitAndBondApp({super.key, this.enableDevicePreview = false});
 
   final bool enableDevicePreview;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp(
-      title: 'Chen Leveling',
+      title: 'The Bit & Bond',
       debugShowCheckedModeBanner: false,
       locale: enableDevicePreview ? DevicePreview.locale(context) : null,
       builder: enableDevicePreview ? DevicePreview.appBuilder : null,

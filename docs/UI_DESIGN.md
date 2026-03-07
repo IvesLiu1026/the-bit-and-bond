@@ -141,7 +141,7 @@ Source: `lib/features/auth/hunter_login_page.dart`
 
 ### 4.1 Storage
 - Package: `flutter_secure_storage`
-- Persist key: `chen_leveling_auth_session_v1`
+- Persist key: `the_bit_and_bond_auth_session_v1`
 - Data: `access_token`, `role`, `guild_id`, `hunter_id`, `invite_code`
 
 ### 4.2 Guard Behavior

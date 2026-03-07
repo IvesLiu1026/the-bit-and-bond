@@ -57,7 +57,7 @@ class _GameShellPageState extends ConsumerState<GameShellPage> {
   static const double _minPoseDeltaForSync = 1.5;
   static const Duration _debugMeterWindow = Duration(seconds: 1);
 
-  late final ChenLevelingGame _game;
+  late final TheBitAndBondGame _game;
   String? _presenceConnectionKey;
   String? _presenceConnectingKey;
   WebSocketChannel? _presenceChannel;
@@ -87,7 +87,7 @@ class _GameShellPageState extends ConsumerState<GameShellPage> {
   final Set<String> _knownPendingInviteIds = <String>{};
   GuildInviteInfo? _activeGuildInvite;
   Set<String> _onlineHunterIds = <String>{};
-  String _interactionHintText = '拖曳任意位置，叫出搖桿移動';
+  String _interactionHintText = '左下固定搖桿可 360 度移動';
   TavernFurnitureType? _nearbyFurniture;
   TavernVisualTheme _visualTheme = TavernVisualTheme.cozyWood;
   ProviderSubscription<AuthSession?>? _authSessionSubscription;
@@ -107,7 +107,7 @@ class _GameShellPageState extends ConsumerState<GameShellPage> {
   @override
   void initState() {
     super.initState();
-    _game = ChenLevelingGame(
+    _game = TheBitAndBondGame(
       onFurnitureInteracted: _handleFurnitureInteraction,
     );
     _game.setVisualTheme(_visualTheme);
@@ -305,8 +305,23 @@ class _GameShellPageState extends ConsumerState<GameShellPage> {
           final actionGap = isPhoneLayout ? 8.0 : 10.0;
           final sideInset = isPhoneLayout ? 10.0 : 16.0;
           final bottomInset = mediaPadding.bottom + 12;
+          final titleMaxWidth = math.max(
+            180.0,
+            constraints.maxWidth - (sideInset * 2) - 24,
+          );
+          final topOverlayMaxWidth = math.max(
+            140.0,
+            constraints.maxWidth - hudCompactWidth - sideInset - 32,
+          );
           final hintMaxWidth = isPhoneLayout
-              ? constraints.maxWidth * 0.58
+              ? math.max(
+                  104.0,
+                  constraints.maxWidth -
+                      actionButtonWidth -
+                      sideInset -
+                      14 -
+                      20,
+                )
               : 360.0;
           final topActionY = isPhoneLayout ? topInset + 52 : topInset + 4;
           final avatarTop = isPhoneLayout ? topInset + 96 : topInset + 62;
@@ -319,10 +334,19 @@ class _GameShellPageState extends ConsumerState<GameShellPage> {
                 left: 0,
                 right: 0,
                 child: IgnorePointer(
-                  child: Center(
-                    child: _TitleBadge(
-                      lowFxMode: lowFxMode,
-                      compact: isPhoneLayout,
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: sideInset + 12),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(maxWidth: titleMaxWidth),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: _TitleBadge(
+                            lowFxMode: lowFxMode,
+                            compact: isPhoneLayout,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -393,31 +417,34 @@ class _GameShellPageState extends ConsumerState<GameShellPage> {
                   child: AnimatedOpacity(
                     opacity: _scrollNoticeText == null ? 0 : 1,
                     duration: const Duration(milliseconds: 260),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.parchment,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: AppColors.woodFrame,
-                          width: 3,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: topOverlayMaxWidth),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
                         ),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: AppColors.shadowHard,
-                            offset: Offset(0, 4),
-                            blurRadius: 0,
+                        decoration: BoxDecoration(
+                          color: AppColors.parchment,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: AppColors.woodFrame,
+                            width: 3,
                           ),
-                        ],
-                      ),
-                      child: Text(
-                        _scrollNoticeText!,
-                        style: const TextStyle(
-                          color: AppColors.inkBrown,
-                          fontWeight: FontWeight.w900,
+                          boxShadow: const [
+                            BoxShadow(
+                              color: AppColors.shadowHard,
+                              offset: Offset(0, 4),
+                              blurRadius: 0,
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          _scrollNoticeText!,
+                          style: const TextStyle(
+                            color: AppColors.inkBrown,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
                       ),
                     ),
@@ -427,20 +454,23 @@ class _GameShellPageState extends ConsumerState<GameShellPage> {
                 Positioned(
                   top: avatarTop + 88,
                   right: sideInset,
-                  child: _SummonScrollOverlay(
-                    invite: _activeGuildInvite!,
-                    onAccept: () {
-                      _respondGuildInvite(
-                        inviteId: _activeGuildInvite!.id,
-                        accept: true,
-                      );
-                    },
-                    onReject: () {
-                      _respondGuildInvite(
-                        inviteId: _activeGuildInvite!.id,
-                        accept: false,
-                      );
-                    },
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: topOverlayMaxWidth),
+                    child: _SummonScrollOverlay(
+                      invite: _activeGuildInvite!,
+                      onAccept: () {
+                        _respondGuildInvite(
+                          inviteId: _activeGuildInvite!.id,
+                          accept: true,
+                        );
+                      },
+                      onReject: () {
+                        _respondGuildInvite(
+                          inviteId: _activeGuildInvite!.id,
+                          accept: false,
+                        );
+                      },
+                    ),
                   ),
                 ),
               for (final event in _floatingRewardEvents)

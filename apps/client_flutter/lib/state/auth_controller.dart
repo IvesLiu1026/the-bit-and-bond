@@ -21,7 +21,7 @@ class AuthController extends StateNotifier<AsyncValue<AuthSession?>> {
     }
   }
 
-  static const String storageKey = 'chen_leveling_auth_session_v1';
+  static const String storageKey = 'the_bit_and_bond_auth_session_v1';
 
   final AuthApiClient _authApi;
   final FlutterSecureStorage _storage;

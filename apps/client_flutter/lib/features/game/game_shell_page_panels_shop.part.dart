@@ -281,137 +281,170 @@ class _GuildShopPanelState extends State<_GuildShopPanel>
       builder: (dialogContext) {
         return StatefulBuilder(
           builder: (context, setLocalState) {
-            return Dialog(
-              backgroundColor: Colors.transparent,
-              child: _OverlayPanel(
-                child: SizedBox(
-                  width: 420,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        initial == null ? '上架商品' : '編輯商品',
-                        style: const TextStyle(
-                          color: AppColors.inkBrown,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      _ShopField(controller: nameController, label: '名稱'),
-                      const SizedBox(height: 8),
-                      _ShopField(
-                        controller: descriptionController,
-                        label: '描述（可留空）',
-                      ),
-                      const SizedBox(height: 8),
-                      _ShopField(
-                        controller: costController,
-                        label: '價格（金幣）',
-                        keyboardType: TextInputType.number,
-                      ),
-                      const SizedBox(height: 8),
-                      DropdownButtonFormField<String>(
-                        initialValue: iconTag,
-                        decoration: const InputDecoration(
-                          labelText: '圖示',
-                          filled: true,
-                          fillColor: Color(0xFFE7DDC9),
-                          border: OutlineInputBorder(
-                            borderSide: BorderSide(
-                              color: AppColors.woodFrame,
-                              width: 2.2,
+            final media = MediaQuery.of(dialogContext);
+            final maxWidth = math.min(420.0, media.size.width - 24);
+            final maxHeight = math.max(
+              260.0,
+              media.size.height -
+                  media.padding.vertical -
+                  media.viewInsets.vertical -
+                  24,
+            );
+            return AnimatedPadding(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOut,
+              padding: media.viewInsets,
+              child: Dialog(
+                backgroundColor: Colors.transparent,
+                insetPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 12,
+                ),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: maxWidth,
+                    maxHeight: maxHeight,
+                  ),
+                  child: _OverlayPanel(
+                    child: SingleChildScrollView(
+                      child: SizedBox(
+                        width: maxWidth,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              initial == null ? '上架商品' : '編輯商品',
+                              style: const TextStyle(
+                                color: AppColors.inkBrown,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w900,
+                              ),
                             ),
-                          ),
-                        ),
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'TICKET',
-                            child: Text('TICKET'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'POTION',
-                            child: Text('POTION'),
-                          ),
-                          DropdownMenuItem(value: 'TOY', child: Text('TOY')),
-                          DropdownMenuItem(value: 'FOOD', child: Text('FOOD')),
-                          DropdownMenuItem(
-                            value: 'SCROLL',
-                            child: Text('SCROLL'),
-                          ),
-                        ],
-                        onChanged: (value) {
-                          if (value == null) {
-                            return;
-                          }
-                          setLocalState(() {
-                            iconTag = value;
-                          });
-                        },
-                      ),
-                      if (localError != null) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          localError!,
-                          style: const TextStyle(
-                            color: AppColors.hpRuby,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _StampButton(
-                              label: '取消',
-                              tone: _StampTone.wood,
-                              onPressed: () =>
-                                  Navigator.of(dialogContext).pop(),
+                            const SizedBox(height: 10),
+                            _ShopField(controller: nameController, label: '名稱'),
+                            const SizedBox(height: 8),
+                            _ShopField(
+                              controller: descriptionController,
+                              label: '描述（可留空）',
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: _StampButton(
-                              label: '儲存',
-                              tone: _StampTone.green,
-                              onPressed: () {
-                                final name = nameController.text.trim();
-                                final cost = int.tryParse(
-                                  costController.text.trim(),
-                                );
-                                if (name.isEmpty) {
-                                  setLocalState(() {
-                                    localError = '名稱不能空白';
-                                  });
-                                  return;
-                                }
-                                if (cost == null || cost < 0) {
-                                  setLocalState(() {
-                                    localError = '價格必須是 0 以上整數';
-                                  });
-                                  return;
-                                }
-                                Navigator.of(dialogContext).pop(
-                                  _ShopItemDraft(
-                                    name: name,
-                                    description:
-                                        descriptionController.text
-                                            .trim()
-                                            .isEmpty
-                                        ? null
-                                        : descriptionController.text.trim(),
-                                    costCoins: cost,
-                                    iconTag: iconTag,
+                            const SizedBox(height: 8),
+                            _ShopField(
+                              controller: costController,
+                              label: '價格（金幣）',
+                              keyboardType: TextInputType.number,
+                            ),
+                            const SizedBox(height: 8),
+                            DropdownButtonFormField<String>(
+                              initialValue: iconTag,
+                              decoration: const InputDecoration(
+                                labelText: '圖示',
+                                filled: true,
+                                fillColor: Color(0xFFE7DDC9),
+                                border: OutlineInputBorder(
+                                  borderSide: BorderSide(
+                                    color: AppColors.woodFrame,
+                                    width: 2.2,
                                   ),
-                                );
+                                ),
+                              ),
+                              items: const [
+                                DropdownMenuItem(
+                                  value: 'TICKET',
+                                  child: Text('TICKET'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'POTION',
+                                  child: Text('POTION'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'TOY',
+                                  child: Text('TOY'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'FOOD',
+                                  child: Text('FOOD'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'SCROLL',
+                                  child: Text('SCROLL'),
+                                ),
+                              ],
+                              onChanged: (value) {
+                                if (value == null) {
+                                  return;
+                                }
+                                setLocalState(() {
+                                  iconTag = value;
+                                });
                               },
                             ),
-                          ),
-                        ],
+                            if (localError != null) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                localError!,
+                                style: const TextStyle(
+                                  color: AppColors.hpRuby,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _StampButton(
+                                    label: '取消',
+                                    tone: _StampTone.wood,
+                                    onPressed: () =>
+                                        Navigator.of(dialogContext).pop(),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: _StampButton(
+                                    label: '儲存',
+                                    tone: _StampTone.green,
+                                    onPressed: () {
+                                      final name = nameController.text.trim();
+                                      final cost = int.tryParse(
+                                        costController.text.trim(),
+                                      );
+                                      if (name.isEmpty) {
+                                        setLocalState(() {
+                                          localError = '名稱不能空白';
+                                        });
+                                        return;
+                                      }
+                                      if (cost == null || cost < 0) {
+                                        setLocalState(() {
+                                          localError = '價格必須是 0 以上整數';
+                                        });
+                                        return;
+                                      }
+                                      Navigator.of(dialogContext).pop(
+                                        _ShopItemDraft(
+                                          name: name,
+                                          description:
+                                              descriptionController.text
+                                                  .trim()
+                                                  .isEmpty
+                                              ? null
+                                              : descriptionController.text
+                                                    .trim(),
+                                          costCoins: cost,
+                                          iconTag: iconTag,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -425,6 +458,185 @@ class _GuildShopPanelState extends State<_GuildShopPanel>
     descriptionController.dispose();
     costController.dispose();
     return result;
+  }
+
+  Widget _buildItemActions({
+    required GuildShopItem item,
+    required bool compactCard,
+    required bool buying,
+    required bool editing,
+    required bool affordable,
+    required int currentCoins,
+  }) {
+    if (_manageMode) {
+      final actions = <Widget>[
+        Expanded(
+          child: _StampButton(
+            label: editing ? '處理中' : '編輯',
+            tone: _StampTone.blue,
+            iconWidget: const _PixelLabelGlyph(glyph: 'EDT'),
+            onPressed: editing ? null : () => _editItem(item),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: _StampButton(
+            label: item.isActive ? '下架' : '已下架',
+            tone: item.isActive ? _StampTone.ruby : _StampTone.wood,
+            iconWidget: const _PixelLabelGlyph(glyph: 'OFF'),
+            onPressed: editing || !item.isActive
+                ? null
+                : () => _deactivateItem(item),
+          ),
+        ),
+      ];
+      if (compactCard) {
+        return Row(children: actions);
+      }
+      return SizedBox(width: 196, child: Row(children: actions));
+    }
+
+    final purchaseButton = _StampButton(
+      label: buying ? '購買中' : '購買',
+      tone: affordable ? _StampTone.green : _StampTone.ruby,
+      iconWidget: const _PixelLabelGlyph(glyph: 'BUY'),
+      onPressed: buying ? null : () => _buyItem(item, currentCoins),
+    );
+    if (compactCard) {
+      return purchaseButton;
+    }
+    return SizedBox(width: 108, child: purchaseButton);
+  }
+
+  Widget _buildItemContent({
+    required GuildShopItem item,
+    required bool compactCard,
+    required bool buying,
+    required bool editing,
+    required bool affordable,
+    required int currentCoins,
+  }) {
+    final detailColumn = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          item.name,
+          style: const TextStyle(
+            color: AppColors.inkBrown,
+            fontWeight: FontWeight.w900,
+            fontSize: 16,
+          ),
+        ),
+        if (item.description != null && item.description!.trim().isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(
+              item.description!,
+              style: const TextStyle(
+                color: AppColors.navyBlue,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            const _PixelShopItemIcon(iconTag: 'COIN', size: 16),
+            const SizedBox(width: 5),
+            Text(
+              '${item.costCoins}',
+              style: const TextStyle(
+                color: AppColors.inkBrown,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+        if (_manageMode) ...[
+          const SizedBox(height: 6),
+          Text(
+            item.isActive ? '狀態：上架中' : '狀態：已下架',
+            style: TextStyle(
+              color: item.isActive ? AppColors.stampGreen : AppColors.hpRuby,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ],
+    );
+    final actionPanel = _buildItemActions(
+      item: item,
+      compactCard: compactCard,
+      buying: buying,
+      editing: editing,
+      affordable: affordable,
+      currentCoins: currentCoins,
+    );
+
+    if (compactCard) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _PixelShopItemIcon(iconTag: item.iconTag),
+              const SizedBox(width: 10),
+              Expanded(child: detailColumn),
+            ],
+          ),
+          const SizedBox(height: 10),
+          actionPanel,
+        ],
+      );
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _PixelShopItemIcon(iconTag: item.iconTag),
+        const SizedBox(width: 10),
+        Expanded(child: detailColumn),
+        const SizedBox(width: 8),
+        actionPanel,
+      ],
+    );
+  }
+
+  Widget _buildMasterControls(BoxConstraints constraints) {
+    final stacked = constraints.maxWidth < 440;
+    final manageButton = _StampButton(
+      label: _switchingMode ? '切換中...' : (_manageMode ? '返回購買' : '管理商品'),
+      tone: _StampTone.wood,
+      iconWidget: const _PixelLabelGlyph(glyph: 'CFG'),
+      onPressed: _switchingMode ? null : _toggleManageMode,
+    );
+    final createButton = _StampButton(
+      label: _editingItemId == 'new' ? '上架中' : '新增商品',
+      tone: _StampTone.green,
+      iconWidget: const _PixelLabelGlyph(glyph: 'NEW'),
+      onPressed: _editingItemId == null ? _createItem : null,
+    );
+
+    if (stacked) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(width: double.infinity, child: manageButton),
+          if (_manageMode) const SizedBox(height: 8),
+          if (_manageMode)
+            SizedBox(width: double.infinity, child: createButton),
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(child: manageButton),
+        if (_manageMode) const SizedBox(width: 8),
+        if (_manageMode) Expanded(child: createButton),
+      ],
+    );
   }
 
   @override
@@ -447,28 +659,10 @@ class _GuildShopPanelState extends State<_GuildShopPanel>
         ),
         const SizedBox(height: 8),
         if (widget.isMaster)
-          Align(
-            alignment: Alignment.centerRight,
-            child: Wrap(
-              spacing: 8,
-              children: [
-                _StampButton(
-                  label: _switchingMode
-                      ? '切換中...'
-                      : (_manageMode ? '返回購買' : '⚙️ 管理商品'),
-                  tone: _StampTone.wood,
-                  iconWidget: const _PixelLabelGlyph(glyph: 'CFG'),
-                  onPressed: _switchingMode ? null : _toggleManageMode,
-                ),
-                if (_manageMode)
-                  _StampButton(
-                    label: _editingItemId == 'new' ? '上架中' : '新增商品',
-                    tone: _StampTone.green,
-                    iconWidget: const _PixelLabelGlyph(glyph: 'NEW'),
-                    onPressed: _editingItemId == null ? _createItem : null,
-                  ),
-              ],
-            ),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              return _buildMasterControls(constraints);
+            },
           ),
         if (widget.isMaster) const SizedBox(height: 8),
         Container(
@@ -575,116 +769,19 @@ class _GuildShopPanelState extends State<_GuildShopPanel>
                           ),
                         ],
                       ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _PixelShopItemIcon(iconTag: item.iconTag),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  item.name,
-                                  style: const TextStyle(
-                                    color: AppColors.inkBrown,
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                                if (item.description != null &&
-                                    item.description!.trim().isNotEmpty)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 2),
-                                    child: Text(
-                                      item.description!,
-                                      style: const TextStyle(
-                                        color: AppColors.navyBlue,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  children: [
-                                    const _PixelShopItemIcon(
-                                      iconTag: 'COIN',
-                                      size: 16,
-                                    ),
-                                    const SizedBox(width: 5),
-                                    Text(
-                                      '${item.costCoins}',
-                                      style: const TextStyle(
-                                        color: AppColors.inkBrown,
-                                        fontWeight: FontWeight.w900,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                if (_manageMode) ...[
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    item.isActive ? '狀態：上架中' : '狀態：已下架',
-                                    style: TextStyle(
-                                      color: item.isActive
-                                          ? AppColors.stampGreen
-                                          : AppColors.hpRuby,
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          SizedBox(
-                            width: _manageMode ? 196 : 108,
-                            child: _manageMode
-                                ? Row(
-                                    children: [
-                                      Expanded(
-                                        child: _StampButton(
-                                          label: editing ? '處理中' : '編輯',
-                                          tone: _StampTone.blue,
-                                          iconWidget: const _PixelLabelGlyph(
-                                            glyph: 'EDT',
-                                          ),
-                                          onPressed: editing
-                                              ? null
-                                              : () => _editItem(item),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Expanded(
-                                        child: _StampButton(
-                                          label: item.isActive ? '下架' : '已下架',
-                                          tone: item.isActive
-                                              ? _StampTone.ruby
-                                              : _StampTone.wood,
-                                          iconWidget: const _PixelLabelGlyph(
-                                            glyph: 'OFF',
-                                          ),
-                                          onPressed: editing || !item.isActive
-                                              ? null
-                                              : () => _deactivateItem(item),
-                                        ),
-                                      ),
-                                    ],
-                                  )
-                                : _StampButton(
-                                    label: buying ? '購買中' : '購買',
-                                    tone: affordable
-                                        ? _StampTone.green
-                                        : _StampTone.ruby,
-                                    iconWidget: const _PixelLabelGlyph(
-                                      glyph: 'BUY',
-                                    ),
-                                    onPressed: buying
-                                        ? null
-                                        : () => _buyItem(item, currentCoins),
-                                  ),
-                          ),
-                        ],
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final compactCard =
+                              constraints.maxWidth < (_manageMode ? 460 : 360);
+                          return _buildItemContent(
+                            item: item,
+                            compactCard: compactCard,
+                            buying: buying,
+                            editing: editing,
+                            affordable: affordable,
+                            currentCoins: currentCoins,
+                          );
+                        },
                       ),
                     ),
                   );

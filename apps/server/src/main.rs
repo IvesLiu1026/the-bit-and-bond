@@ -56,7 +56,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let addr: SocketAddr = cfg.bind_addr.parse()?;
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    info!(%addr, "chen-leveling server listening");
+    info!(%addr, "The Bit & Bond server listening");
 
     axum::serve(listener, app).await?;
     Ok(())

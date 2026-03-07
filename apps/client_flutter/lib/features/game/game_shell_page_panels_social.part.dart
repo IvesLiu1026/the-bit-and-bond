@@ -67,253 +67,362 @@ class _SocialPanelState extends State<_SocialPanel> {
     return _ParchmentSection(
       title: '社交召喚',
       icon: Icons.groups_rounded,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          TextField(
-            controller: _playerIdController,
-            decoration: InputDecoration(
-              labelText: '玩家 ID',
-              isDense: true,
-              filled: true,
-              fillColor: const Color(0xFFE7DDC9),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(
-                  color: AppColors.woodFrame,
-                  width: 2,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final stackedPrimaryActions = constraints.maxWidth < 460;
+          final stackedCardActions = constraints.maxWidth < 380;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(
-                child: _StampButton(
-                  label: _submitting ? '處理中...' : '送好友請求',
-                  icon: Icons.person_add_alt_1,
-                  tone: _StampTone.blue,
-                  onPressed: _submitting
-                      ? null
-                      : () => _run(widget.onAddFriend, clearOnSuccess: true),
+              TextField(
+                controller: _playerIdController,
+                decoration: InputDecoration(
+                  labelText: '玩家 ID',
+                  isDense: true,
+                  filled: true,
+                  fillColor: const Color(0xFFE7DDC9),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(
+                      color: AppColors.woodFrame,
+                      width: 2,
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _StampButton(
-                  label: _submitting ? '處理中...' : '召喚入會',
-                  icon: Icons.mail_outline_rounded,
-                  tone: _StampTone.green,
-                  onPressed: _submitting
-                      ? null
-                      : () =>
-                            _run(widget.onInviteFriend, clearOnSuccess: false),
+              const SizedBox(height: 8),
+              if (stackedPrimaryActions)
+                Column(
+                  children: [
+                    SizedBox(
+                      width: double.infinity,
+                      child: _StampButton(
+                        label: _submitting ? '處理中...' : '送好友請求',
+                        icon: Icons.person_add_alt_1,
+                        tone: _StampTone.blue,
+                        onPressed: _submitting
+                            ? null
+                            : () => _run(
+                                widget.onAddFriend,
+                                clearOnSuccess: true,
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: _StampButton(
+                        label: _submitting ? '處理中...' : '召喚入會',
+                        icon: Icons.mail_outline_rounded,
+                        tone: _StampTone.green,
+                        onPressed: _submitting
+                            ? null
+                            : () => _run(
+                                widget.onInviteFriend,
+                                clearOnSuccess: false,
+                              ),
+                      ),
+                    ),
+                  ],
+                )
+              else
+                Row(
+                  children: [
+                    Expanded(
+                      child: _StampButton(
+                        label: _submitting ? '處理中...' : '送好友請求',
+                        icon: Icons.person_add_alt_1,
+                        tone: _StampTone.blue,
+                        onPressed: _submitting
+                            ? null
+                            : () => _run(
+                                widget.onAddFriend,
+                                clearOnSuccess: true,
+                              ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _StampButton(
+                        label: _submitting ? '處理中...' : '召喚入會',
+                        icon: Icons.mail_outline_rounded,
+                        tone: _StampTone.green,
+                        onPressed: _submitting
+                            ? null
+                            : () => _run(
+                                widget.onInviteFriend,
+                                clearOnSuccess: false,
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
+              const SizedBox(height: 10),
+              widget.state.when(
+                data: (snapshot) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '好友 ${snapshot.friends.length} 位',
+                        style: const TextStyle(
+                          color: AppColors.inkBrown,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      if (snapshot.friends.isEmpty)
+                        const Text(
+                          '尚未新增好友',
+                          style: TextStyle(color: AppColors.navyBlue),
+                        )
+                      else
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: snapshot.friends
+                              .map(
+                                (friend) => ConstrainedBox(
+                                  constraints: BoxConstraints(
+                                    maxWidth: constraints.maxWidth,
+                                  ),
+                                  child: _StatGemChip(
+                                    icon: const _PixelLabelGlyph(glyph: 'FR'),
+                                    label:
+                                        '${friend.name} (@${friend.playerId})',
+                                    color: AppColors.navyBlue,
+                                  ),
+                                ),
+                              )
+                              .toList(growable: false),
+                        ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '好友請求 ${snapshot.incomingFriendRequests.length} 筆',
+                        style: const TextStyle(
+                          color: AppColors.inkBrown,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      if (snapshot.incomingFriendRequests.isEmpty)
+                        const Text(
+                          '目前沒有待回覆好友請求',
+                          style: TextStyle(color: AppColors.navyBlue),
+                        )
+                      else
+                        Column(
+                          children: snapshot.incomingFriendRequests
+                              .map(
+                                (request) => Container(
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF8EED7),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: const Color(0xFF7B5A3C),
+                                      width: 2,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '${request.requesterName} (@${request.requesterPlayerId})',
+                                        style: const TextStyle(
+                                          color: AppColors.inkBrown,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      _SocialActionButtons(
+                                        stacked: stackedCardActions,
+                                        primaryLabel: '接受好友',
+                                        primaryIcon: Icons.check_circle,
+                                        primaryTone: _StampTone.green,
+                                        onPrimaryPressed: () {
+                                          widget.onRespondFriendRequest(
+                                            requestId: request.id,
+                                            accept: true,
+                                          );
+                                        },
+                                        secondaryLabel: '拒絕',
+                                        secondaryIcon: Icons.cancel,
+                                        secondaryTone: _StampTone.ruby,
+                                        onSecondaryPressed: () {
+                                          widget.onRespondFriendRequest(
+                                            requestId: request.id,
+                                            accept: false,
+                                          );
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              )
+                              .toList(growable: false),
+                        ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '收到邀請 ${snapshot.pendingInvites.length} 筆',
+                        style: const TextStyle(
+                          color: AppColors.inkBrown,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      if (snapshot.pendingInvites.isEmpty)
+                        const Text(
+                          '目前沒有公會邀請',
+                          style: TextStyle(color: AppColors.navyBlue),
+                        )
+                      else
+                        Column(
+                          children: snapshot.pendingInvites
+                              .map(
+                                (invite) => Container(
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF8EED7),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: const Color(0xFF7B5A3C),
+                                      width: 2,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '${invite.inviterName} (@${invite.inviterPlayerId})',
+                                        style: const TextStyle(
+                                          color: AppColors.inkBrown,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      _SocialActionButtons(
+                                        stacked: stackedCardActions,
+                                        primaryLabel: '接受',
+                                        primaryIcon: Icons.check_circle,
+                                        primaryTone: _StampTone.green,
+                                        onPrimaryPressed: () {
+                                          widget.onRespondGuildInvite(
+                                            inviteId: invite.id,
+                                            accept: true,
+                                          );
+                                        },
+                                        secondaryLabel: '拒絕',
+                                        secondaryIcon: Icons.cancel,
+                                        secondaryTone: _StampTone.ruby,
+                                        onSecondaryPressed: () {
+                                          widget.onRespondGuildInvite(
+                                            inviteId: invite.id,
+                                            accept: false,
+                                          );
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              )
+                              .toList(growable: false),
+                        ),
+                    ],
+                  );
+                },
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (error, _) => Text(
+                  '社交資料載入失敗：$error',
+                  style: const TextStyle(
+                    color: AppColors.hpRuby,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _SocialActionButtons extends StatelessWidget {
+  const _SocialActionButtons({
+    required this.stacked,
+    required this.primaryLabel,
+    required this.primaryIcon,
+    required this.primaryTone,
+    required this.onPrimaryPressed,
+    required this.secondaryLabel,
+    required this.secondaryIcon,
+    required this.secondaryTone,
+    required this.onSecondaryPressed,
+  });
+
+  final bool stacked;
+  final String primaryLabel;
+  final IconData primaryIcon;
+  final _StampTone primaryTone;
+  final VoidCallback onPrimaryPressed;
+  final String secondaryLabel;
+  final IconData secondaryIcon;
+  final _StampTone secondaryTone;
+  final VoidCallback onSecondaryPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    if (stacked) {
+      return Column(
+        children: [
+          SizedBox(
+            width: double.infinity,
+            child: _StampButton(
+              label: primaryLabel,
+              icon: primaryIcon,
+              tone: primaryTone,
+              onPressed: onPrimaryPressed,
+            ),
           ),
-          const SizedBox(height: 10),
-          widget.state.when(
-            data: (snapshot) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '好友 ${snapshot.friends.length} 位',
-                    style: const TextStyle(
-                      color: AppColors.inkBrown,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  if (snapshot.friends.isEmpty)
-                    const Text(
-                      '尚未新增好友',
-                      style: TextStyle(color: AppColors.navyBlue),
-                    )
-                  else
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: snapshot.friends
-                          .map(
-                            (friend) => _StatGemChip(
-                              icon: const _PixelLabelGlyph(glyph: 'FR'),
-                              label: '${friend.name} (@${friend.playerId})',
-                              color: AppColors.navyBlue,
-                            ),
-                          )
-                          .toList(growable: false),
-                    ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '好友請求 ${snapshot.incomingFriendRequests.length} 筆',
-                    style: const TextStyle(
-                      color: AppColors.inkBrown,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  if (snapshot.incomingFriendRequests.isEmpty)
-                    const Text(
-                      '目前沒有待回覆好友請求',
-                      style: TextStyle(color: AppColors.navyBlue),
-                    )
-                  else
-                    Column(
-                      children: snapshot.incomingFriendRequests
-                          .map(
-                            (request) => Container(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF8EED7),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: const Color(0xFF7B5A3C),
-                                  width: 2,
-                                ),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '${request.requesterName} (@${request.requesterPlayerId})',
-                                    style: const TextStyle(
-                                      color: AppColors.inkBrown,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: _StampButton(
-                                          label: '接受好友',
-                                          icon: Icons.check_circle,
-                                          tone: _StampTone.green,
-                                          onPressed: () {
-                                            widget.onRespondFriendRequest(
-                                              requestId: request.id,
-                                              accept: true,
-                                            );
-                                          },
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Expanded(
-                                        child: _StampButton(
-                                          label: '拒絕',
-                                          icon: Icons.cancel,
-                                          tone: _StampTone.ruby,
-                                          onPressed: () {
-                                            widget.onRespondFriendRequest(
-                                              requestId: request.id,
-                                              accept: false,
-                                            );
-                                          },
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          )
-                          .toList(growable: false),
-                    ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '收到邀請 ${snapshot.pendingInvites.length} 筆',
-                    style: const TextStyle(
-                      color: AppColors.inkBrown,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  if (snapshot.pendingInvites.isEmpty)
-                    const Text(
-                      '目前沒有公會邀請',
-                      style: TextStyle(color: AppColors.navyBlue),
-                    )
-                  else
-                    Column(
-                      children: snapshot.pendingInvites
-                          .map(
-                            (invite) => Container(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF8EED7),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: const Color(0xFF7B5A3C),
-                                  width: 2,
-                                ),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '${invite.inviterName} (@${invite.inviterPlayerId})',
-                                    style: const TextStyle(
-                                      color: AppColors.inkBrown,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: _StampButton(
-                                          label: '接受',
-                                          icon: Icons.check_circle,
-                                          tone: _StampTone.green,
-                                          onPressed: () {
-                                            widget.onRespondGuildInvite(
-                                              inviteId: invite.id,
-                                              accept: true,
-                                            );
-                                          },
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Expanded(
-                                        child: _StampButton(
-                                          label: '拒絕',
-                                          icon: Icons.cancel,
-                                          tone: _StampTone.ruby,
-                                          onPressed: () {
-                                            widget.onRespondGuildInvite(
-                                              inviteId: invite.id,
-                                              accept: false,
-                                            );
-                                          },
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          )
-                          .toList(growable: false),
-                    ),
-                ],
-              );
-            },
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (error, _) => Text(
-              '社交資料載入失敗：$error',
-              style: const TextStyle(
-                color: AppColors.hpRuby,
-                fontWeight: FontWeight.w700,
-              ),
+          const SizedBox(height: 6),
+          SizedBox(
+            width: double.infinity,
+            child: _StampButton(
+              label: secondaryLabel,
+              icon: secondaryIcon,
+              tone: secondaryTone,
+              onPressed: onSecondaryPressed,
             ),
           ),
         ],
-      ),
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(
+          child: _StampButton(
+            label: primaryLabel,
+            icon: primaryIcon,
+            tone: primaryTone,
+            onPressed: onPrimaryPressed,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: _StampButton(
+            label: secondaryLabel,
+            icon: secondaryIcon,
+            tone: secondaryTone,
+            onPressed: onSecondaryPressed,
+          ),
+        ),
+      ],
     );
   }
 }

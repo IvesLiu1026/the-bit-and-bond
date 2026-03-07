@@ -132,6 +132,51 @@ class _InventoryPanelState extends State<_InventoryPanel>
     }
   }
 
+  Widget _buildInventoryActionRow({
+    required InventoryItem item,
+    required bool using,
+    required bool stacked,
+  }) {
+    final quantityChip = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE7DDC9),
+        border: Border.all(color: AppColors.woodFrame, width: 2),
+      ),
+      child: Text(
+        'x${item.quantity}',
+        style: const TextStyle(
+          color: AppColors.inkBrown,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+    final useButton = _StampButton(
+      label: using ? '處理中' : '使用',
+      tone: _StampTone.green,
+      onPressed: using ? null : () => _confirmUse(item),
+    );
+
+    if (stacked) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          quantityChip,
+          const SizedBox(height: 8),
+          SizedBox(width: double.infinity, child: useButton),
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        quantityChip,
+        const Spacer(),
+        SizedBox(width: 96, child: useButton),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -192,13 +237,21 @@ class _InventoryPanelState extends State<_InventoryPanel>
               }
               return LayoutBuilder(
                 builder: (context, constraints) {
-                  final crossAxisCount = constraints.maxWidth >= 520 ? 3 : 2;
+                  final crossAxisCount = math.max(
+                    1,
+                    math.min(3, (constraints.maxWidth / 220).floor()),
+                  );
+                  final mainAxisExtent = switch (crossAxisCount) {
+                    1 => 170.0,
+                    2 => 206.0,
+                    _ => 214.0,
+                  };
                   return GridView.builder(
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: crossAxisCount,
                       crossAxisSpacing: 8,
                       mainAxisSpacing: 8,
-                      childAspectRatio: 1.08,
+                      mainAxisExtent: mainAxisExtent,
                     ),
                     itemCount: items.length,
                     itemBuilder: (context, index) {
@@ -273,56 +326,37 @@ class _InventoryPanelState extends State<_InventoryPanel>
                                 ),
                                 const SizedBox(height: 6),
                                 Expanded(
-                                  child: Text(
-                                    item.description?.trim().isNotEmpty == true
-                                        ? item.description!
-                                        : '可於家庭任務流程中核銷',
-                                    maxLines: 3,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: AppColors.navyBlue,
-                                      fontWeight: FontWeight.w700,
-                                    ),
+                                  child: LayoutBuilder(
+                                    builder: (context, cardConstraints) {
+                                      final stackedActions =
+                                          cardConstraints.maxWidth < 180;
+                                      final descriptionMaxLines = stackedActions
+                                          ? 2
+                                          : 3;
+                                      return Text(
+                                        item.description?.trim().isNotEmpty ==
+                                                true
+                                            ? item.description!
+                                            : '可於家庭任務流程中核銷',
+                                        maxLines: descriptionMaxLines,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: AppColors.navyBlue,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      );
+                                    },
                                   ),
                                 ),
                                 const SizedBox(height: 6),
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 7,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFE7DDC9),
-                                        border: Border.all(
-                                          color: AppColors.woodFrame,
-                                          width: 2,
-                                        ),
-                                      ),
-                                      child: Text(
-                                        'x${item.quantity}',
-                                        style: const TextStyle(
-                                          color: AppColors.inkBrown,
-                                          fontWeight: FontWeight.w900,
-                                        ),
-                                      ),
-                                    ),
-                                    const Spacer(),
-                                    SizedBox(
-                                      width: 78,
-                                      child: _StampButton(
-                                        label: using ? '處理中' : '使用',
-                                        tone: _StampTone.green,
-                                        iconWidget: const _PixelLabelGlyph(
-                                          glyph: 'USE',
-                                        ),
-                                        onPressed: using
-                                            ? null
-                                            : () => _confirmUse(item),
-                                      ),
-                                    ),
-                                  ],
+                                LayoutBuilder(
+                                  builder: (context, cardConstraints) {
+                                    return _buildInventoryActionRow(
+                                      item: item,
+                                      using: using,
+                                      stacked: cardConstraints.maxWidth < 180,
+                                    );
+                                  },
                                 ),
                               ],
                             ),

@@ -17,9 +17,9 @@ void main() {
         ? DevicePreview(
             enabled: true,
             builder: (_) => const ProviderScope(
-              child: ChenLevelingApp(enableDevicePreview: true),
+              child: TheBitAndBondApp(enableDevicePreview: true),
             ),
           )
-        : const ProviderScope(child: ChenLevelingApp()),
+        : const ProviderScope(child: TheBitAndBondApp()),
   );
 }

@@ -184,7 +184,7 @@ class InteractiveFurniture extends PositionComponent {
   @override
   void render(Canvas canvas) {
     super.render(canvas);
-    final rect = Rect.fromLTWH(position.x, position.y, size.x, size.y);
+    final rect = Rect.fromLTWH(0, 0, size.x, size.y);
     final border = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3
@@ -616,17 +616,4 @@ class InteractiveFurniture extends PositionComponent {
       Offset(tagRect.left + padding.dx, tagRect.top + padding.dy - 1),
     );
   }
-}
-
-enum _HeroFacing { down, up, left, right }
-
-enum _HeroAnimState {
-  idleDown,
-  walkDown,
-  idleUp,
-  walkUp,
-  idleLeft,
-  walkLeft,
-  idleRight,
-  walkRight,
 }

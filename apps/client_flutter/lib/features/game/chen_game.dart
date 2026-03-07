@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flame/components.dart';
+import 'package:flame/experimental.dart' show Rectangle;
 import 'package:flame/game.dart';
 import 'package:flame/input.dart';
 import 'package:flame/sprite.dart';
@@ -84,8 +85,8 @@ class HunterRealtimePose {
   }
 }
 
-class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
-  ChenLevelingGame({this.onFurnitureInteracted});
+class TheBitAndBondGame extends FlameGame with PanDetector, KeyboardEvents {
+  TheBitAndBondGame({this.onFurnitureInteracted});
 
   static const String _heroSpriteSheetPath =
       'sprites/hero/Free Pixel Character Base Pack/character.png';
@@ -119,6 +120,8 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
   final Set<String> _realtimeOnlyHunterIds = <String>{};
   final Set<String> _rosterHunterIds = <String>{};
   final List<Rect> _obstacleRects = <Rect>[];
+  String? _cameraTrackingHunterId;
+  bool _joystickMovementEngaged = false;
   Vector2 _worldSize = Vector2(_baseWorldWidth, _baseWorldHeight);
   List<String> _hunterOrder = const [];
   String? _controlledHunterId;
@@ -144,6 +147,8 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
   Vector2 get worldSize => _worldSize;
   final void Function(TavernFurnitureType furniture)? onFurnitureInteracted;
 
+  bool get _isCompactPhoneViewport => size.x > 0 && size.x <= 520;
+
   double get _playAreaTopInset {
     return switch (_theme) {
       TavernVisualTheme.cozyWood => _worldSize.y * 0.33,
@@ -161,14 +166,19 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
       position: Vector2.zero(),
       size: _worldSize,
       paint: Paint()..color = const Color(0xFF4A2E24),
+      priority: -1000,
     );
     _background = background;
-    add(background);
+    world.add(background);
+    camera.viewfinder.anchor = Anchor.center;
+    _syncCameraBounds();
     camera.viewfinder.position = Vector2(_worldSize.x / 2, _worldSize.y / 2);
 
     final spriteImage = await images.load(_heroSpriteSheetPath);
     final tavernBackdropImage = await images.load(_tavernBackdropPath);
-    final campfireSpriteSheetImage = await images.load(_campfireSpriteSheetPath);
+    final campfireSpriteSheetImage = await images.load(
+      _campfireSpriteSheetPath,
+    );
     final spriteSheet = SpriteSheet(
       image: spriteImage,
       srcSize: Vector2.all(32),
@@ -179,9 +189,9 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
     final environmentLayer = _TavernEnvironmentLayer(
       theme: _theme,
       tavernBackdropImage: tavernBackdropImage,
-    );
+    )..priority = -900;
     _environmentLayer = environmentLayer;
-    add(environmentLayer);
+    world.add(environmentLayer);
 
     final floatingJoystick = _FloatingJoystickOverlay(
       baseRadius: _joystickBaseRadius,
@@ -203,6 +213,7 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
     super.onGameResize(size);
     _updateWorldForViewport(size);
     _background?.size = _worldSize;
+    _syncCameraBounds();
     _floatingJoystick?.resizeTo(size);
     _environmentLayer?.markDirty();
     _layoutFurniture();
@@ -215,8 +226,12 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
       return;
     }
     if (_theme == TavernVisualTheme.cozyWood) {
-      final minHeight = viewportSize.y * 1.05;
-      var targetWidth = math.max(_baseWorldWidth, viewportSize.x * 1.45);
+      final compactPhone = viewportSize.x <= 520;
+      final minHeight = viewportSize.y * (compactPhone ? 1.28 : 1.12);
+      var targetWidth = math.max(
+        _baseWorldWidth,
+        viewportSize.x * (compactPhone ? 1.6 : 1.45),
+      );
       var targetHeight = targetWidth / _cozyBackdropAspectRatio;
       if (targetHeight < minHeight) {
         targetHeight = minHeight;
@@ -457,14 +472,14 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
     _furnitures[TavernFurnitureType.honorBanner] = honorBanner;
     _furnitures[TavernFurnitureType.trainingDummy] = trainingDummy;
 
-    add(noticeBoard);
-    add(masterDesk);
-    add(guildChest);
-    add(campfireBar);
-    add(guildMerchant);
-    add(wallBookshelf);
-    add(honorBanner);
-    add(trainingDummy);
+    world.add(noticeBoard);
+    world.add(masterDesk);
+    world.add(guildChest);
+    world.add(campfireBar);
+    world.add(guildMerchant);
+    world.add(wallBookshelf);
+    world.add(honorBanner);
+    world.add(trainingDummy);
   }
 
   void _layoutFurniture() {
@@ -669,8 +684,8 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
       TavernFurnitureType.guildMerchant => '已接近公會商人，點右下互動鍵',
       TavernFurnitureType.wallBookshelf ||
       TavernFurnitureType.honorBanner ||
-      TavernFurnitureType.trainingDummy => '拖曳任意位置，叫出搖桿移動',
-      null => '拖曳任意位置，叫出搖桿移動',
+      TavernFurnitureType.trainingDummy => '左下固定搖桿可 360 度移動',
+      null => '左下固定搖桿可 360 度移動',
     };
     if (hint == _lastInteractionHint) {
       return;
@@ -809,13 +824,19 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
     if (_tryInteractFurniture(worldTouchPoint)) {
       _joystickInput.setZero();
       _floatingJoystick?.deactivate();
+      _joystickMovementEngaged = false;
       return;
     }
     final floatingJoystick = _floatingJoystick;
     if (floatingJoystick == null) {
       return;
     }
-    floatingJoystick.activate(touchPoint);
+    if (!floatingJoystick.containsTouch(touchPoint)) {
+      _joystickInput.setZero();
+      return;
+    }
+    floatingJoystick.activate();
+    _joystickMovementEngaged = false;
     _joystickInput.setZero();
   }
 
@@ -834,18 +855,31 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
       Vector2(details.localPosition.dx, details.localPosition.dy),
       _joystickInput,
     );
+    final engagedNow = _joystickInput.length >= _joystickDeadZone;
+    if (engagedNow != _joystickMovementEngaged) {
+      _joystickMovementEngaged = engagedNow;
+      HapticFeedback.selectionClick();
+    }
   }
 
   @override
   void handlePanEnd(DragEndDetails details) {
     super.handlePanEnd(details);
     _joystickInput.setZero();
+    if (_joystickMovementEngaged) {
+      HapticFeedback.selectionClick();
+    }
+    _joystickMovementEngaged = false;
     _floatingJoystick?.deactivate();
   }
 
   @override
   void onPanCancel() {
     _joystickInput.setZero();
+    if (_joystickMovementEngaged) {
+      HapticFeedback.selectionClick();
+    }
+    _joystickMovementEngaged = false;
     _floatingJoystick?.deactivate();
   }
 
@@ -923,10 +957,7 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
       final controlled = _hunterSprites[controlledId];
       if (controlled != null &&
           !_initializedHunterPositions.contains(controlledId)) {
-        final preferred = Vector2(
-          _worldSize.x / 2,
-          (_playAreaTopInset + _worldSize.y) / 2,
-        );
+        final preferred = _preferredControlledSpawnPoint();
         controlled.position = _findNearestWalkablePosition(
           preferred,
           controlled.radius,
@@ -995,7 +1026,7 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
 
     final sprite = _HeroCharacterComponent(
       position: Vector2.zero(),
-      animations: _HeroCharacterComponent.buildAnimations(spriteSheet),
+      spriteSheet: spriteSheet,
     );
     _hunterSprites[hunterId] = sprite;
     if (realtimeOnly) {
@@ -1003,7 +1034,7 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
     } else {
       _realtimeOnlyHunterIds.remove(hunterId);
     }
-    add(sprite);
+    world.add(sprite);
     _publishActiveHunterIds();
     return sprite;
   }
@@ -1029,10 +1060,7 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
       }
     }
     if (!_initializedHunterPositions.contains(preferred)) {
-      final preferredCenter = Vector2(
-        _worldSize.x / 2,
-        (_playAreaTopInset + _worldSize.y) / 2,
-      );
+      final preferredCenter = _preferredControlledSpawnPoint();
       sprite.position = _findNearestWalkablePosition(
         preferredCenter,
         sprite.radius,
@@ -1193,30 +1221,42 @@ class ChenLevelingGame extends FlameGame with PanDetector, KeyboardEvents {
     );
   }
 
+  Vector2 _preferredControlledSpawnPoint() {
+    final playableHeight = math.max(0.0, _worldSize.y - _playAreaTopInset);
+    final verticalFactor = _isCompactPhoneViewport ? 0.34 : 0.5;
+    return Vector2(
+      _worldSize.x / 2,
+      _playAreaTopInset + (playableHeight * verticalFactor),
+    );
+  }
+
+  void _syncCameraBounds() {
+    if (size.x <= 0 || size.y <= 0) {
+      return;
+    }
+    camera.setBounds(
+      Rectangle.fromLTWH(0, 0, _worldSize.x, _worldSize.y),
+      considerViewport: true,
+    );
+  }
+
   void _syncCameraFollow({bool snap = false}) {
     if (size.x <= 0 || size.y <= 0) {
       return;
     }
     final controlled = _controlledHunter;
-    final halfW = size.x * 0.5;
-    final halfH = size.y * 0.5;
-    final minX = halfW;
-    final maxX = math.max(minX, _worldSize.x - halfW);
-    final minY = halfH;
-    final maxY = math.max(minY, _worldSize.y - halfH);
-    final target =
-        controlled?.position ?? Vector2(_worldSize.x / 2, _worldSize.y / 2);
-    final targetX = target.x.clamp(minX, maxX).toDouble();
-    final targetY = target.y.clamp(minY, maxY).toDouble();
-    if (snap) {
-      camera.viewfinder.position.setValues(targetX, targetY);
+    final controlledId = _controlledHunterId;
+    if (controlled == null || controlledId == null) {
+      _cameraTrackingHunterId = null;
+      camera.stop();
+      camera.viewfinder.position.setValues(_worldSize.x / 2, _worldSize.y / 2);
       return;
     }
-    final current = camera.viewfinder.position;
-    final lerp = 0.22;
-    current
-      ..x = current.x + ((targetX - current.x) * lerp)
-      ..y = current.y + ((targetY - current.y) * lerp);
+    if (_cameraTrackingHunterId == controlledId && !snap) {
+      return;
+    }
+    _cameraTrackingHunterId = controlledId;
+    camera.follow(controlled, snap: snap);
   }
 
   void _publishActiveHunterIds() {

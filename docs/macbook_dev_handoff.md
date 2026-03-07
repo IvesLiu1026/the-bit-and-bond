@@ -1,6 +1,6 @@
 # MacBook AI Agent Handoff
 
-這份文件是給接手 `chen-leveling` 的 MacBook dev。
+這份文件是給接手 `The Bit & Bond` 的 MacBook dev。
 目標不是重講產品願景，而是讓新dev能快速判斷：
 
 - 目前 repo 已經做到哪裡
