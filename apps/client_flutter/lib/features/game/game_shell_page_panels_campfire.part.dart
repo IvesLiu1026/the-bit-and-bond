@@ -97,13 +97,13 @@ class _CampfireVoicePanelState extends State<_CampfireVoicePanel> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
+  @override  Widget build(BuildContext context) {
     final state = widget.state;
     final speakingCount = state.activeSpeakerIdentities.length;
-    final compact =
-        MediaQuery.of(context).size.width < 520 ||
-        MediaQuery.of(context).size.height < 760;
+    final media = MediaQuery.of(context);
+    final narrowLayout = media.size.width < 520;
+    final shortHeight = media.size.height < 520;
+    final denseSpacing = narrowLayout || shortHeight;
     final roomLabel = () {
       final room = state.roomId;
       if (room == null || room.isEmpty) {
@@ -121,299 +121,215 @@ class _CampfireVoicePanelState extends State<_CampfireVoicePanel> {
     return _ParchmentSection(
       title: '營火語音吧台',
       icon: Icons.local_fire_department,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (compact)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 8,
+      child: Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (narrowLayout)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _CampfireStatusBanner(subtitle: subtitle),
+                  SizedBox(height: denseSpacing ? 6 : 8),
+                  _StampButton(
+                    label: state.connected
+                        ? (state.micEnabled ? '麥克風開啟' : '麥克風靜音')
+                        : '麥克風',
+                    iconWidget: _PixelMicStoneIcon(enabled: state.micEnabled),
+                    tone: state.micEnabled ? _StampTone.green : _StampTone.wood,
+                    onPressed: state.connected ? widget.onToggleMic : null,
                   ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF4A2A20),
-                    border: Border.all(
-                      color: const Color(0xFF7B5A3C),
-                      width: 2,
-                    ),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Color(0x803E2723),
-                        offset: Offset(0, 2),
-                        blurRadius: 0,
-                      ),
-                    ],
-                  ),
-                  child: Text(
-                    subtitle,
-                    style: const TextStyle(
-                      color: Color(0xFFFDE8C8),
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                _StampButton(
-                  label: state.connected
-                      ? (state.micEnabled ? '麥克風開啟' : '麥克風靜音')
-                      : '麥克風',
-                  iconWidget: _PixelMicStoneIcon(enabled: state.micEnabled),
-                  tone: state.micEnabled ? _StampTone.green : _StampTone.wood,
-                  onPressed: state.connected ? widget.onToggleMic : null,
-                ),
-              ],
-            )
-          else
-            Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF4A2A20),
-                      border: Border.all(
-                        color: const Color(0xFF7B5A3C),
-                        width: 2,
-                      ),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x803E2723),
-                          offset: Offset(0, 2),
-                          blurRadius: 0,
-                        ),
-                      ],
-                    ),
-                    child: Text(
-                      subtitle,
-                      style: const TextStyle(
-                        color: Color(0xFFFDE8C8),
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                _StampButton(
-                  label: state.connected
-                      ? (state.micEnabled ? '麥克風開啟' : '麥克風靜音')
-                      : '麥克風',
-                  iconWidget: _PixelMicStoneIcon(enabled: state.micEnabled),
-                  tone: state.micEnabled ? _StampTone.green : _StampTone.wood,
-                  onPressed: state.connected ? widget.onToggleMic : null,
-                ),
-              ],
-            ),
-          const SizedBox(height: 8),
-          if (compact)
-            Column(
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: _StatTile(
-                        title: '連線人數',
-                        value: '${state.participantCount}',
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _StatTile(title: '發話中', value: '$speakingCount'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                _StatTile(title: '房間', value: roomLabel),
-              ],
-            )
-          else
-            Row(
-              children: [
-                Expanded(
-                  child: _StatTile(
-                    title: '連線人數',
-                    value: '${state.participantCount}',
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _StatTile(title: '發話中', value: '$speakingCount'),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _StatTile(title: '房間', value: roomLabel),
-                ),
-              ],
-            ),
-          if (state.errorMessage != null) ...[
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF5E2720),
-                border: Border.all(color: const Color(0xFFD84343), width: 2),
-              ),
-              child: Text(
-                state.errorMessage!,
-                style: const TextStyle(
-                  color: Color(0xFFFFD7CF),
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          ],
-          SizedBox(height: compact ? 6 : 10),
-          SizedBox(
-            height: compact ? 156 : 248,
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF3E2723),
-                border: Border.all(color: const Color(0xFF9C7454), width: 2.4),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x8A2A1811),
-                    offset: Offset(0, 3),
-                    blurRadius: 0,
+                ],
+              )
+            else
+              Row(
+                children: [
+                  Expanded(child: _CampfireStatusBanner(subtitle: subtitle)),
+                  const SizedBox(width: 8),
+                  _StampButton(
+                    label: state.connected
+                        ? (state.micEnabled ? '麥克風開啟' : '麥克風靜音')
+                        : '麥克風',
+                    iconWidget: _PixelMicStoneIcon(enabled: state.micEnabled),
+                    tone: state.micEnabled ? _StampTone.green : _StampTone.wood,
+                    onPressed: state.connected ? widget.onToggleMic : null,
                   ),
                 ],
               ),
-              child: state.messages.isEmpty
-                  ? const Center(
-                      child: Text(
-                        '營火還很安靜，來說第一句話吧。',
-                        style: TextStyle(
-                          color: Color(0xFFF5DEBE),
-                          fontWeight: FontWeight.w700,
+            SizedBox(height: denseSpacing ? 6 : 8),
+            if (narrowLayout)
+              Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _StatTile(
+                          title: '連線人數',
+                          value: '${state.participantCount}',
                         ),
                       ),
-                    )
-                  : NotificationListener<UserScrollNotification>(
-                      onNotification: (notification) {
-                        if (!_chatScrollController.hasClients) {
-                          return false;
-                        }
-                        final extentAfter =
-                            _chatScrollController.position.extentAfter;
-                        if (notification.direction == ScrollDirection.reverse) {
-                          _autoScrollEnabled = true;
-                        } else if (notification.direction ==
-                            ScrollDirection.forward) {
-                          _autoScrollEnabled = extentAfter <= 56;
-                        }
-                        return false;
-                      },
-                      child: ListView.separated(
-                        controller: _chatScrollController,
-                        itemCount: state.messages.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: 6),
-                        itemBuilder: (context, index) {
-                          final message = state.messages[index];
-                          return Container(
-                            padding: const EdgeInsets.fromLTRB(8, 6, 8, 7),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF5D4037),
-                              border: Border.all(
-                                color: const Color(0xFFD7C4A3),
-                                width: 2,
-                              ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        message.senderName,
-                                        style: const TextStyle(
-                                          color: Color(0xFFFFE8BF),
-                                          fontWeight: FontWeight.w900,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ),
-                                    Text(
-                                      _formatDateTime(message.sentAt),
-                                      style: const TextStyle(
-                                        color: Color(0xFFD3B88E),
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 11,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  message.content,
-                                  style: const TextStyle(
-                                    color: Color(0xFFFDF4E3),
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _StatTile(title: '發話中', value: '$speakingCount'),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  _StatTile(title: '房間', value: roomLabel),
+                ],
+              )
+            else
+              Row(
+                children: [
+                  Expanded(
+                    child: _StatTile(
+                      title: '連線人數',
+                      value: '${state.participantCount}',
                     ),
-            ),
-          ),
-          SizedBox(height: compact ? 6 : 10),
-          if (!state.connected)
-            _StampButton(
-              label: state.connecting ? '連線中...' : '加入營火',
-              icon: Icons.campaign,
-              tone: _StampTone.green,
-              onPressed: state.connecting ? null : widget.onJoin,
-            )
-          else if (compact)
-            Column(
-              children: [
-                TextField(
-                  controller: _messageController,
-                  enabled: !_sending,
-                  decoration: const InputDecoration(
-                    labelText: '酒館聊天',
-                    isDense: true,
-                    filled: true,
-                    fillColor: Color(0xFFE7DDC9),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _StatTile(title: '發話中', value: '$speakingCount'),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _StatTile(title: '房間', value: roomLabel),
+                  ),
+                ],
+              ),
+            if (state.errorMessage != null) ...[
+              SizedBox(height: denseSpacing ? 6 : 8),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF5E2720),
+                  border: Border.all(color: const Color(0xFFD84343), width: 2),
+                ),
+                child: Text(
+                  state.errorMessage!,
+                  style: const TextStyle(
+                    color: Color(0xFFFFD7CF),
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _StampButton(
-                        label: _sending ? '送出中...' : '送出',
-                        icon: Icons.send_rounded,
-                        tone: _StampTone.blue,
-                        onPressed: _sending ? null : _send,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _StampButton(
-                        label: '離開營火',
-                        icon: Icons.logout,
-                        tone: _StampTone.ruby,
-                        onPressed: widget.onLeave,
-                      ),
+              ),
+            ],
+            SizedBox(height: denseSpacing ? 6 : 10),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF3E2723),
+                  border: Border.all(
+                    color: const Color(0xFF9C7454),
+                    width: 2.4,
+                  ),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x8A2A1811),
+                      offset: Offset(0, 3),
+                      blurRadius: 0,
                     ),
                   ],
                 ),
-              ],
-            )
-          else
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
+                child: state.messages.isEmpty
+                    ? const Center(
+                        child: Text(
+                          '營火還很安靜，來說第一句話吧。',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Color(0xFFF5DEBE),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      )
+                    : NotificationListener<UserScrollNotification>(
+                        onNotification: (notification) {
+                          if (!_chatScrollController.hasClients) {
+                            return false;
+                          }
+                          final extentAfter =
+                              _chatScrollController.position.extentAfter;
+                          if (notification.direction ==
+                              ScrollDirection.reverse) {
+                            _autoScrollEnabled = true;
+                          } else if (notification.direction ==
+                              ScrollDirection.forward) {
+                            _autoScrollEnabled = extentAfter <= 56;
+                          }
+                          return false;
+                        },
+                        child: ListView.separated(
+                          controller: _chatScrollController,
+                          itemCount: state.messages.length,
+                          separatorBuilder: (_, _) => const SizedBox(height: 6),
+                          itemBuilder: (context, index) {
+                            final message = state.messages[index];
+                            return Container(
+                              padding: const EdgeInsets.fromLTRB(8, 6, 8, 7),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF5D4037),
+                                border: Border.all(
+                                  color: const Color(0xFFD7C4A3),
+                                  width: 2,
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          message.senderName,
+                                          style: const TextStyle(
+                                            color: Color(0xFFFFE8BF),
+                                            fontWeight: FontWeight.w900,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                      Text(
+                                        _formatDateTime(message.sentAt),
+                                        style: const TextStyle(
+                                          color: Color(0xFFD3B88E),
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    message.content,
+                                    style: const TextStyle(
+                                      color: Color(0xFFFDF4E3),
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+              ),
+            ),
+            SizedBox(height: denseSpacing ? 6 : 10),
+            if (!state.connected)
+              _StampButton(
+                label: state.connecting ? '連線中...' : '加入營火',
+                icon: Icons.campaign,
+                tone: _StampTone.green,
+                onPressed: state.connecting ? null : widget.onJoin,
+              )
+            else if (narrowLayout)
+              Column(
+                children: [
+                  TextField(
                     controller: _messageController,
                     enabled: !_sending,
                     decoration: const InputDecoration(
@@ -422,28 +338,98 @@ class _CampfireVoicePanelState extends State<_CampfireVoicePanel> {
                       filled: true,
                       fillColor: Color(0xFFE7DDC9),
                     ),
-                    onSubmitted: (_) {
-                      _send();
-                    },
                   ),
-                ),
-                const SizedBox(width: 8),
-                _StampButton(
-                  label: _sending ? '送出中...' : '送出',
-                  icon: Icons.send_rounded,
-                  tone: _StampTone.blue,
-                  onPressed: _sending ? null : _send,
-                ),
-                const SizedBox(width: 8),
-                _StampButton(
-                  label: '離開營火',
-                  icon: Icons.logout,
-                  tone: _StampTone.ruby,
-                  onPressed: widget.onLeave,
-                ),
-              ],
-            ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _StampButton(
+                          label: _sending ? '送出中...' : '送出',
+                          icon: Icons.send_rounded,
+                          tone: _StampTone.blue,
+                          onPressed: _sending ? null : _send,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _StampButton(
+                          label: '離開營火',
+                          icon: Icons.logout,
+                          tone: _StampTone.ruby,
+                          onPressed: widget.onLeave,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              )
+            else
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _messageController,
+                      enabled: !_sending,
+                      decoration: const InputDecoration(
+                        labelText: '酒館聊天',
+                        isDense: true,
+                        filled: true,
+                        fillColor: Color(0xFFE7DDC9),
+                      ),
+                      onSubmitted: (_) {
+                        _send();
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  _StampButton(
+                    label: _sending ? '送出中...' : '送出',
+                    icon: Icons.send_rounded,
+                    tone: _StampTone.blue,
+                    onPressed: _sending ? null : _send,
+                  ),
+                  const SizedBox(width: 8),
+                  _StampButton(
+                    label: '離開營火',
+                    icon: Icons.logout,
+                    tone: _StampTone.ruby,
+                    onPressed: widget.onLeave,
+                  ),
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CampfireStatusBanner extends StatelessWidget {
+  const _CampfireStatusBanner({required this.subtitle});
+
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF4A2A20),
+        border: Border.all(color: const Color(0xFF7B5A3C), width: 2),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x803E2723),
+            offset: Offset(0, 2),
+            blurRadius: 0,
+          ),
         ],
+      ),
+      child: Text(
+        subtitle,
+        style: const TextStyle(
+          color: Color(0xFFFDE8C8),
+          fontWeight: FontWeight.w800,
+        ),
       ),
     );
   }

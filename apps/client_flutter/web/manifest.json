@@ -1,11 +1,11 @@
 {
-    "name": "chen_leveling_client",
-    "short_name": "chen_leveling_client",
+    "name": "The Bit & Bond",
+    "short_name": "The Bit & Bond",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "A cozy guild-life RPG app for The Bit & Bond.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

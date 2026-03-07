@@ -88,7 +88,7 @@ class _PlayerProfileDialogState extends State<_PlayerProfileDialog> {
     return DefaultTabController(
       length: 2,
       child: Column(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize: MainAxisSize.max,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Row(
@@ -124,8 +124,7 @@ class _PlayerProfileDialogState extends State<_PlayerProfileDialog> {
             ),
           ),
           const SizedBox(height: 10),
-          SizedBox(
-            height: 470,
+          Expanded(
             child: TabBarView(
               children: [
                 ListView(

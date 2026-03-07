@@ -46,7 +46,7 @@ jobs:
         run: |
           mkdir -p dist
           cp target/release/chen_leveling_server dist/chen_leveling_server
-          tar -C dist -czf dist/chen-leveling-server-linux-x64.tar.gz chen_leveling_server
+          tar -C dist -czf dist/the-bit-and-bond-server-linux-x64.tar.gz chen_leveling_server
 
       - name: Flutter pub get
         working-directory: apps/client_flutter
@@ -58,13 +58,13 @@ jobs:
 
       - name: Build Flutter web release
         working-directory: apps/client_flutter
-        run: flutter build web --release --web-renderer canvaskit
+        run: flutter build web --release
 
       - name: Package Flutter web
         run: |
           mkdir -p dist
           cd apps/client_flutter/build/web
-          zip -r ../../../../dist/chen-leveling-web-release.zip .
+          zip -r ../../../../dist/the-bit-and-bond-web-release.zip .
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
@@ -72,5 +72,5 @@ jobs:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           generate_release_notes: true
           files: |
-            dist/chen-leveling-server-linux-x64.tar.gz
-            dist/chen-leveling-web-release.zip
+            dist/the-bit-and-bond-server-linux-x64.tar.gz
+            dist/the-bit-and-bond-web-release.zip

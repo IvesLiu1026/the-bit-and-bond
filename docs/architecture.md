@@ -2,7 +2,7 @@
 
 ## Monorepo strategy
 
-`chen-leveling` uses a single repository to keep API contract, data model, backend logic, and client integration in lockstep.
+`The Bit & Bond` uses a single repository to keep API contract, data model, backend logic, and client integration in lockstep.
 
 ## Boundaries
 

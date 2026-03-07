@@ -1,6 +1,6 @@
-# Chen Leveling
+# The Bit & Bond
 
-`Chen Leveling` 是一個「RPG 公會生活」導向的任務與社交 App，採用 Monorepo 架構，包含：
+`The Bit & Bond` 是一個「RPG 公會生活」導向的任務與社交 App，採用 Monorepo 架構，包含：
 - Rust 後端（Axum + SeaORM + PostgreSQL）
 - Flutter 前端（Flame + Riverpod）
 - 即時多人同步（WebSocket）

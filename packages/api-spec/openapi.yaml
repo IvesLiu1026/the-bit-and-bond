@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: chen-leveling API
+  title: The Bit & Bond API
   version: 0.1.0
 servers:
   - url: http://localhost:8080

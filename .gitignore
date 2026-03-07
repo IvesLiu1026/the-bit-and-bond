@@ -1,9 +1,11 @@
 /target
 **/target
+.DS_Store
 **/.dart_tool
 **/.idea
 **/.vscode
 **/build
+**/build.backup.*
 **/ios/Pods
 **/ios/.symlinks
 **/android/.gradle
@@ -12,6 +14,7 @@
 **/__pycache__/
 apps/client_flutter/assets/external/
 output/
+B&B.png
 .env
 .env.*
 !.env.example

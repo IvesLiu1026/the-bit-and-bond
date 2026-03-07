@@ -29,7 +29,7 @@ jobs:
       - name: Upload server artifact
         uses: actions/upload-artifact@v4
         with:
-          name: chen-leveling-server-linux-x64
+          name: the-bit-and-bond-server-linux-x64
           path: target/release/chen_leveling_server
           if-no-files-found: error
 
@@ -54,11 +54,11 @@ jobs:
         run: flutter pub get
 
       - name: Build web release
-        run: flutter build web --release --web-renderer canvaskit
+        run: flutter build web --release
 
       - name: Upload web artifact
         uses: actions/upload-artifact@v4
         with:
-          name: chen-leveling-web-build
+          name: the-bit-and-bond-web-build
           path: apps/client_flutter/build/web
           if-no-files-found: error

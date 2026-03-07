@@ -5,17 +5,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
-import 'package:chen_leveling_client/app/app.dart';
-import 'package:chen_leveling_client/core/auth/auth_session.dart';
-import 'package:chen_leveling_client/core/network/api_client.dart';
-import 'package:chen_leveling_client/core/network/auth_api_client.dart';
-import 'package:chen_leveling_client/features/quests/models.dart';
-import 'package:chen_leveling_client/features/quests/quest_repository.dart';
-import 'package:chen_leveling_client/state/auth_controller.dart';
-import 'package:chen_leveling_client/state/progression_controller.dart';
-import 'package:chen_leveling_client/state/providers.dart';
-import 'package:chen_leveling_client/state/quest_controller.dart';
-import 'package:chen_leveling_client/state/social_controller.dart';
+import 'package:the_bit_and_bond_client/app/app.dart';
+import 'package:the_bit_and_bond_client/core/auth/auth_session.dart';
+import 'package:the_bit_and_bond_client/core/network/api_client.dart';
+import 'package:the_bit_and_bond_client/core/network/auth_api_client.dart';
+import 'package:the_bit_and_bond_client/features/quests/models.dart';
+import 'package:the_bit_and_bond_client/features/quests/quest_repository.dart';
+import 'package:the_bit_and_bond_client/state/auth_controller.dart';
+import 'package:the_bit_and_bond_client/state/inventory_controller.dart';
+import 'package:the_bit_and_bond_client/state/progression_controller.dart';
+import 'package:the_bit_and_bond_client/state/providers.dart';
+import 'package:the_bit_and_bond_client/state/quest_controller.dart';
+import 'package:the_bit_and_bond_client/state/social_controller.dart';
 
 void main() {
   testWidgets('Game shell renders tavern HUD and profile dialog', (
@@ -36,11 +37,14 @@ void main() {
           progressionControllerProvider.overrideWith(
             (ref) => _TestProgressionController(),
           ),
+          inventoryControllerProvider.overrideWith(
+            (ref) => _TestInventoryController(),
+          ),
           socialControllerProvider.overrideWith(
             (ref) => _TestSocialController(),
           ),
         ],
-        child: const ChenLevelingApp(),
+        child: const TheBitAndBondApp(),
       ),
     );
 
@@ -48,7 +52,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('公會任務板'), findsOneWidget);
-    expect(find.text('拖曳任意位置，叫出搖桿移動'), findsOneWidget);
+    expect(find.text('左下固定搖桿可 360 度移動'), findsOneWidget);
     expect(find.text('玩家通行證'), findsNothing);
 
     await tester.tap(find.text('Lv.2'));
@@ -76,11 +80,14 @@ void main() {
           progressionControllerProvider.overrideWith(
             (ref) => _TestProgressionController(),
           ),
+          inventoryControllerProvider.overrideWith(
+            (ref) => _TestInventoryController(),
+          ),
           socialControllerProvider.overrideWith(
             (ref) => _TestSocialController(),
           ),
         ],
-        child: const ChenLevelingApp(),
+        child: const TheBitAndBondApp(),
       ),
     );
 
@@ -113,11 +120,97 @@ void main() {
           progressionControllerProvider.overrideWith(
             (ref) => _TestProgressionController(),
           ),
+          inventoryControllerProvider.overrideWith(
+            (ref) => _TestInventoryController(),
+          ),
           socialControllerProvider.overrideWith(
             (ref) => _TestSocialController(),
           ),
         ],
-        child: const ChenLevelingApp(),
+        child: const TheBitAndBondApp(),
+      ),
+    );
+
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.text('營火聊天'));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('營火語音吧台'), findsOneWidget);
+    expect(find.text('加入營火'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'Inventory dialog keeps action buttons stable on phone viewport',
+    (WidgetTester tester) async {
+      tester.view.devicePixelRatio = 1.0;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authControllerProvider.overrideWith((ref) => _TestAuthController()),
+            questControllerProvider.overrideWith(
+              (ref) => _TestQuestController(),
+            ),
+            progressionControllerProvider.overrideWith(
+              (ref) => _TestProgressionController(),
+            ),
+            inventoryControllerProvider.overrideWith(
+              (ref) => _TestInventoryController(),
+            ),
+            socialControllerProvider.overrideWith(
+              (ref) => _TestSocialController(),
+            ),
+          ],
+          child: const TheBitAndBondApp(),
+        ),
+      );
+
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(find.text('背包'));
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.text('冒險背包'), findsOneWidget);
+      expect(find.text('修理工具卷'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('Campfire dialog stays stable on landscape phone viewport', (
+    WidgetTester tester,
+  ) async {
+    tester.view.devicePixelRatio = 1.0;
+    tester.view.physicalSize = const Size(844, 390);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authControllerProvider.overrideWith((ref) => _TestAuthController()),
+          questControllerProvider.overrideWith((ref) => _TestQuestController()),
+          progressionControllerProvider.overrideWith(
+            (ref) => _TestProgressionController(),
+          ),
+          inventoryControllerProvider.overrideWith(
+            (ref) => _TestInventoryController(),
+          ),
+          socialControllerProvider.overrideWith(
+            (ref) => _TestSocialController(),
+          ),
+        ],
+        child: const TheBitAndBondApp(),
       ),
     );
 
@@ -197,6 +290,38 @@ class _TestProgressionController extends ProgressionController {
 
   @override
   Future<void> refresh() async {}
+}
+
+class _TestInventoryController extends InventoryController {
+  _TestInventoryController() : super(repo: _NoopQuestRepository()) {
+    state = AsyncValue.data([
+      InventoryItem(
+        itemId: 'inventory-1',
+        name: '修理工具卷',
+        description: '記下今天要修的家具與工具，方便公會長派工。',
+        iconTag: 'SCROLL',
+        quantity: 1,
+        updatedAt: DateTime(2026, 3, 7),
+      ),
+    ]);
+  }
+
+  @override
+  Future<void> load() async {}
+
+  @override
+  Future<void> refresh() async {}
+
+  @override
+  Future<InventoryUseResult> useItem({required String itemId}) async {
+    return InventoryUseResult(
+      itemId: itemId,
+      itemName: '修理工具卷',
+      remainingQuantity: 0,
+      systemMessage: '已使用修理工具卷',
+      chatMessageId: 'chat-message-1',
+    );
+  }
 }
 
 class _TestSocialController extends SocialController {

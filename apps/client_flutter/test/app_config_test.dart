@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:chen_leveling_client/core/config/app_config.dart';
+import 'package:the_bit_and_bond_client/core/config/app_config.dart';
 
 void main() {
   test('web default api base url follows current host/port', () {

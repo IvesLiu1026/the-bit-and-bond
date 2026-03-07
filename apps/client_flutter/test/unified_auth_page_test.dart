@@ -4,11 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
-import 'package:chen_leveling_client/core/auth/auth_session.dart';
-import 'package:chen_leveling_client/core/network/auth_api_client.dart';
-import 'package:chen_leveling_client/features/auth/unified_auth_page.dart';
-import 'package:chen_leveling_client/state/auth_controller.dart';
-import 'package:chen_leveling_client/state/providers.dart';
+import 'package:the_bit_and_bond_client/core/auth/auth_session.dart';
+import 'package:the_bit_and_bond_client/core/network/auth_api_client.dart';
+import 'package:the_bit_and_bond_client/features/auth/unified_auth_page.dart';
+import 'package:the_bit_and_bond_client/state/auth_controller.dart';
+import 'package:the_bit_and_bond_client/state/providers.dart';
 
 void main() {
   testWidgets('shows inline validation error for empty login input', (

@@ -35,29 +35,39 @@ extension _GameShellDialogs on _GameShellPageState {
       builder: (dialogContext) {
         final media = MediaQuery.of(dialogContext);
         final compact = media.size.width < 520 || media.size.height < 760;
-        final maxWidth = math.max(300.0, media.size.width - 24);
-        final maxHeight = math.max(
-          320.0,
-          media.size.height - media.padding.vertical - 24,
-        );
+        final maxWidth = math.max(280.0, media.size.width - 24);
+        final availableHeight =
+            media.size.height -
+            media.padding.vertical -
+            media.viewInsets.vertical -
+            24;
+        final maxHeight = math.max(220.0, availableHeight);
         final width = math.min(preferredWidth, maxWidth);
         final height = preferredHeight == null
             ? null
-            : math.min(preferredHeight, compact ? maxHeight * 0.88 : maxHeight);
+            : math.min(preferredHeight, compact ? maxHeight * 0.94 : maxHeight);
 
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 12,
-          ),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: width, maxHeight: maxHeight),
-            child: _OverlayPanel(
-              child: SizedBox(
-                width: width,
-                height: height,
-                child: builder(dialogContext),
+        return AnimatedPadding(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          padding: media.viewInsets,
+          child: Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 12,
+            ),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: width,
+                maxHeight: maxHeight,
+              ),
+              child: _OverlayPanel(
+                child: SizedBox(
+                  width: width,
+                  height: height,
+                  child: builder(dialogContext),
+                ),
               ),
             ),
           ),

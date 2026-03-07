@@ -10,7 +10,7 @@ resolver = "2"
 edition = "2024"
 version = "0.1.0"
 license = "MIT"
-authors = ["chen-leveling"]
+authors = ["The Bit & Bond"]
 
 [workspace.dependencies]
 axum = { version = "0.8", features = ["macros", "json", "ws"] }

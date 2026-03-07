@@ -1,7 +1,7 @@
 part of 'chen_game.dart';
 
 class _TavernEnvironmentLayer extends Component
-    with HasGameReference<ChenLevelingGame> {
+    with HasGameReference<TheBitAndBondGame> {
   _TavernEnvironmentLayer({
     required TavernVisualTheme theme,
     this.tavernBackdropImage,
@@ -9,7 +9,7 @@ class _TavernEnvironmentLayer extends Component
 
   static const double _floorTile = 64;
   static const double _torchSpacing = 128;
-  static const double _wallHeight = ChenLevelingGame._baseTopWallHeight;
+  static const double _wallHeight = TheBitAndBondGame._baseTopWallHeight;
   ui.Picture? _cachedBase;
   Size _cachedSize = Size.zero;
   double _elapsed = 0;
@@ -282,6 +282,7 @@ class _TavernEnvironmentLayer extends Component
           Color(0x2A140D08),
           Color(0x55140D08),
         ],
+        const [0.0, 0.68, 1.0],
       );
     canvas.drawRect(targetRect, vignette);
 
@@ -294,6 +295,7 @@ class _TavernEnvironmentLayer extends Component
           Color(0x221A0F09),
           Color(0x001A0F09),
         ],
+        const [0.0, 0.48, 1.0],
       );
     canvas.drawRect(targetRect, topShade);
   }

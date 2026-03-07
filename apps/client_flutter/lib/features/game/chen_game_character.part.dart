@@ -1,25 +1,22 @@
 part of 'chen_game.dart';
 
-class _HeroCharacterComponent
-    extends SpriteAnimationGroupComponent<_HeroAnimState> {
+class _HeroCharacterComponent extends PositionComponent {
   _HeroCharacterComponent({
     required super.position,
-    required Map<_HeroAnimState, SpriteAnimation> animations,
-  }) : super(
-         size: Vector2.all(72),
-         anchor: Anchor.center,
-         animations: animations,
-         current: _HeroAnimState.idleDown,
-       ) {
-    paint.filterQuality = FilterQuality.none;
-  }
+    required SpriteSheet spriteSheet,
+  }) : _spriteSheet = spriteSheet,
+       super(size: Vector2.all(72), anchor: Anchor.center, priority: 200);
 
   static const double _frameStep = 0.1;
+  static const int _frameSize = 32;
   static const int _downRow = 13;
   static const int _rightRow = 14;
   static const int _leftRow = 15;
   static const int _upRow = 16;
+  static const List<int> _walkColumns = <int>[1, 2, 3, 4];
 
+  final SpriteSheet _spriteSheet;
+  final Paint _spritePaint = Paint()..filterQuality = FilterQuality.none;
   final double radius = 22;
   _HeroFacing _facing = _HeroFacing.down;
   bool _controlled = false;
@@ -27,69 +24,33 @@ class _HeroCharacterComponent
   bool _hasRemoteTarget = false;
   final Vector2 _remoteTarget = Vector2.zero();
   static const double _remoteLerpSpeed = 14.0;
+  double _animationTick = 0;
+  int _walkFrameIndex = 0;
 
-  static Map<_HeroAnimState, SpriteAnimation> buildAnimations(
-    SpriteSheet spriteSheet,
-  ) {
-    return {
-      _HeroAnimState.idleDown: _buildAnimation(
-        spriteSheet: spriteSheet,
-        row: _downRow,
-        columns: const [0],
+  @override
+  void render(Canvas canvas) {
+    final shadow = Paint()..color = const Color(0x5520100A);
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(size.x * 0.5, size.y * 0.83),
+        width: size.x * 0.42,
+        height: size.y * 0.16,
       ),
-      _HeroAnimState.walkDown: _buildAnimation(
-        spriteSheet: spriteSheet,
-        row: _downRow,
-        columns: const [1, 2, 3, 4],
-      ),
-      _HeroAnimState.idleUp: _buildAnimation(
-        spriteSheet: spriteSheet,
-        row: _upRow,
-        columns: const [0],
-      ),
-      _HeroAnimState.walkUp: _buildAnimation(
-        spriteSheet: spriteSheet,
-        row: _upRow,
-        columns: const [1, 2, 3, 4],
-      ),
-      _HeroAnimState.idleLeft: _buildAnimation(
-        spriteSheet: spriteSheet,
-        row: _leftRow,
-        columns: const [0],
-      ),
-      _HeroAnimState.walkLeft: _buildAnimation(
-        spriteSheet: spriteSheet,
-        row: _leftRow,
-        columns: const [1, 2, 3, 4],
-      ),
-      _HeroAnimState.idleRight: _buildAnimation(
-        spriteSheet: spriteSheet,
-        row: _rightRow,
-        columns: const [0],
-      ),
-      _HeroAnimState.walkRight: _buildAnimation(
-        spriteSheet: spriteSheet,
-        row: _rightRow,
-        columns: const [1, 2, 3, 4],
-      ),
-    };
-  }
+      shadow,
+    );
 
-  static SpriteAnimation _buildAnimation({
-    required SpriteSheet spriteSheet,
-    required int row,
-    required List<int> columns,
-  }) {
-    final frameData = columns
-        .map(
-          (column) =>
-              spriteSheet.createFrameData(row, column, stepTime: _frameStep),
-        )
-        .toList();
-
-    return SpriteAnimation.fromFrameData(
-      spriteSheet.image,
-      SpriteAnimationData(frameData),
+    final sourceRect = Rect.fromLTWH(
+      (_currentColumn * _frameSize).toDouble(),
+      (_currentRow * _frameSize).toDouble(),
+      _frameSize.toDouble(),
+      _frameSize.toDouble(),
+    );
+    final destinationRect = Rect.fromLTWH(0, 0, size.x, size.y);
+    canvas.drawImageRect(
+      _spriteSheet.image,
+      sourceRect,
+      destinationRect,
+      _spritePaint,
     );
   }
 
@@ -97,8 +58,11 @@ class _HeroCharacterComponent
     if (!velocity.isZero()) {
       _updateFacing(velocity);
     }
+    if (_walking != moving && !moving) {
+      _animationTick = 0;
+      _walkFrameIndex = 0;
+    }
     _walking = moving;
-    _applyAnimation();
   }
 
   bool get isWalking => _walking;
@@ -119,6 +83,10 @@ class _HeroCharacterComponent
     required double minYBound,
   }) {
     _facing = _fromWireFacing(pose.facing);
+    if (_walking != pose.moving && !pose.moving) {
+      _animationTick = 0;
+      _walkFrameIndex = 0;
+    }
     _walking = pose.moving;
     final minX = radius;
     final maxX = math.max(minX, worldSize.x - radius);
@@ -133,12 +101,13 @@ class _HeroCharacterComponent
     if (snapToTarget) {
       position.setFrom(_remoteTarget);
     }
-    _applyAnimation();
   }
 
   @override
   void update(double dt) {
     super.update(dt);
+    _advanceAnimation(dt);
+
     if (_controlled || !_hasRemoteTarget) {
       return;
     }
@@ -154,19 +123,6 @@ class _HeroCharacterComponent
     }
   }
 
-  void _applyAnimation() {
-    current = switch ((_facing, _walking)) {
-      (_HeroFacing.down, true) => _HeroAnimState.walkDown,
-      (_HeroFacing.down, false) => _HeroAnimState.idleDown,
-      (_HeroFacing.up, true) => _HeroAnimState.walkUp,
-      (_HeroFacing.up, false) => _HeroAnimState.idleUp,
-      (_HeroFacing.left, true) => _HeroAnimState.walkLeft,
-      (_HeroFacing.left, false) => _HeroAnimState.idleLeft,
-      (_HeroFacing.right, true) => _HeroAnimState.walkRight,
-      (_HeroFacing.right, false) => _HeroAnimState.idleRight,
-    };
-  }
-
   void setControlled(bool value) {
     if (_controlled == value) {
       return;
@@ -176,6 +132,36 @@ class _HeroCharacterComponent
       _hasRemoteTarget = false;
     }
     scale = value ? Vector2.all(1.0) : Vector2.all(0.92);
+  }
+
+  int get _currentRow {
+    return switch (_facing) {
+      _HeroFacing.down => _downRow,
+      _HeroFacing.up => _upRow,
+      _HeroFacing.left => _leftRow,
+      _HeroFacing.right => _rightRow,
+    };
+  }
+
+  int get _currentColumn {
+    if (!_walking) {
+      return 0;
+    }
+    return _walkColumns[_walkFrameIndex];
+  }
+
+  void _advanceAnimation(double dt) {
+    if (!_walking) {
+      _animationTick = 0;
+      _walkFrameIndex = 0;
+      return;
+    }
+
+    _animationTick += dt;
+    while (_animationTick >= _frameStep) {
+      _animationTick -= _frameStep;
+      _walkFrameIndex = (_walkFrameIndex + 1) % _walkColumns.length;
+    }
   }
 
   void _updateFacing(Vector2 velocity) {
@@ -195,3 +181,5 @@ class _HeroCharacterComponent
     };
   }
 }
+
+enum _HeroFacing { down, up, left, right }
