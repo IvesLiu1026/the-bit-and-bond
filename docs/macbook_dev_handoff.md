@@ -1,6 +1,6 @@
 # MacBook AI Agent Handoff
 
-這份文件是給接手 `The Bit & Bond` 的 MacBook dev。
+這份文件是給接手 `The Bit and Bond` 的 MacBook dev。
 目標不是重講產品願景，而是讓新dev能快速判斷：
 
 - 目前 repo 已經做到哪裡
@@ -314,7 +314,7 @@ Postgres 預設設定是：
 
 - user: `chen`
 - password: `chen`
-- db: `chen_leveling`
+- db: `the_bit_and_bond`
 - host port: `5433`
 
 啟動：
@@ -332,7 +332,7 @@ docker ps
 如果要手動檢查資料庫：
 
 ```bash
-psql postgres://chen:chen@127.0.0.1:5433/chen_leveling -c '\dt'
+psql postgres://chen:chen@127.0.0.1:5433/the_bit_and_bond -c '\dt'
 ```
 
 ### 8.2 `.env` 應該怎麼配
@@ -340,7 +340,7 @@ psql postgres://chen:chen@127.0.0.1:5433/chen_leveling -c '\dt'
 至少要有：
 
 ```env
-DATABASE_URL=postgres://chen:chen@127.0.0.1:5433/chen_leveling
+DATABASE_URL=postgres://chen:chen@127.0.0.1:5433/the_bit_and_bond
 BIND_ADDR=0.0.0.0:18080
 AUTO_MIGRATE=true
 JWT_SECRET=<長度至少 32 的 secret>
@@ -369,7 +369,7 @@ LIVEKIT_CHAT_TOPIC=guild.chat
 也就是：
 
 ```bash
-cargo run -p chen_leveling_server
+cargo run -p the_bit_and_bond_server
 ```
 
 會自動：
@@ -401,7 +401,7 @@ cargo run -p migration -- status
 例如：
 
 ```bash
-createdb chen_leveling
+createdb the_bit_and_bond
 ```
 
 然後把 `.env` 改成對應的連線字串。
@@ -425,7 +425,7 @@ docker compose -f infra/docker-compose.voice.yml up -d
 ### 8.2 後端 API
 
 ```bash
-cargo run -p chen_leveling_server
+cargo run -p the_bit_and_bond_server
 ```
 
 健康檢查：

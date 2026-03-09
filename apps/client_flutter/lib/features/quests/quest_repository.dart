@@ -16,6 +16,9 @@ class QuestRepository {
     required int rewardXp,
     required int rewardCoins,
     required QuestStatCategory statCategory,
+    QuestCategory category = QuestCategory.chore,
+    String? assignedHunterId,
+    HabitCadence cadence = HabitCadence.none,
   }) {
     return _apiClient.createQuest(
       title: title,
@@ -23,11 +26,22 @@ class QuestRepository {
       rewardXp: rewardXp,
       rewardCoins: rewardCoins,
       statCategory: statCategory,
+      category: category,
+      assignedHunterId: assignedHunterId,
+      cadence: cadence,
     );
   }
 
-  Future<void> submitQuest({required String questInstanceId}) {
-    return _apiClient.submitQuest(questInstanceId: questInstanceId);
+  Future<void> submitQuest({
+    required String questInstanceId,
+    String? proofNote,
+    QuestProofUpload? proofMedia,
+  }) {
+    return _apiClient.submitQuestProof(
+      questInstanceId: questInstanceId,
+      proofNote: proofNote,
+      proofMedia: proofMedia,
+    );
   }
 
   Future<QuestReviewResult> reviewSubmission({

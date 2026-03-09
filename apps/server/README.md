@@ -2,11 +2,12 @@
 
 ## Environment
 
-- `DATABASE_URL` default: `postgres://chen:chen@127.0.0.1:5432/chen_leveling`
+- `DATABASE_URL` default: `postgres://chen:chen@127.0.0.1:5432/the_bit_and_bond`
 - `BIND_ADDR` default: `127.0.0.1:18080`
 - `ALLOWED_ORIGIN` default: `*` (for local dev; set explicit origins in production)
 - `AUTO_MIGRATE` default: `true`
 - `REDIS_URL` optional: enable multi-node realtime presence pub/sub
+- `FIREBASE_PROJECT_ID` optional: enable `POST /api/v1/auth/firebase` token verification for Google Sign-In
 
 ## Data model
 
@@ -20,9 +21,10 @@
 
 1. 玩家註冊（建立玩家 + 個人公會）(`POST /api/v1/auth/register`)
 2. 玩家登入（`account` 可為 `player_id` 或 `email`）(`POST /api/v1/auth/login`)
-3. 取得當前登入身份 (`GET /api/v1/auth/me`)
-4. 公會長管理獵人 (`POST/GET /api/v1/hunters`, `PATCH /api/v1/hunters/{id}/pin`)
-5. 公會任務流程 (`POST/GET /api/v1/quests`, `POST /api/v1/quests/{id}/submit`, `POST /api/v1/quests/{id}/review`)
+3. Google/Firebase 登入（`POST /api/v1/auth/firebase`，需 `FIREBASE_PROJECT_ID`）
+4. 取得當前登入身份 (`GET /api/v1/auth/me`)
+5. 公會長管理獵人 (`POST/GET /api/v1/hunters`, `PATCH /api/v1/hunters/{id}/pin`)
+6. 公會任務流程 (`POST/GET /api/v1/quests`, `POST /api/v1/quests/{id}/submit`, `POST /api/v1/quests/{id}/review`)
 
 ## Auth model
 

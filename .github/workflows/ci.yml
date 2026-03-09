@@ -15,7 +15,7 @@ jobs:
   rust:
     runs-on: ubuntu-latest
     env:
-      DATABASE_URL: postgres://chen:chen@127.0.0.1:5432/chen_leveling
+      DATABASE_URL: postgres://chen:chen@127.0.0.1:5432/the_bit_and_bond
       RUST_TEST_THREADS: 1
     services:
       postgres:
@@ -23,11 +23,11 @@ jobs:
         env:
           POSTGRES_USER: chen
           POSTGRES_PASSWORD: chen
-          POSTGRES_DB: chen_leveling
+          POSTGRES_DB: the_bit_and_bond
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U chen -d chen_leveling"
+          --health-cmd "pg_isready -U chen -d the_bit_and_bond"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 12
@@ -50,7 +50,7 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
 
       - name: Rust tests
-        run: cargo test -p chen_leveling_server --locked
+        run: cargo test -p the_bit_and_bond_server --locked
 
   flutter:
     runs-on: ubuntu-latest
@@ -69,6 +69,9 @@ jobs:
 
       - name: Flutter pub get
         run: flutter pub get
+
+      - name: Hardcoded i18n guard
+        run: dart run tool/check_hardcoded_strings.dart --check
 
       - name: Flutter analyze
         run: flutter analyze

@@ -8,7 +8,7 @@ use axum::{
 };
 use entity::{
     guild, hunter,
-    quest::{self, QuestStatCategory, QuestStatus},
+    quest::{self, HabitCadence, QuestCategory, QuestStatCategory, QuestStatus},
     user,
 };
 use migration::MigratorTrait;
@@ -27,7 +27,9 @@ use crate::{
     state::AppState,
 };
 
-use super::{CreateQuestRequest, ReviewQuestRequest, create_quest, review_quest};
+use super::{
+    CreateQuestRequest, ReviewQuestRequest, SubmitQuestRequest, create_quest, review_quest,
+};
 
 #[tokio::test]
 async fn member_token_cannot_create_quest() -> Result<(), Box<dyn Error>> {
@@ -73,6 +75,18 @@ async fn guild_cannot_review_other_guild_quest() -> Result<(), Box<dyn Error>> {
         reward_xp: Set(20),
         reward_coins: Set(10),
         stat_category: Set(QuestStatCategory::Str),
+        category: Set(QuestCategory::Chore),
+        assigned_hunter_id: Set(None),
+        created_by_hunter_id: Set(None),
+        cadence: Set(None),
+        streak_count: Set(0),
+        best_streak: Set(0),
+        completions_count: Set(0),
+        proof_note: Set(None),
+        proof_submitted_at: Set(None),
+        last_completed_at: Set(None),
+        last_review_note: Set(None),
+        updated_at: Set(chrono::Utc::now().into()),
         status: Set(QuestStatus::PendingReview),
     }
     .insert(&state.db)
@@ -85,6 +99,7 @@ async fn guild_cannot_review_other_guild_quest() -> Result<(), Box<dyn Error>> {
         Json(ReviewQuestRequest {
             approved: false,
             hunter_id: None,
+            review_note: None,
         }),
     )
     .await
@@ -109,6 +124,18 @@ async fn review_rollback_keeps_quest_pending_when_reward_overflows() -> Result<(
         reward_xp: Set(1),
         reward_coins: Set(1),
         stat_category: Set(QuestStatCategory::Vit),
+        category: Set(QuestCategory::Chore),
+        assigned_hunter_id: Set(None),
+        created_by_hunter_id: Set(None),
+        cadence: Set(None),
+        streak_count: Set(0),
+        best_streak: Set(0),
+        completions_count: Set(0),
+        proof_note: Set(None),
+        proof_submitted_at: Set(None),
+        last_completed_at: Set(None),
+        last_review_note: Set(None),
+        updated_at: Set(chrono::Utc::now().into()),
         status: Set(QuestStatus::PendingReview),
     }
     .insert(&state.db)
@@ -130,6 +157,7 @@ async fn review_rollback_keeps_quest_pending_when_reward_overflows() -> Result<(
         Json(ReviewQuestRequest {
             approved: true,
             hunter_id: Some(hunter_model.id),
+            review_note: None,
         }),
     )
     .await
@@ -167,15 +195,20 @@ async fn create_submit_review_happy_path() -> Result<(), Box<dyn Error>> {
             reward_xp: 10,
             reward_coins: 3,
             stat_category: QuestStatCategory::Int,
+            category: QuestCategory::Chore,
+            assigned_hunter_id: None,
+            cadence: None,
         }),
     )
     .await?;
     assert_eq!(created.stat_category, QuestStatCategory::Int);
+    assert_eq!(created.category, QuestCategory::Chore);
 
     let submitted = super::submit_quest(
         hunter_claims.clone(),
         State(state.clone()),
         Path(created.id),
+        Json(SubmitQuestRequest { proof_note: None }),
     )
     .await?;
     assert_eq!(submitted.status, QuestStatus::PendingReview);
@@ -187,6 +220,7 @@ async fn create_submit_review_happy_path() -> Result<(), Box<dyn Error>> {
         Json(ReviewQuestRequest {
             approved: true,
             hunter_id: Some(hunter_claims.0.sub),
+            review_note: None,
         }),
     )
     .await?;
@@ -217,6 +251,18 @@ async fn review_returns_level_up_event_when_xp_crosses_threshold() -> Result<(),
         reward_xp: Set(10),
         reward_coins: Set(5),
         stat_category: Set(QuestStatCategory::Int),
+        category: Set(QuestCategory::Chore),
+        assigned_hunter_id: Set(None),
+        created_by_hunter_id: Set(None),
+        cadence: Set(None),
+        streak_count: Set(0),
+        best_streak: Set(0),
+        completions_count: Set(0),
+        proof_note: Set(None),
+        proof_submitted_at: Set(None),
+        last_completed_at: Set(None),
+        last_review_note: Set(None),
+        updated_at: Set(chrono::Utc::now().into()),
         status: Set(QuestStatus::PendingReview),
     }
     .insert(&state.db)
@@ -238,6 +284,7 @@ async fn review_returns_level_up_event_when_xp_crosses_threshold() -> Result<(),
         Json(ReviewQuestRequest {
             approved: true,
             hunter_id: Some(hunter_model.id),
+            review_note: None,
         }),
     )
     .await?;
@@ -274,6 +321,18 @@ async fn master_cannot_submit_quest_completion() -> Result<(), Box<dyn Error>> {
         reward_xp: Set(5),
         reward_coins: Set(2),
         stat_category: Set(QuestStatCategory::Str),
+        category: Set(QuestCategory::Chore),
+        assigned_hunter_id: Set(None),
+        created_by_hunter_id: Set(None),
+        cadence: Set(None),
+        streak_count: Set(0),
+        best_streak: Set(0),
+        completions_count: Set(0),
+        proof_note: Set(None),
+        proof_submitted_at: Set(None),
+        last_completed_at: Set(None),
+        last_review_note: Set(None),
+        updated_at: Set(chrono::Utc::now().into()),
         status: Set(QuestStatus::Available),
     }
     .insert(&state.db)
@@ -283,6 +342,7 @@ async fn master_cannot_submit_quest_completion() -> Result<(), Box<dyn Error>> {
         HunterClaims(master_claims.0.clone()),
         State(state.clone()),
         Path(quest.id),
+        Json(SubmitQuestRequest { proof_note: None }),
     )
     .await
     .expect_err("master should not submit member completion");
@@ -298,6 +358,84 @@ async fn master_cannot_submit_quest_completion() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[tokio::test]
+async fn habit_review_approves_reward_and_reopens_for_next_cycle() -> Result<(), Box<dyn Error>> {
+    let ctx = TestDbContext::create().await?;
+    let (state, master_claims, hunter_claims) = ctx.seed_guild("habit").await?;
+
+    let (_, created) = create_quest(
+        master_claims.clone(),
+        State(state.clone()),
+        Json(CreateQuestRequest {
+            title: "Drink Water".to_string(),
+            description: Some("Upload proof after dinner".to_string()),
+            reward_xp: 15,
+            reward_coins: 4,
+            stat_category: QuestStatCategory::Vit,
+            category: QuestCategory::Habit,
+            assigned_hunter_id: Some(hunter_claims.0.sub),
+            cadence: Some(HabitCadence::Daily),
+        }),
+    )
+    .await?;
+
+    assert_eq!(created.category, QuestCategory::Habit);
+    assert_eq!(created.cadence, Some(HabitCadence::Daily));
+    assert_eq!(created.assigned_hunter_id, Some(hunter_claims.0.sub));
+
+    let submitted = super::submit_quest(
+        hunter_claims.clone(),
+        State(state.clone()),
+        Path(created.id),
+        Json(SubmitQuestRequest {
+            proof_note: Some("Bottle photo uploaded".to_string()),
+        }),
+    )
+    .await?;
+    assert_eq!(submitted.status, QuestStatus::PendingReview);
+    assert_eq!(
+        submitted.proof_note.as_deref(),
+        Some("Bottle photo uploaded")
+    );
+
+    let reviewed = review_quest(
+        master_claims,
+        State(state.clone()),
+        Path(created.id),
+        Json(ReviewQuestRequest {
+            approved: true,
+            hunter_id: Some(hunter_claims.0.sub),
+            review_note: Some("Nice job".to_string()),
+        }),
+    )
+    .await?;
+
+    assert_eq!(reviewed.quest.status, QuestStatus::Available);
+    assert_eq!(reviewed.quest.streak_count, 1);
+    assert_eq!(reviewed.quest.best_streak, 1);
+    assert_eq!(reviewed.quest.completions_count, 1);
+    assert_eq!(reviewed.quest.last_review_note.as_deref(), Some("Nice job"));
+    assert!(reviewed.quest.last_completed_at.is_some());
+    assert_eq!(reviewed.hunter.as_ref().map(|h| h.xp), Some(15));
+    assert_eq!(reviewed.hunter.as_ref().map(|h| h.coins), Some(4));
+
+    let second_submit_err = super::submit_quest(
+        hunter_claims,
+        State(state.clone()),
+        Path(created.id),
+        Json(SubmitQuestRequest {
+            proof_note: Some("Second proof same day".to_string()),
+        }),
+    )
+    .await
+    .expect_err("daily habit should block a second completion in the same cycle");
+
+    assert!(matches!(second_submit_err, AppError::BadRequest(_)));
+
+    ctx.cleanup().await?;
+    Ok(())
+}
+
 struct TestDbContext {
     admin_db: sea_orm::DatabaseConnection,
     app_db: sea_orm::DatabaseConnection,
@@ -308,8 +446,8 @@ impl TestDbContext {
     async fn create() -> Result<Self, Box<dyn Error>> {
         dotenvy::dotenv().ok();
         let base_url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgres://chen:chen@127.0.0.1:5433/chen_leveling".to_string());
-        let db_name = format!("chen_leveling_it_quests_{}", Uuid::new_v4().simple());
+            .unwrap_or_else(|_| "postgres://chen:chen@127.0.0.1:5433/the_bit_and_bond".to_string());
+        let db_name = format!("the_bit_and_bond_it_quests_{}", Uuid::new_v4().simple());
         let admin_url = replace_database_name(&base_url, "postgres")?;
         let test_url = replace_database_name(&base_url, &db_name)?;
 

@@ -3,8 +3,8 @@
 set -euo pipefail
 
 BASE_URL="${BASE_URL:-http://127.0.0.1:18080}"
-DB_CONTAINER="${DB_CONTAINER:-chen_leveling_postgres}"
-DB_NAME="${DB_NAME:-chen_leveling}"
+DB_CONTAINER="${DB_CONTAINER:-the_bit_and_bond_postgres}"
+DB_NAME="${DB_NAME:-the_bit_and_bond}"
 DB_USER="${DB_USER:-chen}"
 
 API_STATUS=""
@@ -209,6 +209,116 @@ SET guild_id = EXCLUDED.guild_id,
     stat_category = EXCLUDED.stat_category,
     status = EXCLUDED.status;
 
+INSERT INTO quests (
+  id,
+  guild_id,
+  title,
+  description,
+  reward_xp,
+  reward_coins,
+  stat_category,
+  category,
+  assigned_hunter_id,
+  created_by_hunter_id,
+  cadence,
+  streak_count,
+  best_streak,
+  completions_count,
+  proof_note,
+  proof_submitted_at,
+  last_completed_at,
+  last_review_note,
+  updated_at,
+  status
+)
+VALUES
+  (
+    '10000000-0000-0000-0000-000000000301',
+    '$master_guild_id',
+    '晚餐後喝水回報',
+    '晚餐後補滿今天最後一杯水，完成後用一句話記錄。',
+    15,
+    4,
+    'VIT',
+    'habit',
+    '$member_hunter_id',
+    '$master_hunter_id',
+    'daily',
+    3,
+    5,
+    8,
+    '昨天晚餐後喝完 500ml。',
+    NOW() - INTERVAL '1 day',
+    CURRENT_DATE - 1,
+    '保持得很好',
+    NOW(),
+    'available'
+  ),
+  (
+    '10000000-0000-0000-0000-000000000302',
+    '$master_guild_id',
+    '睡前書桌重置',
+    '睡前把桌面整理好，再送出今天的整理證明。',
+    10,
+    6,
+    'STR',
+    'habit',
+    '$member_hunter_id',
+    '$master_hunter_id',
+    'daily',
+    2,
+    4,
+    6,
+    '桌面已整理好，只剩書包待收。',
+    NOW() - INTERVAL '18 minutes',
+    CURRENT_DATE - 1,
+    NULL,
+    NOW(),
+    'pending_review'
+  ),
+  (
+    '10000000-0000-0000-0000-000000000303',
+    '$master_guild_id',
+    '週末家庭散步',
+    '每週至少一次和家人一起散步 20 分鐘。',
+    30,
+    12,
+    'AGI',
+    'habit',
+    '$member_hunter_id',
+    '$master_hunter_id',
+    'weekly',
+    1,
+    2,
+    3,
+    '上週日完成河堤散步。',
+    NOW() - INTERVAL '8 days',
+    CURRENT_DATE - 8,
+    '本週再接再厲',
+    NOW(),
+    'available'
+  )
+ON CONFLICT (id) DO UPDATE
+SET guild_id = EXCLUDED.guild_id,
+    title = EXCLUDED.title,
+    description = EXCLUDED.description,
+    reward_xp = EXCLUDED.reward_xp,
+    reward_coins = EXCLUDED.reward_coins,
+    stat_category = EXCLUDED.stat_category,
+    category = EXCLUDED.category,
+    assigned_hunter_id = EXCLUDED.assigned_hunter_id,
+    created_by_hunter_id = EXCLUDED.created_by_hunter_id,
+    cadence = EXCLUDED.cadence,
+    streak_count = EXCLUDED.streak_count,
+    best_streak = EXCLUDED.best_streak,
+    completions_count = EXCLUDED.completions_count,
+    proof_note = EXCLUDED.proof_note,
+    proof_submitted_at = EXCLUDED.proof_submitted_at,
+    last_completed_at = EXCLUDED.last_completed_at,
+    last_review_note = EXCLUDED.last_review_note,
+    updated_at = EXCLUDED.updated_at,
+    status = EXCLUDED.status;
+
 INSERT INTO guild_items (id, guild_id, name, description, cost_coins, icon_tag, is_active)
 VALUES
   ('20000000-0000-0000-0000-000000000101', '$master_guild_id', '冒險補給藥水', '喝下後讓冒險者恢復精神，適合任務前補給。', 25, 'POTION', true),
@@ -307,6 +417,52 @@ VALUES
   ('50000000-0000-0000-0000-000000000103', '$master_hunter_id', '$friend_hunter_id', NOW()),
   ('50000000-0000-0000-0000-000000000104', '$friend_hunter_id', '$master_hunter_id', NOW())
 ON CONFLICT (player_id, friend_id) DO NOTHING;
+
+INSERT INTO direct_messages (id, sender_hunter_id, recipient_hunter_id, conversation_key, client_message_id, content, sent_at)
+VALUES
+  (
+    '60000000-0000-0000-0000-000000000101',
+    '$master_hunter_id',
+    '$member_hunter_id',
+    CASE WHEN '$master_hunter_id' <= '$member_hunter_id'
+      THEN '$master_hunter_id:$member_hunter_id'
+      ELSE '$member_hunter_id:$master_hunter_id'
+    END,
+    '60000000-0000-0000-0000-000000009101',
+    '晚餐後記得把喝水習慣送審給我，我幫你核准。',
+    NOW() - INTERVAL '35 minutes'
+  ),
+  (
+    '60000000-0000-0000-0000-000000000102',
+    '$member_hunter_id',
+    '$master_hunter_id',
+    CASE WHEN '$master_hunter_id' <= '$member_hunter_id'
+      THEN '$master_hunter_id:$member_hunter_id'
+      ELSE '$member_hunter_id:$master_hunter_id'
+    END,
+    '60000000-0000-0000-0000-000000009102',
+    '好，我等等整理完書桌就一起送。',
+    NOW() - INTERVAL '29 minutes'
+  ),
+  (
+    '60000000-0000-0000-0000-000000000103',
+    '$friend_hunter_id',
+    '$master_hunter_id',
+    CASE WHEN '$friend_hunter_id' <= '$master_hunter_id'
+      THEN '$friend_hunter_id:$master_hunter_id'
+      ELSE '$master_hunter_id:$friend_hunter_id'
+    END,
+    '60000000-0000-0000-0000-000000009103',
+    '週末要不要一起散步挑戰？我想開一條 weekly habit。',
+    NOW() - INTERVAL '12 minutes'
+  )
+ON CONFLICT (id) DO UPDATE
+SET sender_hunter_id = EXCLUDED.sender_hunter_id,
+    recipient_hunter_id = EXCLUDED.recipient_hunter_id,
+    conversation_key = EXCLUDED.conversation_key,
+    client_message_id = EXCLUDED.client_message_id,
+    content = EXCLUDED.content,
+    sent_at = EXCLUDED.sent_at;
 SQL
 }
 
@@ -339,6 +495,7 @@ printf '  %-12s PIN %-4s role=%-6s guild=%s\n' \
 printf '  %-12s PIN %-4s role=%-6s guild=%s\n' \
   "demo_friend" "3333" "master" "$(printf '%s' "$friend_json" | jq -r '.guild_id')"
 printf '\nDemo data seeded:\n'
-printf '  %s\n' "旅人酒館公會：5 個 quest、4 個 shop items、會員背包與初始金幣/XP"
-printf '  %s\n' "遠行公會：2 個 quest、1 個 shop item"
-printf '  %s\n' "好友關係：demo_master <-> demo_member，demo_master <-> demo_friend"
+  printf '  %s\n' "旅人酒館公會：5 個 task、3 個 habit、4 個 shop items、會員背包與初始金幣/XP"
+  printf '  %s\n' "遠行公會：2 個 quest、1 個 shop item"
+  printf '  %s\n' "好友關係：demo_master <-> demo_member，demo_master <-> demo_friend"
+  printf '  %s\n' "私訊對話：demo_master <-> demo_member、demo_master <-> demo_friend"

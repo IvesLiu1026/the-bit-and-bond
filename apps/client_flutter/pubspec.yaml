@@ -1,5 +1,5 @@
 name: the_bit_and_bond_client
-description: A cozy guild-life RPG app for The Bit & Bond
+description: A cozy guild-life RPG app for The Bit and Bond
 publish_to: 'none'
 version: 0.1.0+1
 
@@ -8,6 +8,8 @@ environment:
 
 dependencies:
   flutter:
+    sdk: flutter
+  flutter_localizations:
     sdk: flutter
   cupertino_icons: ^1.0.8
   device_preview: ^1.2.0
@@ -19,6 +21,11 @@ dependencies:
   audioplayers: ^6.1.0
   uuid: ^4.5.1
   web_socket_channel: ^3.0.1
+  firebase_core: ^4.5.0
+  firebase_auth: ^6.2.0
+  google_sign_in: ^7.2.0
+  cryptography: ^2.7.0
+  image_picker: ^1.1.2
 
 dev_dependencies:
   flutter_test:
@@ -28,13 +35,18 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
+    - assets/branding/
     - assets/sprites/hero/Free Pixel Character Base Pack/character.png
     - assets/sprites/hero/LICENSE.txt
     - assets/sprites/hero/Free Pixel Character Base Pack/licence.txt.txt
     - assets/environment/
     - assets/audio/coin.wav
+    - assets/audio/door_open.wav
     - assets/audio/use_success.wav
   fonts:
+    - family: FusionPixelZhHant
+      fonts:
+        - asset: assets/fonts/fusion-pixel-10px-proportional-zh_hant.ttf
     - family: Nunito
       fonts:
         - asset: assets/fonts/Nunito-Variable.ttf

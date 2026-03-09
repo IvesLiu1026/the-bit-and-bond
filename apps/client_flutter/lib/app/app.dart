@@ -1,9 +1,11 @@
 import 'package:device_preview/device_preview.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/l10n/app_strings.dart';
 import '../core/theme/app_theme.dart';
-import '../features/auth/unified_auth_page.dart';
+import '../features/auth/immersive_onboarding_page.dart';
 import '../features/game/game_shell_page.dart';
 import '../state/providers.dart';
 
@@ -14,13 +16,24 @@ class TheBitAndBondApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final appSettings = ref.watch(appSettingsProvider);
+    final strings = ref.watch(appStringsProvider);
+
     return MaterialApp(
-      title: 'The Bit & Bond',
+      title: strings.appTitle,
       debugShowCheckedModeBanner: false,
-      locale: enableDevicePreview ? DevicePreview.locale(context) : null,
+      locale: enableDevicePreview
+          ? DevicePreview.locale(context)
+          : appSettings.locale,
       builder: enableDevicePreview ? DevicePreview.appBuilder : null,
+      supportedLocales: AppStrings.supportedLocales,
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ],
       theme: AppTheme.cozyGuildTheme,
-      home: const _AuthGate(),
+      home: AppStringsScope(strings: strings, child: const _AuthGate()),
     );
   }
 }
@@ -52,35 +65,7 @@ class _AuthLandingWithRouting extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        const UnifiedAuthPage(),
-        if (errorMessage != null)
-          Positioned(
-            top: 16,
-            left: 16,
-            right: 16,
-            child: Material(
-              color: Colors.transparent,
-              child: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFDECEA),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFB71C1C), width: 2),
-                ),
-                child: Text(
-                  '登入錯誤：$errorMessage',
-                  style: const TextStyle(
-                    color: Color(0xFFB71C1C),
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
+    return ImmersiveOnboardingPage(errorMessage: errorMessage);
   }
 }
 

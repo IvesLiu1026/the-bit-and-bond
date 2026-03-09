@@ -67,6 +67,7 @@ class AuthController extends StateNotifier<AsyncValue<AuthSession?>> {
     required String displayName,
     String? avatarType,
   }) async {
+    final previousSession = state.valueOrNull;
     state = const AsyncValue.loading();
     try {
       final session = await _authApi.registerPlayer(
@@ -78,8 +79,8 @@ class AuthController extends StateNotifier<AsyncValue<AuthSession?>> {
       await _persist(session);
       state = AsyncValue.data(session);
       return session;
-    } catch (error, stackTrace) {
-      state = AsyncValue.error(error, stackTrace);
+    } catch (error) {
+      state = AsyncValue.data(previousSession);
       rethrow;
     }
   }
@@ -88,6 +89,7 @@ class AuthController extends StateNotifier<AsyncValue<AuthSession?>> {
     required String playerId,
     required String pinCode,
   }) async {
+    final previousSession = state.valueOrNull;
     state = const AsyncValue.loading();
     try {
       final session = await _authApi.loginPlayer(
@@ -97,8 +99,30 @@ class AuthController extends StateNotifier<AsyncValue<AuthSession?>> {
       await _persist(session);
       state = AsyncValue.data(session);
       return session;
-    } catch (error, stackTrace) {
-      state = AsyncValue.error(error, stackTrace);
+    } catch (error) {
+      state = AsyncValue.data(previousSession);
+      rethrow;
+    }
+  }
+
+  Future<AuthSession> loginWithFirebaseIdToken({
+    required String idToken,
+    String? displayName,
+    String? avatarType,
+  }) async {
+    final previousSession = state.valueOrNull;
+    state = const AsyncValue.loading();
+    try {
+      final session = await _authApi.loginWithFirebaseIdToken(
+        idToken: idToken,
+        displayName: displayName,
+        avatarType: avatarType,
+      );
+      await _persist(session);
+      state = AsyncValue.data(session);
+      return session;
+    } catch (error) {
+      state = AsyncValue.data(previousSession);
       rethrow;
     }
   }

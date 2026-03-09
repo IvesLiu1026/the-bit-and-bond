@@ -1,0 +1,344 @@
+use sea_orm_migration::prelude::*;
+
+#[derive(DeriveMigrationName)]
+pub struct Migration;
+
+#[async_trait::async_trait]
+impl MigrationTrait for Migration {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(DmDeviceKeys::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(DmDeviceKeys::Id)
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(DmDeviceKeys::HunterId).uuid().not_null())
+                    .col(
+                        ColumnDef::new(DmDeviceKeys::DeviceId)
+                            .string_len(96)
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(DmDeviceKeys::DeviceLabel)
+                            .string_len(120)
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(DmDeviceKeys::SigningPublicKey)
+                            .text()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(DmDeviceKeys::EncryptionPublicKey)
+                            .text()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(DmDeviceKeys::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(DmDeviceKeys::LastSeenAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(DmDeviceKeys::RevokedAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_dm_device_keys_hunter")
+                            .from(DmDeviceKeys::Table, DmDeviceKeys::HunterId)
+                            .to(Hunters::Table, Hunters::Id)
+                            .on_update(ForeignKeyAction::Cascade)
+                            .on_delete(ForeignKeyAction::Cascade),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_dm_device_keys_hunter_device_unique")
+                    .table(DmDeviceKeys::Table)
+                    .col(DmDeviceKeys::HunterId)
+                    .col(DmDeviceKeys::DeviceId)
+                    .unique()
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_dm_device_keys_hunter_active")
+                    .table(DmDeviceKeys::Table)
+                    .col(DmDeviceKeys::HunterId)
+                    .col(DmDeviceKeys::RevokedAt)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_table(
+                Table::create()
+                    .table(DmConversationCapabilities::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(DmConversationCapabilities::ConversationKey)
+                            .string_len(80)
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new(DmConversationCapabilities::LeftHunterId)
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(DmConversationCapabilities::RightHunterId)
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(DmConversationCapabilities::EncryptionMode)
+                            .string_len(24)
+                            .not_null()
+                            .default("plaintext"),
+                    )
+                    .col(
+                        ColumnDef::new(DmConversationCapabilities::UpgradedAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(DmConversationCapabilities::LastHandshakeAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_dm_capabilities_left_hunter")
+                            .from(
+                                DmConversationCapabilities::Table,
+                                DmConversationCapabilities::LeftHunterId,
+                            )
+                            .to(Hunters::Table, Hunters::Id)
+                            .on_update(ForeignKeyAction::Cascade)
+                            .on_delete(ForeignKeyAction::Cascade),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_dm_capabilities_right_hunter")
+                            .from(
+                                DmConversationCapabilities::Table,
+                                DmConversationCapabilities::RightHunterId,
+                            )
+                            .to(Hunters::Table, Hunters::Id)
+                            .on_update(ForeignKeyAction::Cascade)
+                            .on_delete(ForeignKeyAction::Cascade),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_dm_capabilities_pair")
+                    .table(DmConversationCapabilities::Table)
+                    .col(DmConversationCapabilities::LeftHunterId)
+                    .col(DmConversationCapabilities::RightHunterId)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_table(
+                Table::create()
+                    .table(DmEncryptedMessages::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(DmEncryptedMessages::Id)
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new(DmEncryptedMessages::SenderHunterId)
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(DmEncryptedMessages::RecipientHunterId)
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(DmEncryptedMessages::ConversationKey)
+                            .string_len(80)
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(DmEncryptedMessages::SenderDeviceId)
+                            .string_len(96)
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(DmEncryptedMessages::RecipientDeviceId)
+                            .string_len(96)
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(DmEncryptedMessages::ClientMessageId)
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(DmEncryptedMessages::ProtocolVersion)
+                            .string_len(24)
+                            .not_null()
+                            .default("dm-e2ee-v1"),
+                    )
+                    .col(
+                        ColumnDef::new(DmEncryptedMessages::Ciphertext)
+                            .text()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(DmEncryptedMessages::Nonce)
+                            .string_len(255)
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(DmEncryptedMessages::SentAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_dm_encrypted_sender_hunter")
+                            .from(
+                                DmEncryptedMessages::Table,
+                                DmEncryptedMessages::SenderHunterId,
+                            )
+                            .to(Hunters::Table, Hunters::Id)
+                            .on_update(ForeignKeyAction::Cascade)
+                            .on_delete(ForeignKeyAction::Cascade),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_dm_encrypted_recipient_hunter")
+                            .from(
+                                DmEncryptedMessages::Table,
+                                DmEncryptedMessages::RecipientHunterId,
+                            )
+                            .to(Hunters::Table, Hunters::Id)
+                            .on_update(ForeignKeyAction::Cascade)
+                            .on_delete(ForeignKeyAction::Cascade),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_dm_encrypted_conversation_timeline")
+                    .table(DmEncryptedMessages::Table)
+                    .col(DmEncryptedMessages::ConversationKey)
+                    .col(DmEncryptedMessages::SentAt)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_dm_encrypted_conversation_client_unique")
+                    .table(DmEncryptedMessages::Table)
+                    .col(DmEncryptedMessages::ConversationKey)
+                    .col(DmEncryptedMessages::ClientMessageId)
+                    .unique()
+                    .to_owned(),
+            )
+            .await?;
+
+        Ok(())
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(DmEncryptedMessages::Table).to_owned())
+            .await?;
+        manager
+            .drop_table(
+                Table::drop()
+                    .table(DmConversationCapabilities::Table)
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .drop_table(Table::drop().table(DmDeviceKeys::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum Hunters {
+    Table,
+    Id,
+}
+
+#[derive(DeriveIden)]
+enum DmDeviceKeys {
+    Table,
+    Id,
+    HunterId,
+    DeviceId,
+    DeviceLabel,
+    SigningPublicKey,
+    EncryptionPublicKey,
+    CreatedAt,
+    LastSeenAt,
+    RevokedAt,
+}
+
+#[derive(DeriveIden)]
+enum DmConversationCapabilities {
+    Table,
+    ConversationKey,
+    LeftHunterId,
+    RightHunterId,
+    EncryptionMode,
+    UpgradedAt,
+    LastHandshakeAt,
+}
+
+#[derive(DeriveIden)]
+enum DmEncryptedMessages {
+    Table,
+    Id,
+    SenderHunterId,
+    RecipientHunterId,
+    ConversationKey,
+    SenderDeviceId,
+    RecipientDeviceId,
+    ClientMessageId,
+    ProtocolVersion,
+    Ciphertext,
+    Nonce,
+    SentAt,
+}

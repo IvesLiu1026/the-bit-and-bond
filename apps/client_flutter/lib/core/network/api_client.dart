@@ -5,6 +5,11 @@ import 'package:http/http.dart' as http;
 import '../../features/quests/models.dart';
 import '../auth/auth_session.dart';
 
+part 'api_client_direct_messages.part.dart';
+part 'api_client_quests.part.dart';
+part 'api_client_social.part.dart';
+part 'api_client_voice.part.dart';
+
 class ApiClient {
   ApiClient({
     required this.baseUrl,
@@ -17,92 +22,222 @@ class ApiClient {
   final http.Client _httpClient;
   static const int _maxErrorSnippetLength = 180;
 
-  Future<List<QuestInstance>> listQuests() async {
-    final data = await _authedGet(
-      '/api/v1/quests',
-      const {},
-      role: _AuthRole.any,
-    );
-    return (data as List)
-        .map((item) => QuestInstance.fromJson(item as Map<String, dynamic>))
-        .toList();
-  }
+  Future<List<QuestInstance>> listQuests() => _apiClientListQuests(this);
 
-  Future<void> submitQuest({required String questInstanceId}) async {
-    await _authedPost(
-      '/api/v1/quests/$questInstanceId/submit',
-      const {},
-      role: _AuthRole.any,
-    );
-  }
+  Future<void> submitQuest({required String questInstanceId}) =>
+      _apiClientSubmitQuest(this, questInstanceId: questInstanceId);
+
+  Future<void> submitQuestProof({
+    required String questInstanceId,
+    String? proofNote,
+    QuestProofUpload? proofMedia,
+  }) => _apiClientSubmitQuestProof(
+    this,
+    questInstanceId: questInstanceId,
+    proofNote: proofNote,
+    proofMedia: proofMedia,
+  );
+
+  Future<QuestProofMedia> uploadQuestProofMedia({
+    required String questInstanceId,
+    required QuestProofUpload upload,
+  }) => _apiClientUploadQuestProofMedia(
+    this,
+    questInstanceId: questInstanceId,
+    upload: upload,
+  );
 
   Future<QuestReviewResult> reviewSubmission({
     required String submissionId,
     required bool approve,
     String? hunterId,
     String? reviewNote,
-  }) async {
-    final payload = <String, dynamic>{'approved': approve};
-    final normalizedHunterId = hunterId?.trim();
-    if (normalizedHunterId != null && normalizedHunterId.isNotEmpty) {
-      payload['hunter_id'] = normalizedHunterId;
-    }
-    if (reviewNote != null && reviewNote.trim().isNotEmpty) {
-      payload['review_note'] = reviewNote.trim();
-    }
+  }) => _apiClientReviewSubmission(
+    this,
+    submissionId: submissionId,
+    approve: approve,
+    hunterId: hunterId,
+    reviewNote: reviewNote,
+  );
 
-    final data = await _authedPost(
-      '/api/v1/quests/$submissionId/review',
-      payload,
-      role: _AuthRole.owner,
-    );
-    return QuestReviewResult.fromJson(data as Map<String, dynamic>);
-  }
+  Future<Progression> getProgression({String? hunterId}) =>
+      _apiClientGetProgression(this, hunterId: hunterId);
 
-  Future<Progression> getProgression({String? hunterId}) async {
-    final session = _requireSession();
-    final quests = await listQuests();
-    final availableQuests = quests
-        .where((q) => q.status == QuestStatus.available)
-        .length;
-    final submittedQuests = quests
-        .where((q) => q.status == QuestStatus.submitted)
-        .length;
+  Future<QuestInstance> createQuest({
+    required String title,
+    String? description,
+    required int rewardXp,
+    required int rewardCoins,
+    required QuestStatCategory statCategory,
+    QuestCategory category = QuestCategory.chore,
+    String? assignedHunterId,
+    HabitCadence cadence = HabitCadence.none,
+  }) => _apiClientCreateQuest(
+    this,
+    title: title,
+    description: description,
+    rewardXp: rewardXp,
+    rewardCoins: rewardCoins,
+    statCategory: statCategory,
+    category: category,
+    assignedHunterId: assignedHunterId,
+    cadence: cadence,
+  );
 
-    if (session.isGuildMaster) {
-      final hunters = await listHunters();
-      if (hunters.isEmpty) {
-        return Progression(
-          childMemberId: hunterId ?? '',
-          level: 1,
-          xp: 0,
-          coins: 0,
-          availableQuests: availableQuests,
-          submittedQuests: submittedQuests,
-        );
-      }
+  Future<VoiceTokenBundle> issueVoiceToken({String? roomId}) =>
+      _apiClientIssueVoiceToken(this, roomId: roomId);
 
-      final selected = _resolveHunterSelection(hunters, hunterId);
-      return Progression(
-        childMemberId: selected.id,
-        level: selected.level,
-        xp: selected.xp,
-        coins: selected.coins,
-        availableQuests: availableQuests,
-        submittedQuests: submittedQuests,
-      );
-    }
+  Future<List<ChatMessage>> getChatHistory({
+    String? roomId,
+    int limit = 50,
+    int? beforeMs,
+  }) => _apiClientGetChatHistory(
+    this,
+    roomId: roomId,
+    limit: limit,
+    beforeMs: beforeMs,
+  );
 
-    final me = await getHunterMe();
-    return Progression(
-      childMemberId: me.id,
-      level: me.level,
-      xp: me.xp,
-      coins: me.coins,
-      availableQuests: availableQuests,
-      submittedQuests: submittedQuests,
-    );
-  }
+  Future<ChatMessage> persistChatMessage({
+    required String content,
+    String? roomId,
+    String? clientMessageId,
+    int? sentAtMs,
+  }) => _apiClientPersistChatMessage(
+    this,
+    content: content,
+    roomId: roomId,
+    clientMessageId: clientMessageId,
+    sentAtMs: sentAtMs,
+  );
+
+  Future<List<DirectMessageThread>> listDirectMessageThreads({
+    int limit = 40,
+  }) => _apiClientListDirectMessageThreads(this, limit: limit);
+
+  Future<void> markDirectMessageThreadRead({
+    required String counterpartHunterId,
+  }) => _apiClientMarkDirectMessageThreadRead(
+    this,
+    counterpartHunterId: counterpartHunterId,
+  );
+
+  Future<List<DmDeviceKey>> listDirectMessageDeviceKeys({
+    required String hunterId,
+  }) => _apiClientListDirectMessageDeviceKeys(this, hunterId: hunterId);
+
+  Future<Map<String, List<DmDeviceKey>>> listDirectMessageDeviceKeysBatch({
+    required List<String> hunterIds,
+  }) => _apiClientListDirectMessageDeviceKeysBatch(this, hunterIds: hunterIds);
+
+  Future<DmDeviceKey> registerDirectMessageDeviceKey({
+    required String deviceId,
+    String? deviceLabel,
+    required String signingPublicKey,
+    required String encryptionPublicKey,
+  }) => _apiClientRegisterDirectMessageDeviceKey(
+    this,
+    deviceId: deviceId,
+    deviceLabel: deviceLabel,
+    signingPublicKey: signingPublicKey,
+    encryptionPublicKey: encryptionPublicKey,
+  );
+
+  Future<DmDeviceKey> revokeDirectMessageDeviceKey({
+    required String deviceId,
+  }) => _apiClientRevokeDirectMessageDeviceKey(this, deviceId: deviceId);
+
+  Future<List<DirectMessage>> getDirectMessageHistory({
+    required String counterpartHunterId,
+    int limit = 50,
+    int? beforeMs,
+  }) => _apiClientGetDirectMessageHistory(
+    this,
+    counterpartHunterId: counterpartHunterId,
+    limit: limit,
+    beforeMs: beforeMs,
+  );
+
+  Future<DirectMessage> persistDirectMessage({
+    required String recipientHunterId,
+    required String content,
+    String? clientMessageId,
+    int? sentAtMs,
+  }) => _apiClientPersistDirectMessage(
+    this,
+    recipientHunterId: recipientHunterId,
+    content: content,
+    clientMessageId: clientMessageId,
+    sentAtMs: sentAtMs,
+  );
+
+  Future<List<EncryptedDirectMessage>> getEncryptedDirectMessageHistory({
+    required String counterpartHunterId,
+    int limit = 50,
+    int? beforeMs,
+  }) => _apiClientGetEncryptedDirectMessageHistory(
+    this,
+    counterpartHunterId: counterpartHunterId,
+    limit: limit,
+    beforeMs: beforeMs,
+  );
+
+  Future<EncryptedDirectMessage> persistEncryptedDirectMessage({
+    required String recipientHunterId,
+    required String senderDeviceId,
+    required String recipientDeviceId,
+    String? clientMessageId,
+    String? protocolVersion,
+    required String ciphertext,
+    required String nonce,
+    int? sentAtMs,
+  }) => _apiClientPersistEncryptedDirectMessage(
+    this,
+    recipientHunterId: recipientHunterId,
+    senderDeviceId: senderDeviceId,
+    recipientDeviceId: recipientDeviceId,
+    clientMessageId: clientMessageId,
+    protocolVersion: protocolVersion,
+    ciphertext: ciphertext,
+    nonce: nonce,
+    sentAtMs: sentAtMs,
+  );
+
+  Future<List<FriendProfile>> listFriends() => _apiClientListFriends(this);
+
+  Future<FriendProfile> addFriend({required String playerId}) =>
+      _apiClientAddFriend(this, playerId: playerId);
+
+  Future<FriendRequestInfo> requestFriend({required String playerId}) =>
+      _apiClientRequestFriend(this, playerId: playerId);
+
+  Future<List<FriendRequestInfo>> listIncomingFriendRequests() =>
+      _apiClientListIncomingFriendRequests(this);
+
+  Future<FriendRequestInfo> respondFriendRequest({
+    required String requestId,
+    required bool accept,
+  }) => _apiClientRespondFriendRequest(
+    this,
+    requestId: requestId,
+    accept: accept,
+  );
+
+  Future<GuildInviteInfo> inviteFriendToGuild({required String playerId}) =>
+      _apiClientInviteFriendToGuild(this, playerId: playerId);
+
+  Future<List<GuildInviteInfo>> listMyGuildInvites() =>
+      _apiClientListMyGuildInvites(this);
+
+  Future<GuildInviteInfo> respondGuildInvite({
+    required String inviteId,
+    required bool accept,
+  }) => _apiClientRespondGuildInvite(this, inviteId: inviteId, accept: accept);
+
+  Future<SocialProfile> getSocialProfile() => _apiClientGetSocialProfile(this);
+
+  Future<SocialProfile> updateSocialProfile({String? motto}) =>
+      _apiClientUpdateSocialProfile(this, motto: motto);
 
   Future<List<HunterProfile>> listHunters() async {
     final data = await _authedGet(
@@ -165,31 +300,6 @@ class ApiClient {
       role: _AuthRole.any,
     );
     return HunterStatsSummary.fromJson(data as Map<String, dynamic>);
-  }
-
-  Future<QuestInstance> createQuest({
-    required String title,
-    String? description,
-    required int rewardXp,
-    required int rewardCoins,
-    required QuestStatCategory statCategory,
-  }) async {
-    final payload = <String, dynamic>{
-      'title': title.trim(),
-      'reward_xp': rewardXp,
-      'reward_coins': rewardCoins,
-      'stat_category': questStatCategoryToApiValue(statCategory),
-    };
-    final normalizedDescription = description?.trim();
-    if (normalizedDescription != null && normalizedDescription.isNotEmpty) {
-      payload['description'] = normalizedDescription;
-    }
-    final data = await _authedPost(
-      '/api/v1/quests',
-      payload,
-      role: _AuthRole.owner,
-    );
-    return QuestInstance.fromJson(data as Map<String, dynamic>);
   }
 
   Future<List<GuildShopItem>> listShopItems({
@@ -285,169 +395,6 @@ class ApiClient {
       role: _AuthRole.any,
     );
     return RealtimeWsTicket.fromJson(data as Map<String, dynamic>);
-  }
-
-  Future<VoiceTokenBundle> issueVoiceToken({String? roomId}) async {
-    final payload = <String, dynamic>{};
-    final normalizedRoomId = roomId?.trim();
-    if (normalizedRoomId != null && normalizedRoomId.isNotEmpty) {
-      payload['room_id'] = normalizedRoomId;
-    }
-    final data = await _authedPost(
-      '/api/v1/voice/token',
-      payload,
-      role: _AuthRole.any,
-    );
-    return VoiceTokenBundle.fromJson(data as Map<String, dynamic>);
-  }
-
-  Future<List<ChatMessage>> getChatHistory({
-    String? roomId,
-    int limit = 50,
-    int? beforeMs,
-  }) async {
-    final query = <String, String>{'limit': '$limit'};
-    final normalizedRoomId = roomId?.trim();
-    if (normalizedRoomId != null && normalizedRoomId.isNotEmpty) {
-      query['room_id'] = normalizedRoomId;
-    }
-    if (beforeMs != null) {
-      query['before_ms'] = '$beforeMs';
-    }
-    final data = await _authedGet(
-      '/api/v1/chat/history',
-      query,
-      role: _AuthRole.any,
-    );
-    return (data as List)
-        .map((item) => ChatMessage.fromJson(item as Map<String, dynamic>))
-        .toList();
-  }
-
-  Future<ChatMessage> persistChatMessage({
-    required String content,
-    String? roomId,
-    String? clientMessageId,
-    int? sentAtMs,
-  }) async {
-    final payload = <String, dynamic>{'content': content};
-    final normalizedRoomId = roomId?.trim();
-    if (normalizedRoomId != null && normalizedRoomId.isNotEmpty) {
-      payload['room_id'] = normalizedRoomId;
-    }
-    final normalizedClientMessageId = clientMessageId?.trim();
-    if (normalizedClientMessageId != null &&
-        normalizedClientMessageId.isNotEmpty) {
-      payload['client_message_id'] = normalizedClientMessageId;
-    }
-    if (sentAtMs != null) {
-      payload['sent_at_ms'] = sentAtMs;
-    }
-    final data = await _authedPost(
-      '/api/v1/chat/messages',
-      payload,
-      role: _AuthRole.any,
-    );
-    return ChatMessage.fromJson(data as Map<String, dynamic>);
-  }
-
-  Future<List<FriendProfile>> listFriends() async {
-    final data = await _authedGet(
-      '/api/v1/social/friends',
-      const {},
-      role: _AuthRole.any,
-    );
-    return (data as List)
-        .map((item) => FriendProfile.fromJson(item as Map<String, dynamic>))
-        .toList();
-  }
-
-  Future<FriendProfile> addFriend({required String playerId}) async {
-    final data = await _authedPost('/api/v1/social/friends', {
-      'player_id': playerId.trim(),
-    }, role: _AuthRole.any);
-    return FriendProfile.fromJson(data as Map<String, dynamic>);
-  }
-
-  Future<FriendRequestInfo> requestFriend({required String playerId}) async {
-    final data = await _authedPost('/api/v1/friends/request', {
-      'player_id': playerId.trim(),
-    }, role: _AuthRole.any);
-    return FriendRequestInfo.fromJson(data as Map<String, dynamic>);
-  }
-
-  Future<List<FriendRequestInfo>> listIncomingFriendRequests() async {
-    final data = await _authedGet(
-      '/api/v1/friends/requests/incoming',
-      const {},
-      role: _AuthRole.any,
-    );
-    return (data as List)
-        .map((item) => FriendRequestInfo.fromJson(item as Map<String, dynamic>))
-        .toList();
-  }
-
-  Future<FriendRequestInfo> respondFriendRequest({
-    required String requestId,
-    required bool accept,
-  }) async {
-    final data = await _authedPost(
-      '/api/v1/friends/requests/$requestId/respond',
-      {'accept': accept},
-      role: _AuthRole.any,
-    );
-    return FriendRequestInfo.fromJson(data as Map<String, dynamic>);
-  }
-
-  Future<GuildInviteInfo> inviteFriendToGuild({
-    required String playerId,
-  }) async {
-    final data = await _authedPost('/api/v1/guilds/summon', {
-      'player_id': playerId.trim(),
-    }, role: _AuthRole.any);
-    return GuildInviteInfo.fromJson(data as Map<String, dynamic>);
-  }
-
-  Future<List<GuildInviteInfo>> listMyGuildInvites() async {
-    final data = await _authedGet(
-      '/api/v1/social/guild/invites',
-      const {},
-      role: _AuthRole.any,
-    );
-    return (data as List)
-        .map((item) => GuildInviteInfo.fromJson(item as Map<String, dynamic>))
-        .toList();
-  }
-
-  Future<GuildInviteInfo> respondGuildInvite({
-    required String inviteId,
-    required bool accept,
-  }) async {
-    final data = await _authedPost(
-      '/api/v1/social/guild/invites/$inviteId/respond',
-      {'accept': accept},
-      role: _AuthRole.any,
-    );
-    return GuildInviteInfo.fromJson(data as Map<String, dynamic>);
-  }
-
-  Future<SocialProfile> getSocialProfile() async {
-    final data = await _authedGet(
-      '/api/v1/social/profile',
-      const {},
-      role: _AuthRole.any,
-    );
-    return SocialProfile.fromJson(data as Map<String, dynamic>);
-  }
-
-  Future<SocialProfile> updateSocialProfile({String? motto}) async {
-    final payload = <String, dynamic>{'motto': motto?.trim() ?? ''};
-    final data = await _authedPatch(
-      '/api/v1/social/profile',
-      payload,
-      role: _AuthRole.any,
-    );
-    return SocialProfile.fromJson(data as Map<String, dynamic>);
   }
 
   HunterProfile _resolveHunterSelection(
@@ -557,6 +504,19 @@ class ApiClient {
       throw ApiException('session missing hunter_id, please login again', 401);
     }
     return session;
+  }
+
+  String resolveMediaUrl(String contentPath) {
+    return Uri.parse(baseUrl).resolve(contentPath).toString();
+  }
+
+  Map<String, String> mediaHeaders() {
+    final session = authSession;
+    final token = session?.accessToken.trim();
+    if (token == null || token.isEmpty) {
+      return const {'ngrok-skip-browser-warning': 'true'};
+    }
+    return _bearerHeaders(token);
   }
 
   Map<String, String> _bearerHeaders(String token) => {

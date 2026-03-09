@@ -30,6 +30,32 @@ pub enum QuestStatus {
     Completed,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize)]
+#[sea_orm(rs_type = "String", db_type = "String(StringLen::N(24))")]
+#[serde(rename_all = "snake_case")]
+pub enum QuestCategory {
+    #[sea_orm(string_value = "chore")]
+    Chore,
+    #[sea_orm(string_value = "study")]
+    Study,
+    #[sea_orm(string_value = "exam")]
+    Exam,
+    #[sea_orm(string_value = "habit")]
+    Habit,
+    #[sea_orm(string_value = "unknown")]
+    Unknown,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize)]
+#[sea_orm(rs_type = "String", db_type = "String(StringLen::N(24))")]
+#[serde(rename_all = "snake_case")]
+pub enum HabitCadence {
+    #[sea_orm(string_value = "daily")]
+    Daily,
+    #[sea_orm(string_value = "weekly")]
+    Weekly,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Serialize, Deserialize)]
 #[sea_orm(table_name = "quests")]
 pub struct Model {
@@ -41,6 +67,18 @@ pub struct Model {
     pub reward_xp: i32,
     pub reward_coins: i32,
     pub stat_category: QuestStatCategory,
+    pub category: QuestCategory,
+    pub assigned_hunter_id: Option<Uuid>,
+    pub created_by_hunter_id: Option<Uuid>,
+    pub cadence: Option<HabitCadence>,
+    pub streak_count: i32,
+    pub best_streak: i32,
+    pub completions_count: i32,
+    pub proof_note: Option<String>,
+    pub proof_submitted_at: Option<DateTimeWithTimeZone>,
+    pub last_completed_at: Option<Date>,
+    pub last_review_note: Option<String>,
+    pub updated_at: DateTimeWithTimeZone,
     pub status: QuestStatus,
 }
 
@@ -54,11 +92,33 @@ pub enum Relation {
         on_delete = "Cascade"
     )]
     Guild,
+    #[sea_orm(
+        belongs_to = "super::hunter::Entity",
+        from = "Column::AssignedHunterId",
+        to = "super::hunter::Column::Id",
+        on_update = "Cascade",
+        on_delete = "SetNull"
+    )]
+    AssignedHunter,
+    #[sea_orm(
+        belongs_to = "super::hunter::Entity",
+        from = "Column::CreatedByHunterId",
+        to = "super::hunter::Column::Id",
+        on_update = "Cascade",
+        on_delete = "SetNull"
+    )]
+    CreatedByHunter,
 }
 
 impl Related<super::guild::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Guild.def()
+    }
+}
+
+impl Related<super::hunter::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::AssignedHunter.def()
     }
 }
 

@@ -24,13 +24,13 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Build server release
-        run: cargo build -p chen_leveling_server --release --locked
+        run: cargo build -p the_bit_and_bond_server --release --locked
 
       - name: Upload server artifact
         uses: actions/upload-artifact@v4
         with:
           name: the-bit-and-bond-server-linux-x64
-          path: target/release/chen_leveling_server
+          path: target/release/the_bit_and_bond_server
           if-no-files-found: error
 
   flutter-web:

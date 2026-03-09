@@ -1,14 +1,14 @@
 services:
   redis:
     image: redis:7-alpine
-    container_name: chen_leveling_voice_redis
+    container_name: the_bit_and_bond_voice_redis
     restart: unless-stopped
     ports:
       - "${VOICE_REDIS_PORT:-6380}:6379"
 
   livekit:
     image: livekit/livekit-server:latest
-    container_name: chen_leveling_livekit
+    container_name: the_bit_and_bond_livekit
     restart: unless-stopped
     depends_on:
       - redis
@@ -22,7 +22,7 @@ services:
 
   coturn:
     image: coturn/coturn:4.6.3-r3
-    container_name: chen_leveling_coturn
+    container_name: the_bit_and_bond_coturn
     restart: unless-stopped
     command: ["-c", "/etc/coturn/turnserver.conf"]
     volumes:

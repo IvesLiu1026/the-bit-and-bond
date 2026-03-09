@@ -22,6 +22,8 @@ pub enum AppError {
     Conflict(String),
     #[error("too many requests: {0}")]
     TooManyRequests(String),
+    #[error("service unavailable: {0}")]
+    ServiceUnavailable(String),
     #[error("database error: {0}")]
     Database(#[from] DbErr),
 }
@@ -40,6 +42,7 @@ impl IntoResponse for AppError {
             AppError::NotFound(_) => StatusCode::NOT_FOUND,
             AppError::Conflict(_) => StatusCode::CONFLICT,
             AppError::TooManyRequests(_) => StatusCode::TOO_MANY_REQUESTS,
+            AppError::ServiceUnavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
             AppError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
 

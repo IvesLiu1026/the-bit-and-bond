@@ -7,14 +7,14 @@ use sea_orm::{
 use std::error::Error;
 use uuid::Uuid;
 
-use crate::{jwt::JwtService, state::AppState};
+use crate::{firebase_identity::FirebaseIdentity, jwt::JwtService, state::AppState};
 use entity::{guild, hunter, user};
 use migration::MigratorTrait;
 
 use super::{
     INVITE_CODE_ALPHABET, INVITE_CODE_LEN, PlayerLoginRequest, PlayerRegisterRequest,
-    generate_invite_code, hash_password, player_login, player_register,
-    register_player_with_code_factory, verify_password,
+    generate_invite_code, hash_password, login_with_firebase_identity, player_login,
+    player_register, register_player_with_code_factory, verify_password,
 };
 
 #[test]
@@ -187,6 +187,54 @@ async fn register_retries_when_invite_code_collides() -> Result<(), Box<dyn Erro
     Ok(())
 }
 
+#[tokio::test]
+async fn firebase_login_creates_owner_hunter_with_avatar_profile() -> Result<(), Box<dyn Error>> {
+    let ctx = TestDbContext::create().await?;
+    let state = ctx.app_state();
+    let email = format!("google_{}@example.com", Uuid::new_v4().simple());
+
+    let response = login_with_firebase_identity(
+        &state,
+        FirebaseIdentity {
+            uid: format!("firebase_uid_{}", Uuid::new_v4().simple()),
+            email: email.clone(),
+            display_name: Some("Pixel Hero".to_string()),
+        },
+        Some("Pixel Hero".to_string()),
+        Some("hair:ponytail|cloth:plum".to_string()),
+    )
+    .await?;
+
+    let hunter_id = response
+        .hunter_id
+        .expect("firebase login should issue hunter");
+    let inserted_hunter = hunter::Entity::find_by_id(hunter_id)
+        .one(&state.db)
+        .await?
+        .expect("hunter should exist");
+    assert_eq!(inserted_hunter.name, "Pixel Hero");
+    assert_eq!(inserted_hunter.avatar_type, "hair:ponytail|cloth:plum");
+    assert_eq!(
+        response.avatar_type.as_deref(),
+        Some("hair:ponytail|cloth:plum")
+    );
+
+    let inserted_user = user::Entity::find()
+        .filter(user::Column::Email.eq(email))
+        .one(&state.db)
+        .await?
+        .expect("user should exist");
+    let inserted_guild = guild::Entity::find()
+        .filter(guild::Column::OwnerId.eq(inserted_user.id))
+        .one(&state.db)
+        .await?
+        .expect("guild should exist");
+    assert_eq!(inserted_guild.id, response.guild_id);
+
+    ctx.cleanup().await?;
+    Ok(())
+}
+
 struct TestDbContext {
     admin_db: sea_orm::DatabaseConnection,
     app_db: sea_orm::DatabaseConnection,
@@ -197,8 +245,8 @@ impl TestDbContext {
     async fn create() -> Result<Self, Box<dyn Error>> {
         dotenvy::dotenv().ok();
         let base_url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgres://chen:chen@127.0.0.1:5433/chen_leveling".to_string());
-        let db_name = format!("chen_leveling_it_{}", Uuid::new_v4().simple());
+            .unwrap_or_else(|_| "postgres://chen:chen@127.0.0.1:5433/the_bit_and_bond".to_string());
+        let db_name = format!("the_bit_and_bond_it_{}", Uuid::new_v4().simple());
         let admin_url = replace_database_name(&base_url, "postgres")?;
         let test_url = replace_database_name(&base_url, &db_name)?;
 

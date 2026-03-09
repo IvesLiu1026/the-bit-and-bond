@@ -1,12 +1,12 @@
 services:
   postgres:
     image: postgres:16
-    container_name: chen_leveling_postgres
+    container_name: the_bit_and_bond_postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: chen
       POSTGRES_PASSWORD: chen
-      POSTGRES_DB: chen_leveling
+      POSTGRES_DB: the_bit_and_bond
     ports:
       - "${POSTGRES_PORT:-5433}:5432"
     volumes:

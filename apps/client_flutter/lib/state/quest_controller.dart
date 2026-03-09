@@ -28,8 +28,16 @@ class QuestController extends StateNotifier<AsyncValue<List<QuestInstance>>> {
     state = await AsyncValue.guard(_repo.fetchQuests);
   }
 
-  Future<void> submitQuest(String questInstanceId) async {
-    await _repo.submitQuest(questInstanceId: questInstanceId);
+  Future<void> submitQuest(
+    String questInstanceId, {
+    String? proofNote,
+    QuestProofUpload? proofMedia,
+  }) async {
+    await _repo.submitQuest(
+      questInstanceId: questInstanceId,
+      proofNote: proofNote,
+      proofMedia: proofMedia,
+    );
     await refresh();
   }
 
@@ -39,6 +47,9 @@ class QuestController extends StateNotifier<AsyncValue<List<QuestInstance>>> {
     required int rewardXp,
     required int rewardCoins,
     required QuestStatCategory statCategory,
+    QuestCategory category = QuestCategory.chore,
+    String? assignedHunterId,
+    HabitCadence cadence = HabitCadence.none,
   }) async {
     await _repo.createQuest(
       title: title,
@@ -46,6 +57,9 @@ class QuestController extends StateNotifier<AsyncValue<List<QuestInstance>>> {
       rewardXp: rewardXp,
       rewardCoins: rewardCoins,
       statCategory: statCategory,
+      category: category,
+      assignedHunterId: assignedHunterId,
+      cadence: cadence,
     );
     await refresh();
   }

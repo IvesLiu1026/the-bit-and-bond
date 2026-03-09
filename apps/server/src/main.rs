@@ -5,6 +5,7 @@ mod auth_throttle;
 mod config;
 mod error;
 mod extractors;
+mod firebase_identity;
 mod jwt;
 mod presence;
 mod realtime_ticket;
@@ -17,7 +18,7 @@ use crate::{
     app::build_router,
     config::Config,
     presence::PresenceHub,
-    state::{AppState, LiveKitConfig},
+    state::{AppState, FirebaseAuthConfig, LiveKitConfig},
 };
 use migration::MigratorTrait;
 use sea_orm::Database;
@@ -39,24 +40,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let livekit = resolve_livekit_config(&cfg);
+    let firebase_auth = resolve_firebase_auth_config(&cfg);
     let state = match cfg.redis_url.as_deref() {
         Some(redis_url) => match PresenceHub::with_redis(redis_url).await {
             Ok(hub) => {
                 info!(redis_url, "realtime presence uses redis pub/sub");
-                AppState::with_presence_and_livekit(db, jwt, hub, livekit.clone())
+                AppState::with_services(db, jwt, hub, livekit.clone(), firebase_auth.clone())
             }
             Err(err) => {
                 warn!(error = %err, "failed to initialize redis presence, fallback to in-memory");
-                AppState::with_presence_and_livekit(db, jwt, PresenceHub::new(), livekit.clone())
+                AppState::with_services(
+                    db,
+                    jwt,
+                    PresenceHub::new(),
+                    livekit.clone(),
+                    firebase_auth.clone(),
+                )
             }
         },
-        None => AppState::with_presence_and_livekit(db, jwt, PresenceHub::new(), livekit),
+        None => AppState::with_services(db, jwt, PresenceHub::new(), livekit, firebase_auth),
     };
     let app = build_router(state, &cfg.allowed_origin, cfg.allow_wildcard_origin())?;
 
     let addr: SocketAddr = cfg.bind_addr.parse()?;
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    info!(%addr, "The Bit & Bond server listening");
+    info!(%addr, "The Bit and Bond server listening");
 
     axum::serve(listener, app).await?;
     Ok(())
@@ -64,7 +72,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 fn init_tracing() {
     let env = tracing_subscriber::EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| "chen_leveling_server=debug,tower_http=info".into());
+        .unwrap_or_else(|_| "the_bit_and_bond_server=debug,tower_http=info".into());
 
     tracing_subscriber::fmt().with_env_filter(env).init();
 }
@@ -88,4 +96,12 @@ fn resolve_livekit_config(cfg: &Config) -> Option<LiveKitConfig> {
             None
         }
     }
+}
+
+fn resolve_firebase_auth_config(cfg: &Config) -> Option<FirebaseAuthConfig> {
+    cfg.firebase_project_id
+        .as_ref()
+        .map(|project_id| FirebaseAuthConfig {
+            project_id: project_id.clone(),
+        })
 }

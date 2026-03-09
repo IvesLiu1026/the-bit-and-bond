@@ -5,98 +5,32 @@ import 'package:flame/components.dart';
 import 'package:flame/experimental.dart' show Rectangle;
 import 'package:flame/game.dart';
 import 'package:flame/input.dart';
-import 'package:flame/sprite.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/settings/app_settings.dart';
 import '../../core/theme/app_colors.dart';
+import '../avatar/avatar_appearance.dart';
 import '../quests/models.dart';
 
+part 'chen_game_models.part.dart';
 part 'chen_game_environment.part.dart';
 part 'chen_game_furniture.part.dart';
 part 'chen_game_character.part.dart';
 part 'chen_game_joystick.part.dart';
-
-enum TavernFurnitureType {
-  noticeBoard,
-  masterDesk,
-  guildChest,
-  campfireBar,
-  guildMerchant,
-  wallBookshelf,
-  honorBanner,
-  trainingDummy,
-}
-
-enum TavernVisualTheme { cozyWood, technoMinimal, hotbloodAdventure }
-
-class HunterRealtimePose {
-  HunterRealtimePose({
-    required this.hunterId,
-    required this.x,
-    required this.y,
-    required this.facing,
-    required this.moving,
-    required this.updatedAtMs,
-  });
-
-  final String hunterId;
-  final double x;
-  final double y;
-  final String facing;
-  final bool moving;
-  final int updatedAtMs;
-
-  Map<String, dynamic> toClientMessage() {
-    return {
-      'type': 'pose',
-      'hunter_id': hunterId,
-      'x': x,
-      'y': y,
-      'facing': facing,
-      'moving': moving,
-    };
-  }
-
-  static HunterRealtimePose? fromServerJson(Map<String, dynamic> json) {
-    final hunterId = json['hunter_id'] as String?;
-    final xRaw = json['x'];
-    final yRaw = json['y'];
-    final facing = (json['facing'] as String?)?.trim();
-    final moving = json['moving'] as bool?;
-    final updatedAtMs = json['updated_at_ms'];
-
-    if (hunterId == null ||
-        xRaw is! num ||
-        yRaw is! num ||
-        facing == null ||
-        moving == null ||
-        updatedAtMs is! int) {
-      return null;
-    }
-    return HunterRealtimePose(
-      hunterId: hunterId,
-      x: xRaw.toDouble(),
-      y: yRaw.toDouble(),
-      facing: facing,
-      moving: moving,
-      updatedAtMs: updatedAtMs,
-    );
-  }
-}
+part 'chen_game_interaction.part.dart';
+part 'chen_game_hunters.part.dart';
+part 'chen_game_sandbox.part.dart';
 
 class TheBitAndBondGame extends FlameGame with PanDetector, KeyboardEvents {
   TheBitAndBondGame({this.onFurnitureInteracted});
 
-  static const String _heroSpriteSheetPath =
-      'sprites/hero/Free Pixel Character Base Pack/character.png';
-  static const String _tavernBackdropPath = 'environment/tavern_main_room.png';
-  static const String _campfireSpriteSheetPath =
-      'environment/campfire_sprite_sheet.png';
+  static const bool _sandboxRoomMode = true;
+  static const String _testingDummyHunterId = '__bibon_test_dummy__';
   static const double _heroSpeed = 210;
   static const double _joystickDeadZone = 0.08;
-  static const double _joystickBaseRadius = 88;
-  static const double _joystickKnobRadius = 38;
+  static const double _joystickBaseRadius = 68;
+  static const double _joystickKnobRadius = 27;
   static const int _remoteActorTtlMs = 15000;
   static const double _baseTopWallHeight = 118;
   static const double _baseWorldWidth = 1920;
@@ -105,15 +39,64 @@ class TheBitAndBondGame extends FlameGame with PanDetector, KeyboardEvents {
   static const double _playHorizontalPadding = 14;
   static const double _playBottomPadding = 14;
   static const double _furnitureInteractDistance = 10;
+  static const double _sandboxWallRatio = 0.24;
+  static const double _dummyLinkMagnetRange = 126;
+  static const double _dummyLinkSpacing = 70;
+  static const double _dummyLinkBreakHoldSeconds = 0.58;
+  static const double _dummyRelinkCooldownSeconds = 0.82;
+  static const double _portalCooldownSeconds = 0.9;
+  static const List<_SandboxRoomDefinition> _sandboxRooms =
+      <_SandboxRoomDefinition>[
+        _SandboxRoomDefinition(
+          id: 'main_bay',
+          label: '主接點室',
+          hasDummy: true,
+          rightPortalTargetIndex: 1,
+          palette: _SandboxRoomPalette(
+            backgroundColor: Color(0xFF1A130F),
+            wallColor: Color(0xFF32261D),
+            wallShadeColor: Color(0xFF241B14),
+            sideWallColor: Color(0xFF271D16),
+            floorBaseColor: Color(0xFF18110D),
+            floorTileA: Color(0xFF2B2018),
+            floorTileB: Color(0xFF221913),
+            gridLineColor: Color(0xAA5A4637),
+            borderColor: Color(0xFF0C0806),
+            glowColor: Color(0x1FB9E0FF),
+            portalCoreColor: Color(0x6642C6FF),
+            portalRingColor: Color(0xFF9FE7FF),
+            mapAccentColor: Color(0xFFD8A55F),
+          ),
+        ),
+        _SandboxRoomDefinition(
+          id: 'mint_room',
+          label: '薄荷副室',
+          leftPortalTargetIndex: 0,
+          palette: _SandboxRoomPalette(
+            backgroundColor: Color(0xFF131A19),
+            wallColor: Color(0xFF213432),
+            wallShadeColor: Color(0xFF182725),
+            sideWallColor: Color(0xFF14211F),
+            floorBaseColor: Color(0xFF0F1716),
+            floorTileA: Color(0xFF1E3431),
+            floorTileB: Color(0xFF192A28),
+            gridLineColor: Color(0xAA7AD4C8),
+            borderColor: Color(0xFF081111),
+            glowColor: Color(0x1F8EF7D1),
+            portalCoreColor: Color(0x664CE6C9),
+            portalRingColor: Color(0xFFB9FFF1),
+            mapAccentColor: Color(0xFF74D8C3),
+          ),
+        ),
+      ];
 
   RectangleComponent? _background;
-  SpriteSheet? _heroSpriteSheet;
-  ui.Image? _campfireSpriteSheetImage;
   _FloatingJoystickOverlay? _floatingJoystick;
   _TavernEnvironmentLayer? _environmentLayer;
   final Map<TavernFurnitureType, InteractiveFurniture> _furnitures = {};
   final Vector2 _joystickInput = Vector2.zero();
   final Map<String, _HeroCharacterComponent> _hunterSprites = {};
+  final Map<String, AvatarAppearance> _hunterAppearances = {};
   final Set<String> _initializedHunterPositions = <String>{};
   final Map<String, int> _lastServerPoseTsByHunter = {};
   final Map<String, int> _lastPoseSeenAtMsByHunter = {};
@@ -132,6 +115,12 @@ class TheBitAndBondGame extends FlameGame with PanDetector, KeyboardEvents {
   bool _campfireConnected = false;
   bool _campfireHasActiveSpeaker = false;
   double _campfirePulseTick = 0;
+  int _currentSandboxRoomIndex = 0;
+  bool _sandboxLinkEngaged = false;
+  double _sandboxLinkBreakHold = 0;
+  double _sandboxRelinkCooldown = 0;
+  double _sandboxPortalCooldown = 0;
+  AppLanguage _language = AppLanguage.traditionalChinese;
 
   final List<QuestInstance> _quests = [];
   final ValueNotifier<String?> interactionHintListenable =
@@ -140,16 +129,74 @@ class TheBitAndBondGame extends FlameGame with PanDetector, KeyboardEvents {
       ValueNotifier<Set<String>>(<String>{});
   final ValueNotifier<TavernFurnitureType?> nearbyFurnitureListenable =
       ValueNotifier<TavernFurnitureType?>(null);
+  final ValueNotifier<int> sandboxRoomIndexListenable = ValueNotifier<int>(0);
 
-  int get actorCount => _hunterSprites.length;
-  int get realtimeActorCount => _realtimeOnlyHunterIds.length;
+  int get actorCount =>
+      _hunterSprites.keys.where((id) => id != _testingDummyHunterId).length;
+  int get realtimeActorCount =>
+      _realtimeOnlyHunterIds.where((id) => id != _testingDummyHunterId).length;
   TavernVisualTheme get theme => _theme;
   Vector2 get worldSize => _worldSize;
+  bool get isSandboxRoomMode => _sandboxRoomMode;
+  int get currentSandboxRoomIndex => _currentSandboxRoomIndex;
+  List<SandboxRoomSnapshot> get sandboxRooms =>
+      List<SandboxRoomSnapshot>.generate(_sandboxRooms.length, (index) {
+        final room = _sandboxRooms[index];
+        final dummyMarker = room.hasDummy
+            ? (index == _currentSandboxRoomIndex
+                  ? _normalizedSandboxMarkerFor(_dummyHunter?.position)
+                  : const Offset(0.7, 0.62))
+            : null;
+        return SandboxRoomSnapshot(
+          id: room.id,
+          label: _roomLabel(room),
+          index: index,
+          isCurrent: index == _currentSandboxRoomIndex,
+          accentColor: room.palette.mapAccentColor,
+          floorColor: room.palette.floorTileA,
+          wallColor: room.palette.wallColor,
+          hasLeftPortal: room.leftPortalTargetIndex != null,
+          hasRightPortal: room.rightPortalTargetIndex != null,
+          hasDummy: room.hasDummy,
+          playerMarker: index == _currentSandboxRoomIndex
+              ? _normalizedSandboxMarkerFor(_controlledHunter?.position)
+              : null,
+          dummyMarker: dummyMarker,
+        );
+      }, growable: false);
+
+  void setLanguage(AppLanguage language) {
+    if (_language == language) {
+      return;
+    }
+    _language = language;
+    _updateInteractionHint();
+  }
+
+  String _tr({required String zh, required String en}) {
+    return _language == AppLanguage.english ? en : zh;
+  }
+
+  String _roomLabel(_SandboxRoomDefinition room) {
+    return switch (room.id) {
+      'main_bay' => _tr(zh: '主接點室', en: 'Main Link Room'),
+      'mint_room' => _tr(zh: '薄荷副室', en: 'Mint Side Room'),
+      _ => room.label,
+    };
+  }
+
   final void Function(TavernFurnitureType furniture)? onFurnitureInteracted;
 
-  bool get _isCompactPhoneViewport => size.x > 0 && size.x <= 520;
+  _SandboxRoomDefinition get _currentSandboxRoom =>
+      _sandboxRooms[_currentSandboxRoomIndex];
+  _SandboxRoomPalette get _currentSandboxPalette => _currentSandboxRoom.palette;
+
+  bool get _isCompactPhoneViewport => hasLayout && size.x > 0 && size.x <= 520;
 
   double get _playAreaTopInset {
+    if (_sandboxRoomMode) {
+      return _worldSize.y * _sandboxWallRatio;
+    }
     return switch (_theme) {
       TavernVisualTheme.cozyWood => _worldSize.y * 0.33,
       TavernVisualTheme.technoMinimal ||
@@ -174,22 +221,8 @@ class TheBitAndBondGame extends FlameGame with PanDetector, KeyboardEvents {
     _syncCameraBounds();
     camera.viewfinder.position = Vector2(_worldSize.x / 2, _worldSize.y / 2);
 
-    final spriteImage = await images.load(_heroSpriteSheetPath);
-    final tavernBackdropImage = await images.load(_tavernBackdropPath);
-    final campfireSpriteSheetImage = await images.load(
-      _campfireSpriteSheetPath,
-    );
-    final spriteSheet = SpriteSheet(
-      image: spriteImage,
-      srcSize: Vector2.all(32),
-    );
-    _heroSpriteSheet = spriteSheet;
-    _campfireSpriteSheetImage = campfireSpriteSheetImage;
-
-    final environmentLayer = _TavernEnvironmentLayer(
-      theme: _theme,
-      tavernBackdropImage: tavernBackdropImage,
-    )..priority = -900;
+    final environmentLayer = _TavernEnvironmentLayer(theme: _theme)
+      ..priority = -900;
     _environmentLayer = environmentLayer;
     world.add(environmentLayer);
 
@@ -201,7 +234,9 @@ class TheBitAndBondGame extends FlameGame with PanDetector, KeyboardEvents {
     _floatingJoystick = floatingJoystick;
     camera.viewport.add(floatingJoystick);
 
-    _spawnFurniture();
+    if (!_sandboxRoomMode) {
+      _spawnFurniture();
+    }
     _applyThemePalette();
     _layoutFurniture();
     _applyRoster();
@@ -223,6 +258,14 @@ class TheBitAndBondGame extends FlameGame with PanDetector, KeyboardEvents {
 
   void _updateWorldForViewport(Vector2 viewportSize) {
     if (viewportSize.x <= 0 || viewportSize.y <= 0) {
+      return;
+    }
+    if (_sandboxRoomMode) {
+      final squareSize = math.max(
+        980,
+        math.max(viewportSize.x, viewportSize.y) * 1.14,
+      );
+      _worldSize = Vector2.all(squareSize.floorToDouble());
       return;
     }
     if (_theme == TavernVisualTheme.cozyWood) {
@@ -271,6 +314,10 @@ class TheBitAndBondGame extends FlameGame with PanDetector, KeyboardEvents {
   }
 
   void _applyThemePalette() {
+    if (_sandboxRoomMode) {
+      _background?.paint.color = _currentSandboxPalette.backgroundColor;
+      return;
+    }
     final backgroundColor = switch (_theme) {
       TavernVisualTheme.cozyWood => const Color(0xFF4A2E24),
       TavernVisualTheme.technoMinimal => const Color(0xFF0F1B2D),
@@ -356,34 +403,10 @@ class TheBitAndBondGame extends FlameGame with PanDetector, KeyboardEvents {
       ..addAll(quests);
   }
 
-  void syncHunters(
-    List<HunterProfile> hunters, {
-    required String? controlledHunterId,
-  }) {
-    _rosterHunterIds
-      ..clear()
-      ..addAll(
-        hunters
-            .map((hunter) => hunter.id.trim())
-            .where((hunterId) => hunterId.isNotEmpty),
-      );
-    final normalizedControlledId = _normalizeHunterId(controlledHunterId);
-    if (normalizedControlledId != null) {
-      _pendingControlledHunterId = normalizedControlledId;
-    }
-    _applyRoster();
-  }
-
-  void setControlledHunterId(String? hunterId) {
-    final normalized = _normalizeHunterId(hunterId);
-    if (normalized == null || _pendingControlledHunterId == normalized) {
+  void _spawnFurniture() {
+    if (_sandboxRoomMode) {
       return;
     }
-    _pendingControlledHunterId = normalized;
-    _applyRoster();
-  }
-
-  void _spawnFurniture() {
     if (_furnitures.isNotEmpty) {
       return;
     }
@@ -399,7 +422,7 @@ class TheBitAndBondGame extends FlameGame with PanDetector, KeyboardEvents {
     );
     final masterDesk = InteractiveFurniture(
       type: TavernFurnitureType.masterDesk,
-      label: '公會長書桌',
+      label: '家庭中心',
       size: Vector2(160, 86),
       tint: const Color(0xFF6D4C41),
       accent: const Color(0xFF9E7D5A),
@@ -407,23 +430,22 @@ class TheBitAndBondGame extends FlameGame with PanDetector, KeyboardEvents {
     );
     final guildChest = InteractiveFurniture(
       type: TavernFurnitureType.guildChest,
-      label: '公會儲物箱',
+      label: '共享收藏櫃',
       size: Vector2(118, 82),
       tint: const Color(0xFF5D4037),
       accent: const Color(0xFFC9A227),
     );
     final campfireBar = InteractiveFurniture(
       type: TavernFurnitureType.campfireBar,
-      label: '營火語音吧台',
+      label: '語音房',
       size: Vector2(126, 90),
       tint: const Color(0xFF4E342E),
       accent: const Color(0xFFFFB74D),
-      spriteImage: _campfireSpriteSheetImage,
       renderMode: FurnitureRenderMode.flameOverlay,
     );
     final guildMerchant = InteractiveFurniture(
       type: TavernFurnitureType.guildMerchant,
-      label: '公會商人',
+      label: '獎勵兌換站',
       size: Vector2(128, 86),
       tint: const Color(0xFF5E3F2A),
       accent: const Color(0xFFCF9E2D),
@@ -484,6 +506,10 @@ class TheBitAndBondGame extends FlameGame with PanDetector, KeyboardEvents {
 
   void _layoutFurniture() {
     if (size.x <= 0 || size.y <= 0) {
+      return;
+    }
+    if (_sandboxRoomMode) {
+      _rebuildObstacleRects();
       return;
     }
     final noticeBoard = _furnitures[TavernFurnitureType.noticeBoard];
@@ -572,6 +598,9 @@ class TheBitAndBondGame extends FlameGame with PanDetector, KeyboardEvents {
 
   void _rebuildObstacleRects() {
     _obstacleRects.clear();
+    if (_sandboxRoomMode) {
+      return;
+    }
     for (final furniture in _furnitures.values) {
       if (!furniture.collidable) {
         continue;
@@ -610,108 +639,8 @@ class TheBitAndBondGame extends FlameGame with PanDetector, KeyboardEvents {
     );
   }
 
-  bool _tryInteractFurniture(Vector2 touchPoint) {
-    if (onFurnitureInteracted == null) {
-      return false;
-    }
-    final player = _controlledHunter;
-    if (player == null) {
-      return false;
-    }
-
-    for (final furniture in _furnitures.values) {
-      if (!furniture.interactive) {
-        continue;
-      }
-      if (!furniture.hit(touchPoint)) {
-        continue;
-      }
-      final distance = furniture.distanceToInteractionZone(player.position);
-      if (distance > _furnitureInteractDistance) {
-        return false;
-      }
-      onFurnitureInteracted?.call(furniture.type);
-      return true;
-    }
-    return false;
-  }
-
-  bool _tryInteractClosestFurniture() {
-    if (onFurnitureInteracted == null) {
-      return false;
-    }
-    final candidate = _closestFurnitureForInteraction();
-    if (candidate == null) {
-      return false;
-    }
-    onFurnitureInteracted?.call(candidate.type);
-    return true;
-  }
-
-  InteractiveFurniture? _closestFurnitureForInteraction() {
-    final player = _controlledHunter;
-    if (player == null) {
-      return null;
-    }
-    InteractiveFurniture? nearest;
-    var minDistance = double.infinity;
-    for (final furniture in _furnitures.values) {
-      if (!furniture.interactive) {
-        continue;
-      }
-      final distance = furniture.distanceToInteractionZone(player.position);
-      if (distance > _furnitureInteractDistance) {
-        continue;
-      }
-      if (distance < minDistance) {
-        minDistance = distance;
-        nearest = furniture;
-      }
-    }
-    return nearest;
-  }
-
-  void _updateInteractionHint() {
-    final nearest = _closestFurnitureForInteraction();
-    if (nearbyFurnitureListenable.value != nearest?.type) {
-      nearbyFurnitureListenable.value = nearest?.type;
-    }
-    final hint = switch (nearest?.type) {
-      TavernFurnitureType.noticeBoard => '已接近任務佈告欄，點右下互動鍵',
-      TavernFurnitureType.masterDesk => '已接近公會長書桌，點右下互動鍵',
-      TavernFurnitureType.guildChest => '已接近公會儲物箱，點右下互動鍵',
-      TavernFurnitureType.campfireBar => '已接近營火語音吧台，點右下互動鍵',
-      TavernFurnitureType.guildMerchant => '已接近公會商人，點右下互動鍵',
-      TavernFurnitureType.wallBookshelf ||
-      TavernFurnitureType.honorBanner ||
-      TavernFurnitureType.trainingDummy => '左下固定搖桿可 360 度移動',
-      null => '左下固定搖桿可 360 度移動',
-    };
-    if (hint == _lastInteractionHint) {
-      return;
-    }
-    _lastInteractionHint = hint;
-    interactionHintListenable.value = hint;
-  }
-
-  HunterRealtimePose? controlledPoseForSync() {
-    final controlledId = _controlledHunterId;
-    final controlled = _controlledHunter;
-    if (controlledId == null || controlled == null) {
-      return null;
-    }
-    return HunterRealtimePose(
-      hunterId: controlledId,
-      x: controlled.position.x,
-      y: controlled.position.y,
-      facing: controlled.facingWire,
-      moving: controlled.isWalking,
-      updatedAtMs: DateTime.now().millisecondsSinceEpoch,
-    );
-  }
-
   Offset? hunterHeadScreenAnchor(String hunterId, {double verticalLift = 34}) {
-    if (size.x <= 0 || size.y <= 0) {
+    if (!hasLayout || size.x <= 0 || size.y <= 0) {
       return null;
     }
     final hunter = _hunterSprites[hunterId];
@@ -736,38 +665,15 @@ class TheBitAndBondGame extends FlameGame with PanDetector, KeyboardEvents {
     return hunterHeadScreenAnchor(controlledId, verticalLift: verticalLift);
   }
 
-  void applyRemotePose(HunterRealtimePose pose) {
-    if (pose.hunterId == _controlledHunterId) {
-      return;
-    }
-    final sprite = _ensureHunterSprite(pose.hunterId, realtimeOnly: true);
-    if (sprite == null) {
-      return;
-    }
-
-    final lastTs = _lastServerPoseTsByHunter[pose.hunterId];
-    if (lastTs != null && pose.updatedAtMs <= lastTs) {
-      return;
-    }
-    _lastServerPoseTsByHunter[pose.hunterId] = pose.updatedAtMs;
-    _lastPoseSeenAtMsByHunter[pose.hunterId] =
-        DateTime.now().millisecondsSinceEpoch;
-
-    final isFirstPose = !_initializedHunterPositions.contains(pose.hunterId);
-    sprite.applyNetworkPose(
-      pose,
-      snapToTarget: isFirstPose,
-      worldSize: _worldSize,
-      minYBound: _playAreaTopInset,
-    );
-    _initializedHunterPositions.add(pose.hunterId);
-  }
-
   @override
   void update(double dt) {
     super.update(dt);
     _stabilizeControlledHunter();
     _evictStaleRealtimeActors();
+    if (_sandboxRoomMode) {
+      _sandboxRelinkCooldown = math.max(0, _sandboxRelinkCooldown - dt);
+      _sandboxPortalCooldown = math.max(0, _sandboxPortalCooldown - dt);
+    }
     _updateInteractionHint();
     _campfirePulseTick += dt;
     final campfire = _furnitures[TavernFurnitureType.campfireBar];
@@ -784,6 +690,10 @@ class TheBitAndBondGame extends FlameGame with PanDetector, KeyboardEvents {
 
     if (_joystickInput.length < _joystickDeadZone) {
       player.setMotion(Vector2.zero(), moving: false);
+      if (_sandboxRoomMode) {
+        _updateSandboxPortal(player);
+        _updateSandboxLink(player, dt);
+      }
       _syncCameraFollow();
       return;
     }
@@ -794,6 +704,10 @@ class TheBitAndBondGame extends FlameGame with PanDetector, KeyboardEvents {
     _clampPlayerToCanvas(player);
     _resolvePlayerObstacleCollision(player, previous);
     player.setMotion(velocity, moving: true);
+    if (_sandboxRoomMode) {
+      _updateSandboxPortal(player);
+      _updateSandboxLink(player, dt);
+    }
     _syncCameraFollow();
   }
 
@@ -881,223 +795,6 @@ class TheBitAndBondGame extends FlameGame with PanDetector, KeyboardEvents {
     }
     _joystickMovementEngaged = false;
     _floatingJoystick?.deactivate();
-  }
-
-  _HeroCharacterComponent? get _controlledHunter {
-    final id = _controlledHunterId;
-    if (id == null) {
-      return null;
-    }
-    return _hunterSprites[id];
-  }
-
-  void _applyRoster() {
-    if (_heroSpriteSheet == null) {
-      return;
-    }
-
-    final controlledCandidate = _normalizeHunterId(_pendingControlledHunterId);
-    final targetIds = <String>{..._rosterHunterIds, ..._realtimeOnlyHunterIds};
-    if (controlledCandidate != null && controlledCandidate.isNotEmpty) {
-      targetIds.add(controlledCandidate);
-    }
-
-    final removedIds = _hunterSprites.keys
-        .where((id) => !targetIds.contains(id))
-        .toList(growable: false);
-    for (final id in removedIds) {
-      final sprite = _hunterSprites.remove(id);
-      sprite?.removeFromParent();
-      _initializedHunterPositions.remove(id);
-      _lastServerPoseTsByHunter.remove(id);
-      _lastPoseSeenAtMsByHunter.remove(id);
-      _realtimeOnlyHunterIds.remove(id);
-    }
-
-    for (final id in targetIds) {
-      final isControlled =
-          controlledCandidate != null && id == controlledCandidate;
-      _ensureHunterSprite(id, realtimeOnly: !isControlled);
-    }
-
-    _hunterOrder = targetIds.toList(growable: false)..sort();
-    _resolveControlledHunter();
-    _layoutHunters();
-    _syncCameraFollow(snap: true);
-    _publishActiveHunterIds();
-  }
-
-  void _resolveControlledHunter() {
-    if (_hunterOrder.isEmpty) {
-      _controlledHunterId = null;
-      return;
-    }
-
-    final preferred = _normalizeHunterId(_pendingControlledHunterId);
-    if (preferred == null) {
-      _controlledHunterId = null;
-    } else if (_hunterSprites.containsKey(preferred)) {
-      _controlledHunterId = preferred;
-    } else {
-      _controlledHunterId = null;
-    }
-
-    for (final entry in _hunterSprites.entries) {
-      entry.value.setControlled(entry.key == _controlledHunterId);
-    }
-  }
-
-  void _layoutHunters() {
-    if (size.x <= 0 || size.y <= 0 || _hunterOrder.isEmpty) {
-      return;
-    }
-
-    final controlledId = _controlledHunterId;
-    if (controlledId != null) {
-      final controlled = _hunterSprites[controlledId];
-      if (controlled != null &&
-          !_initializedHunterPositions.contains(controlledId)) {
-        final preferred = _preferredControlledSpawnPoint();
-        controlled.position = _findNearestWalkablePosition(
-          preferred,
-          controlled.radius,
-        );
-        _initializedHunterPositions.add(controlledId);
-      }
-      if (controlled != null) {
-        _clampPlayerToCanvas(controlled);
-      }
-    }
-
-    final others = _hunterOrder
-        .where((id) => id != controlledId)
-        .toList(growable: false);
-    if (others.isEmpty) {
-      return;
-    }
-
-    final center = Vector2(
-      _worldSize.x / 2,
-      (_playAreaTopInset + _worldSize.y) / 2,
-    );
-    final radius = math.max(72, math.min(_worldSize.x, _worldSize.y) * 0.24);
-    final total = others.length;
-    for (var index = 0; index < total; index++) {
-      final id = others[index];
-      final sprite = _hunterSprites[id];
-      if (sprite == null) {
-        continue;
-      }
-      if (_initializedHunterPositions.contains(id)) {
-        continue;
-      }
-      final angle = ((2 * math.pi) * index / total) - (math.pi / 2);
-      final preferred =
-          center +
-          Vector2(
-            math.cos(angle).toDouble() * radius,
-            math.sin(angle) * radius,
-          );
-      sprite.position = _findNearestWalkablePosition(preferred, sprite.radius);
-      _clampPlayerToCanvas(sprite);
-      _initializedHunterPositions.add(id);
-      sprite.setMotion(Vector2.zero(), moving: false);
-    }
-  }
-
-  _HeroCharacterComponent? _ensureHunterSprite(
-    String hunterId, {
-    required bool realtimeOnly,
-  }) {
-    final existing = _hunterSprites[hunterId];
-    if (existing != null) {
-      if (realtimeOnly) {
-        _realtimeOnlyHunterIds.add(hunterId);
-      } else {
-        _realtimeOnlyHunterIds.remove(hunterId);
-      }
-      return existing;
-    }
-
-    final spriteSheet = _heroSpriteSheet;
-    if (spriteSheet == null) {
-      return null;
-    }
-
-    final sprite = _HeroCharacterComponent(
-      position: Vector2.zero(),
-      spriteSheet: spriteSheet,
-    );
-    _hunterSprites[hunterId] = sprite;
-    if (realtimeOnly) {
-      _realtimeOnlyHunterIds.add(hunterId);
-    } else {
-      _realtimeOnlyHunterIds.remove(hunterId);
-    }
-    world.add(sprite);
-    _publishActiveHunterIds();
-    return sprite;
-  }
-
-  void _stabilizeControlledHunter() {
-    final preferred = _normalizeHunterId(_pendingControlledHunterId);
-    if (preferred == null || _heroSpriteSheet == null) {
-      return;
-    }
-
-    final sprite = _ensureHunterSprite(preferred, realtimeOnly: false);
-    if (sprite == null) {
-      return;
-    }
-
-    if (!_hunterOrder.contains(preferred)) {
-      _hunterOrder = <String>[..._hunterOrder, preferred];
-    }
-    if (_controlledHunterId != preferred) {
-      _controlledHunterId = preferred;
-      for (final entry in _hunterSprites.entries) {
-        entry.value.setControlled(entry.key == preferred);
-      }
-    }
-    if (!_initializedHunterPositions.contains(preferred)) {
-      final preferredCenter = _preferredControlledSpawnPoint();
-      sprite.position = _findNearestWalkablePosition(
-        preferredCenter,
-        sprite.radius,
-      );
-      _initializedHunterPositions.add(preferred);
-      sprite.setMotion(Vector2.zero(), moving: false);
-      _syncCameraFollow(snap: true);
-    }
-    _publishActiveHunterIds();
-  }
-
-  void _evictStaleRealtimeActors() {
-    final nowMs = DateTime.now().millisecondsSinceEpoch;
-    if (nowMs - _lastRealtimeGcMs < 2000) {
-      return;
-    }
-    _lastRealtimeGcMs = nowMs;
-
-    final staleIds = _realtimeOnlyHunterIds
-        .where(
-          (id) =>
-              nowMs - (_lastPoseSeenAtMsByHunter[id] ?? 0) > _remoteActorTtlMs,
-        )
-        .toList(growable: false);
-    for (final id in staleIds) {
-      _realtimeOnlyHunterIds.remove(id);
-      _lastServerPoseTsByHunter.remove(id);
-      _lastPoseSeenAtMsByHunter.remove(id);
-      if (!_rosterHunterIds.contains(id) && id != _controlledHunterId) {
-        _initializedHunterPositions.remove(id);
-        final sprite = _hunterSprites.remove(id);
-        sprite?.removeFromParent();
-      }
-    }
-    if (staleIds.isNotEmpty) {
-      _publishActiveHunterIds();
-    }
   }
 
   void _clampPlayerToCanvas(_HeroCharacterComponent player) {
@@ -1223,6 +920,9 @@ class TheBitAndBondGame extends FlameGame with PanDetector, KeyboardEvents {
 
   Vector2 _preferredControlledSpawnPoint() {
     final playableHeight = math.max(0.0, _worldSize.y - _playAreaTopInset);
+    if (_sandboxRoomMode) {
+      return Vector2(_worldSize.x * 0.3, _worldSize.y * 0.64);
+    }
     final verticalFactor = _isCompactPhoneViewport ? 0.34 : 0.5;
     return Vector2(
       _worldSize.x / 2,
@@ -1231,7 +931,7 @@ class TheBitAndBondGame extends FlameGame with PanDetector, KeyboardEvents {
   }
 
   void _syncCameraBounds() {
-    if (size.x <= 0 || size.y <= 0) {
+    if (!hasLayout || size.x <= 0 || size.y <= 0) {
       return;
     }
     camera.setBounds(
@@ -1241,7 +941,7 @@ class TheBitAndBondGame extends FlameGame with PanDetector, KeyboardEvents {
   }
 
   void _syncCameraFollow({bool snap = false}) {
-    if (size.x <= 0 || size.y <= 0) {
+    if (!hasLayout || size.x <= 0 || size.y <= 0) {
       return;
     }
     final controlled = _controlledHunter;
@@ -1259,31 +959,12 @@ class TheBitAndBondGame extends FlameGame with PanDetector, KeyboardEvents {
     camera.follow(controlled, snap: snap);
   }
 
-  void _publishActiveHunterIds() {
-    final next = <String>{..._realtimeOnlyHunterIds};
-    if (_controlledHunterId != null && _controlledHunterId!.isNotEmpty) {
-      next.add(_controlledHunterId!);
-    }
-    final current = activeHunterIdsListenable.value;
-    if (next.length == current.length && next.containsAll(current)) {
-      return;
-    }
-    activeHunterIdsListenable.value = next;
-  }
-
-  String? _normalizeHunterId(String? hunterId) {
-    final normalized = hunterId?.trim();
-    if (normalized == null || normalized.isEmpty) {
-      return null;
-    }
-    return normalized;
-  }
-
   @override
   void onRemove() {
     interactionHintListenable.dispose();
     activeHunterIdsListenable.dispose();
     nearbyFurnitureListenable.dispose();
+    sandboxRoomIndexListenable.dispose();
     super.onRemove();
   }
 }

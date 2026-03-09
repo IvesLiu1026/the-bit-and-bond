@@ -13,6 +13,7 @@ pub struct Config {
     pub livekit_api_secret: Option<String>,
     pub livekit_token_ttl_seconds: i64,
     pub livekit_chat_topic: String,
+    pub firebase_project_id: Option<String>,
 }
 
 impl Config {
@@ -25,7 +26,7 @@ impl Config {
                 .unwrap_or_else(|| "development".to_string()),
             bind_addr: env::var("BIND_ADDR").unwrap_or_else(|_| "0.0.0.0:18080".to_string()),
             database_url: env::var("DATABASE_URL").unwrap_or_else(|_| {
-                "postgres://chen:chen@127.0.0.1:5433/chen_leveling".to_string()
+                "postgres://chen:chen@127.0.0.1:5433/the_bit_and_bond".to_string()
             }),
             allowed_origin: env::var("ALLOWED_ORIGIN").unwrap_or_else(|_| "*".to_string()),
             allow_any_origin: env::var("ALLOW_ANY_ORIGIN")
@@ -49,6 +50,7 @@ impl Config {
                 .map(|v| v.trim().to_string())
                 .filter(|v| !v.is_empty())
                 .unwrap_or_else(|| "guild.chat".to_string()),
+            firebase_project_id: optional_trimmed("FIREBASE_PROJECT_ID"),
         }
     }
 

@@ -9,6 +9,7 @@ class AuthSession {
     this.inviteCode,
     this.playerId,
     this.displayName,
+    this.avatarType,
   });
 
   final String accessToken;
@@ -18,6 +19,7 @@ class AuthSession {
   final String? inviteCode;
   final String? playerId;
   final String? displayName;
+  final String? avatarType;
 
   bool get isGuildMaster => guildRole == GuildRole.master;
   bool get isMember => guildRole == GuildRole.member;
@@ -31,6 +33,7 @@ class AuthSession {
       'invite_code': inviteCode,
       'player_id': playerId,
       'display_name': displayName,
+      'avatar_type': avatarType,
     };
   }
 
@@ -49,6 +52,7 @@ class AuthSession {
       inviteCode: json['invite_code'] as String?,
       playerId: json['player_id'] as String?,
       displayName: json['display_name'] as String?,
+      avatarType: json['avatar_type'] as String?,
     );
   }
 

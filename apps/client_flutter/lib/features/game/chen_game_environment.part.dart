@@ -2,10 +2,7 @@ part of 'chen_game.dart';
 
 class _TavernEnvironmentLayer extends Component
     with HasGameReference<TheBitAndBondGame> {
-  _TavernEnvironmentLayer({
-    required TavernVisualTheme theme,
-    this.tavernBackdropImage,
-  }) : _theme = theme;
+  _TavernEnvironmentLayer({required TavernVisualTheme theme}) : _theme = theme;
 
   static const double _floorTile = 64;
   static const double _torchSpacing = 128;
@@ -14,7 +11,6 @@ class _TavernEnvironmentLayer extends Component
   Size _cachedSize = Size.zero;
   double _elapsed = 0;
   TavernVisualTheme _theme;
-  final ui.Image? tavernBackdropImage;
 
   void setTheme(TavernVisualTheme theme) {
     if (_theme == theme) {
@@ -68,16 +64,10 @@ class _TavernEnvironmentLayer extends Component
     required double width,
     required double height,
   }) {
-    if (_theme == TavernVisualTheme.cozyWood && tavernBackdropImage != null) {
-      _paintCozyBackdrop(
-        canvas,
-        width: width,
-        height: height,
-        image: tavernBackdropImage!,
-      );
+    if (TheBitAndBondGame._sandboxRoomMode) {
+      _paintSandboxRoom(canvas, width: width, height: height);
       return;
     }
-
     final (
       floorDarkColor,
       floorAltColor,
@@ -259,61 +249,150 @@ class _TavernEnvironmentLayer extends Component
     );
   }
 
-  void _paintCozyBackdrop(
+  void _paintSandboxRoom(
     Canvas canvas, {
     required double width,
     required double height,
-    required ui.Image image,
   }) {
-    final sourceSize = Size(
-      image.width.toDouble(),
-      image.height.toDouble(),
+    final palette = game._currentSandboxPalette;
+    final wallHeight = height * TheBitAndBondGame._sandboxWallRatio;
+    final roomRect = Rect.fromLTWH(0, 0, width, height);
+    final backWallRect = Rect.fromLTWH(0, 0, width, wallHeight);
+    final floorRect = Rect.fromLTWH(0, wallHeight, width, height - wallHeight);
+    final wallPaint = Paint()..color = palette.wallColor;
+    final wallShade = Paint()
+      ..shader = ui.Gradient.linear(const Offset(0, 0), Offset(0, wallHeight), [
+        palette.wallColor,
+        palette.wallShadeColor,
+      ]);
+    final floorPaint = Paint()..color = palette.floorBaseColor;
+    final tileA = Paint()..color = palette.floorTileA;
+    final tileB = Paint()..color = palette.floorTileB;
+    final gridLine = Paint()
+      ..color = palette.gridLineColor.withValues(alpha: 0.65)
+      ..strokeWidth = 2;
+    final roomBorder = Paint()
+      ..color = palette.borderColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 4;
+    final wallBand = Paint()..color = palette.sideWallColor.withValues(alpha: 0.88);
+    final dividerShadow = Paint()
+      ..color = palette.borderColor.withValues(alpha: 0.24)
+      ..strokeWidth = 6;
+
+    canvas.drawRect(roomRect, wallPaint);
+    canvas.drawRect(backWallRect, wallShade);
+    canvas.drawRect(floorRect, floorPaint);
+    canvas.drawRect(
+      Rect.fromLTWH(0, wallHeight - 14, width, 14),
+      wallBand,
     );
-    final targetRect = Rect.fromLTWH(0, 0, width, height);
-    final sourceRect = _coverSourceRect(sourceSize, targetRect.size);
-    canvas.drawImageRect(image, sourceRect, targetRect, Paint());
+    canvas.drawLine(
+      Offset(0, wallHeight),
+      Offset(width, wallHeight),
+      dividerShadow,
+    );
 
-    final vignette = Paint()
+    const tileSize = 88.0;
+    final rows = ((height - wallHeight) / tileSize).ceil();
+    final cols = (width / tileSize).ceil();
+    for (var row = 0; row < rows; row++) {
+      for (var col = 0; col < cols; col++) {
+        final rect = Rect.fromLTWH(
+          col * tileSize,
+          wallHeight + (row * tileSize),
+          tileSize,
+          tileSize,
+        );
+        canvas.drawRect(rect, (row + col).isEven ? tileA : tileB);
+      }
+    }
+    for (var x = 0.0; x <= width; x += tileSize) {
+      canvas.drawLine(Offset(x, wallHeight), Offset(x, height), gridLine);
+    }
+    for (var y = wallHeight; y <= height; y += tileSize) {
+      canvas.drawLine(Offset(0, y), Offset(width, y), gridLine);
+    }
+
+    final glow = Paint()
       ..shader = ui.Gradient.radial(
-        Offset(width / 2, height * 0.55),
-        math.max(width, height) * 0.72,
-        const [
-          Color(0x00000000),
-          Color(0x2A140D08),
-          Color(0x55140D08),
-        ],
-        const [0.0, 0.68, 1.0],
+        Offset(width * 0.5, height * 0.58),
+        width * 0.38,
+        [palette.glowColor, const Color(0x00000000)],
       );
-    canvas.drawRect(targetRect, vignette);
-
-    final topShade = Paint()
-      ..shader = ui.Gradient.linear(
-        const Offset(0, 0),
-        Offset(0, height * 0.26),
-        const [
-          Color(0x661A0F09),
-          Color(0x221A0F09),
-          Color(0x001A0F09),
-        ],
-        const [0.0, 0.48, 1.0],
-      );
-    canvas.drawRect(targetRect, topShade);
+    canvas.drawRect(floorRect, glow);
+    _paintSandboxPortal(
+      canvas,
+      game._leftPortalRect,
+      isLeft: true,
+      palette: palette,
+    );
+    _paintSandboxPortal(
+      canvas,
+      game._rightPortalRect,
+      isLeft: false,
+      palette: palette,
+    );
+    canvas.drawLine(
+      Offset(0, wallHeight),
+      Offset(width, wallHeight),
+      roomBorder,
+    );
+    canvas.drawRect(roomRect, roomBorder);
   }
 
-  Rect _coverSourceRect(Size sourceSize, Size destinationSize) {
-    final sourceRatio = sourceSize.width / sourceSize.height;
-    final destinationRatio = destinationSize.width / destinationSize.height;
-    if ((sourceRatio - destinationRatio).abs() < 0.0001) {
-      return Offset.zero & sourceSize;
+  void _paintSandboxPortal(
+    Canvas canvas,
+    Rect? rect, {
+    required bool isLeft,
+    required _SandboxRoomPalette palette,
+  }) {
+    if (rect == null) {
+      return;
     }
-    if (sourceRatio > destinationRatio) {
-      final cropWidth = sourceSize.height * destinationRatio;
-      final dx = (sourceSize.width - cropWidth) / 2;
-      return Rect.fromLTWH(dx, 0, cropWidth, sourceSize.height);
-    }
-    final cropHeight = sourceSize.width / destinationRatio;
-    final dy = (sourceSize.height - cropHeight) / 2;
-    return Rect.fromLTWH(0, dy, sourceSize.width, cropHeight);
+    final archRect = Rect.fromLTWH(
+      isLeft ? rect.left - 6 : rect.left + 6,
+      rect.top + 8,
+      rect.width + 20,
+      rect.height - 16,
+    );
+    final glow = Paint()
+      ..shader = ui.Gradient.radial(archRect.center, archRect.width * 0.85, [
+        palette.portalCoreColor.withValues(alpha: 0.72),
+        palette.portalCoreColor.withValues(alpha: 0),
+      ]);
+    final ring = Paint()
+      ..shader = ui.Gradient.linear(
+        Offset(archRect.left, archRect.top),
+        Offset(archRect.right, archRect.bottom),
+        [
+          palette.portalRingColor.withValues(alpha: 0.95),
+          palette.portalCoreColor.withValues(alpha: 0.55),
+        ],
+      )
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 4;
+    final slit = Paint()
+      ..shader = ui.Gradient.linear(
+        Offset(archRect.left, archRect.center.dy),
+        Offset(archRect.right, archRect.center.dy),
+        [
+          palette.portalRingColor.withValues(alpha: 0.18),
+          palette.portalCoreColor.withValues(alpha: 0.55),
+          palette.portalRingColor.withValues(alpha: 0.18),
+        ],
+        const [0, 0.5, 1],
+      );
+
+    canvas.drawOval(archRect.inflate(12), glow);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(archRect, const Radius.circular(18)),
+      slit,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(archRect, const Radius.circular(18)),
+      ring,
+    );
   }
 
   void _paintTorches(

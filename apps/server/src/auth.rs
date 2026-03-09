@@ -16,6 +16,7 @@ use uuid::Uuid;
 use crate::{
     error::{AppError, AppResult},
     extractors::AuthClaims,
+    firebase_identity::{FirebaseIdentity, verify_firebase_id_token},
     jwt::{AuthRole, GuildRole, IssuedToken},
     security::{hash_pin_code, pin_looks_hashed, validate_pin_code, verify_pin_code},
     state::AppState,
@@ -53,6 +54,13 @@ pub struct UnifiedRegisterRequest {
     pub avatar_type: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct FirebaseLoginRequest {
+    pub id_token: String,
+    pub display_name: Option<String>,
+    pub avatar_type: Option<String>,
+}
+
 #[derive(Debug, Serialize)]
 pub struct LoginResponse {
     pub access_token: String,
@@ -68,6 +76,8 @@ pub struct LoginResponse {
     pub player_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub display_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub avatar_type: Option<String>,
 }
 
 impl LoginResponse {
@@ -83,12 +93,19 @@ impl LoginResponse {
             invite_code: None,
             player_id: None,
             display_name: None,
+            avatar_type: None,
         }
     }
 
-    fn with_player(mut self, player_id: Option<String>, display_name: Option<String>) -> Self {
+    fn with_player(
+        mut self,
+        player_id: Option<String>,
+        display_name: Option<String>,
+        avatar_type: Option<String>,
+    ) -> Self {
         self.player_id = player_id;
         self.display_name = display_name;
+        self.avatar_type = avatar_type;
         self
     }
 }
@@ -217,8 +234,11 @@ where
             created_hunter.guild_id,
             GuildRole::Master,
         )?;
-        return Ok(LoginResponse::from_issued(token)
-            .with_player(Some(created_hunter.player_id), Some(created_hunter.name)));
+        return Ok(LoginResponse::from_issued(token).with_player(
+            Some(created_hunter.player_id),
+            Some(created_hunter.name),
+            Some(created_hunter.avatar_type),
+        ));
     }
 
     Err(AppError::Conflict(
@@ -252,9 +272,11 @@ pub async fn player_login(
         hunter.guild_id,
         parse_guild_role(&hunter.guild_role),
     )?;
-    Ok(Json(
-        LoginResponse::from_issued(token).with_player(Some(hunter.player_id), Some(hunter.name)),
-    ))
+    Ok(Json(LoginResponse::from_issued(token).with_player(
+        Some(hunter.player_id),
+        Some(hunter.name),
+        Some(hunter.avatar_type),
+    )))
 }
 
 pub async fn unified_register(
@@ -307,6 +329,22 @@ pub async fn unified_login(
     }
 }
 
+pub async fn firebase_login(
+    State(state): State<AppState>,
+    Json(payload): Json<FirebaseLoginRequest>,
+) -> AppResult<Json<LoginResponse>> {
+    let firebase_auth = state
+        .firebase_auth
+        .as_ref()
+        .ok_or_else(|| AppError::ServiceUnavailable("firebase sign-in is not configured".into()))?;
+    let identity =
+        verify_firebase_id_token(&firebase_auth.project_id, payload.id_token.trim()).await?;
+    let response =
+        login_with_firebase_identity(&state, identity, payload.display_name, payload.avatar_type)
+            .await?;
+    Ok(Json(response))
+}
+
 #[derive(Debug, Serialize)]
 pub struct MeResponse {
     pub sub: Uuid,
@@ -316,13 +354,14 @@ pub struct MeResponse {
     pub hunter_id: Option<Uuid>,
     pub player_id: Option<String>,
     pub display_name: Option<String>,
+    pub avatar_type: Option<String>,
 }
 
 pub async fn me(
     AuthClaims(claims): AuthClaims,
     State(state): State<AppState>,
 ) -> AppResult<Json<MeResponse>> {
-    let (player_id, display_name) = resolve_hunter_identity(&state, &claims).await?;
+    let (player_id, display_name, avatar_type) = resolve_hunter_identity(&state, &claims).await?;
     Ok(Json(MeResponse {
         sub: claims.sub,
         role: claims.role,
@@ -331,6 +370,7 @@ pub async fn me(
         hunter_id: claims.hunter_id,
         player_id,
         display_name,
+        avatar_type,
     }))
 }
 
@@ -361,29 +401,165 @@ async fn login_with_email_password(
     Ok(Json(LoginResponse::from_issued(token).with_player(
         Some(owner_hunter.player_id),
         Some(owner_hunter.name),
+        Some(owner_hunter.avatar_type),
     )))
 }
 
 async fn resolve_hunter_identity(
     state: &AppState,
     claims: &crate::jwt::Claims,
-) -> AppResult<(Option<String>, Option<String>)> {
+) -> AppResult<(Option<String>, Option<String>, Option<String>)> {
     if let Some(hunter_id) = claims.hunter_id {
         let hunter = hunter::Entity::find_by_id(hunter_id)
             .filter(hunter::Column::GuildId.eq(claims.guild_id))
             .one(&state.db)
             .await?;
         if let Some(model) = hunter {
-            return Ok((Some(model.player_id), Some(model.name)));
+            return Ok((
+                Some(model.player_id),
+                Some(model.name),
+                Some(model.avatar_type),
+            ));
         }
     }
-    Ok((None, None))
+    Ok((None, None, None))
+}
+
+async fn login_with_firebase_identity(
+    state: &AppState,
+    identity: FirebaseIdentity,
+    display_name_override: Option<String>,
+    avatar_type_override: Option<String>,
+) -> AppResult<LoginResponse> {
+    let user = match user::Entity::find()
+        .filter(user::Column::Email.eq(identity.email.clone()))
+        .one(&state.db)
+        .await?
+    {
+        Some(existing) => existing,
+        None => create_firebase_user(&state.db, &identity).await?,
+    };
+
+    let guild = ensure_owner_guild_for_user(
+        state,
+        user.id,
+        choose_display_name(
+            display_name_override.as_deref(),
+            identity.display_name.as_deref(),
+        ),
+    )
+    .await?;
+    let owner_hunter = ensure_owner_hunter_for_guild_with_profile(
+        state,
+        guild.id,
+        user.id,
+        choose_display_name(
+            display_name_override.as_deref(),
+            identity.display_name.as_deref(),
+        ),
+        normalize_avatar_type(avatar_type_override.as_deref()),
+    )
+    .await?;
+    let token =
+        state
+            .jwt
+            .issue_player_token(owner_hunter.id, owner_hunter.guild_id, GuildRole::Master)?;
+    Ok(LoginResponse::from_issued(token).with_player(
+        Some(owner_hunter.player_id),
+        Some(owner_hunter.name),
+        Some(owner_hunter.avatar_type),
+    ))
+}
+
+async fn create_firebase_user<C>(db: &C, identity: &FirebaseIdentity) -> AppResult<user::Model>
+where
+    C: ConnectionTrait,
+{
+    user::ActiveModel {
+        id: Set(Uuid::new_v4()),
+        email: Set(identity.email.clone()),
+        password_hash: Set(hash_password(&format!(
+            "firebase:{}:{}",
+            identity.uid,
+            Uuid::new_v4()
+        ))?),
+        hunter_tag: Set(format!(
+            "GG-{}",
+            &identity.uid.chars().take(8).collect::<String>()
+        )),
+        current_role: Set("Explorer".to_string()),
+        created_at: Set(Utc::now()),
+    }
+    .insert(db)
+    .await
+    .map_err(|err| {
+        if is_users_email_unique_violation(&err) {
+            AppError::Conflict("firebase account email already exists".into())
+        } else {
+            err.into()
+        }
+    })
+}
+
+async fn ensure_owner_guild_for_user(
+    state: &AppState,
+    owner_id: Uuid,
+    preferred_name: Option<&str>,
+) -> AppResult<guild::Model> {
+    if let Some(existing) = guild::Entity::find()
+        .filter(guild::Column::OwnerId.eq(owner_id))
+        .one(&state.db)
+        .await?
+    {
+        return Ok(existing);
+    }
+
+    let guild_name = preferred_name
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| format!("{value} 的公會"))
+        .unwrap_or_else(|| "The Bit and Bond 公會".to_string());
+
+    for _ in 0..INVITE_CODE_MAX_RETRIES {
+        let invite_code = generate_invite_code();
+        let created = guild::ActiveModel {
+            id: Set(Uuid::new_v4()),
+            name: Set(guild_name.clone()),
+            owner_id: Set(owner_id),
+            invite_code: Set(invite_code),
+        }
+        .insert(&state.db)
+        .await;
+        match created {
+            Ok(model) => return Ok(model),
+            Err(err) => {
+                if is_guild_invite_code_unique_violation(&err) {
+                    continue;
+                }
+                return Err(err.into());
+            }
+        }
+    }
+
+    Err(AppError::Conflict(
+        "failed to create guild invite code, please retry".into(),
+    ))
 }
 
 async fn ensure_owner_hunter_for_guild(
     state: &AppState,
     guild_id: Uuid,
     owner_id: Uuid,
+) -> AppResult<hunter::Model> {
+    ensure_owner_hunter_for_guild_with_profile(state, guild_id, owner_id, None, None).await
+}
+
+async fn ensure_owner_hunter_for_guild_with_profile(
+    state: &AppState,
+    guild_id: Uuid,
+    owner_id: Uuid,
+    display_name: Option<&str>,
+    avatar_type: Option<&str>,
 ) -> AppResult<hunter::Model> {
     let existing = hunter::Entity::find()
         .filter(hunter::Column::GuildId.eq(guild_id))
@@ -395,12 +571,31 @@ async fn ensure_owner_hunter_for_guild(
         .one(&state.db)
         .await?;
     if let Some(existing) = existing {
-        if existing.user_id == Some(owner_id) && existing.guild_role == "master" {
+        if existing.user_id == Some(owner_id)
+            && existing.guild_role == "master"
+            && display_name
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .is_none()
+            && avatar_type
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .is_none()
+        {
             return Ok(existing);
         }
         let mut am: hunter::ActiveModel = existing.into();
         am.user_id = Set(Some(owner_id));
         am.guild_role = Set("master".to_string());
+        if let Some(display_name) = display_name
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        {
+            am.name = Set(display_name.to_string());
+        }
+        if let Some(avatar_type) = avatar_type.map(str::trim).filter(|value| !value.is_empty()) {
+            am.avatar_type = Set(avatar_type.to_string());
+        }
         return am.update(&state.db).await.map_err(Into::into);
     }
 
@@ -411,8 +606,16 @@ async fn ensure_owner_hunter_for_guild(
         guild_id: Set(guild_id),
         user_id: Set(Some(owner_id)),
         player_id: Set(player_id),
-        name: Set("公會長".to_string()),
-        avatar_type: Set("master".to_string()),
+        name: Set(display_name
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .unwrap_or("公會長")
+            .to_string()),
+        avatar_type: Set(avatar_type
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .unwrap_or("master")
+            .to_string()),
         level: Set(1),
         xp: Set(0),
         coins: Set(0),
@@ -493,6 +696,17 @@ fn normalize_player_id(raw: &str) -> AppResult<String> {
         ));
     }
     Ok(normalized)
+}
+
+fn normalize_avatar_type(raw: Option<&str>) -> Option<&str> {
+    raw.map(str::trim).filter(|value| !value.is_empty())
+}
+
+fn choose_display_name<'a>(primary: Option<&'a str>, fallback: Option<&'a str>) -> Option<&'a str> {
+    primary
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .or_else(|| fallback.map(str::trim).filter(|value| !value.is_empty()))
 }
 
 fn login_throttle_key(account: &str) -> String {

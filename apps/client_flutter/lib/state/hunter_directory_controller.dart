@@ -75,7 +75,7 @@ class HunterDirectoryController
               id: meId,
               guildId: session.guildId,
               name: '目前玩家',
-              avatarType: 'default',
+              avatarType: session.avatarType ?? 'default',
               level: 1,
               xp: 0,
               coins: 0,

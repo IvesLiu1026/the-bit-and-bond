@@ -18,3 +18,5 @@ B&B.png
 .env
 .env.*
 !.env.example
+apps/client_flutter/android/app/google-services.json
+apps/client_flutter/ios/Runner/GoogleService-Info.plist

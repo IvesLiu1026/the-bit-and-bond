@@ -7,9 +7,10 @@ class AppColors {
   static const Color parchment = Color(0xFFF4ECE1);
   static const Color grassBase = Color(0xFF7CB342);
 
-  // Typography Note: Never use pure black
-  static const Color inkBrown = Color(0xFF3E2723);
-  static const Color navyBlue = Color(0xFF1A237E);
+  // Typography
+  static const Color pixelBlack = Color(0xFF130E0C);
+  static const Color inkBrown = pixelBlack;
+  static const Color navyBlue = pixelBlack;
 
   // Accents (Gems instead of glow)
   static const Color hpRuby = Color(0xFFD32F2F);

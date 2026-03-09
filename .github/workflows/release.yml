@@ -37,16 +37,16 @@ jobs:
           cache: true
 
       - name: Rust tests
-        run: cargo test -p chen_leveling_server --locked
+        run: cargo test -p the_bit_and_bond_server --locked
 
       - name: Build Rust release binary
-        run: cargo build -p chen_leveling_server --release --locked
+        run: cargo build -p the_bit_and_bond_server --release --locked
 
       - name: Package Rust binary
         run: |
           mkdir -p dist
-          cp target/release/chen_leveling_server dist/chen_leveling_server
-          tar -C dist -czf dist/the-bit-and-bond-server-linux-x64.tar.gz chen_leveling_server
+          cp target/release/the_bit_and_bond_server dist/the_bit_and_bond_server
+          tar -C dist -czf dist/the-bit-and-bond-server-linux-x64.tar.gz the_bit_and_bond_server
 
       - name: Flutter pub get
         working-directory: apps/client_flutter

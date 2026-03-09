@@ -1,5 +1,5 @@
 [package]
-name = "chen_leveling_server"
+name = "the_bit_and_bond_server"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -25,6 +25,7 @@ jsonwebtoken = "9"
 rand = "0.8"
 redis = { version = "0.27", features = ["tokio-comp", "connection-manager"] }
 futures-util = "0.3"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 tower-http = { version = "0.6", features = ["cors", "trace"] }
 
 [dev-dependencies]

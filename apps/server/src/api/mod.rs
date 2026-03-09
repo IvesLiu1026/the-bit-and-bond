@@ -1,4 +1,5 @@
 mod chat;
+mod direct_messages;
 mod health;
 mod hunters;
 mod inventory;
@@ -23,6 +24,10 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/api/v1/auth/login",
             axum::routing::post(auth::unified_login),
+        )
+        .route(
+            "/api/v1/auth/firebase",
+            axum::routing::post(auth::firebase_login),
         )
         .route("/api/v1/auth/me", axum::routing::get(auth::me))
         .route(
@@ -51,8 +56,16 @@ pub fn router(state: AppState) -> Router {
             axum::routing::post(quests::submit_quest),
         )
         .route(
+            "/api/v1/quests/{quest_id}/proof-media",
+            axum::routing::post(quests::upload_quest_proof_media),
+        )
+        .route(
             "/api/v1/quests/{quest_id}/review",
             axum::routing::post(quests::review_quest),
+        )
+        .route(
+            "/api/v1/quests/proof-media/{media_id}/content",
+            axum::routing::get(quests::get_quest_proof_media_content),
         )
         .route(
             "/api/v1/realtime/ticket",
@@ -93,6 +106,46 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/api/v1/chat/history",
             axum::routing::get(chat::list_chat_history),
+        )
+        .route(
+            "/api/v1/direct-messages/device-keys/register",
+            axum::routing::post(direct_messages::register_dm_device_key),
+        )
+        .route(
+            "/api/v1/direct-messages/device-keys",
+            axum::routing::get(direct_messages::list_dm_device_keys_batch),
+        )
+        .route(
+            "/api/v1/direct-messages/device-keys/{hunter_id}",
+            axum::routing::get(direct_messages::list_dm_device_keys),
+        )
+        .route(
+            "/api/v1/direct-messages/device-keys/revoke",
+            axum::routing::post(direct_messages::revoke_dm_device_key),
+        )
+        .route(
+            "/api/v1/direct-messages/messages",
+            axum::routing::post(direct_messages::persist_direct_message),
+        )
+        .route(
+            "/api/v1/direct-messages/history",
+            axum::routing::get(direct_messages::list_direct_message_history),
+        )
+        .route(
+            "/api/v1/direct-messages/encrypted/messages",
+            axum::routing::post(direct_messages::persist_encrypted_direct_message),
+        )
+        .route(
+            "/api/v1/direct-messages/encrypted/history",
+            axum::routing::get(direct_messages::list_encrypted_direct_message_history),
+        )
+        .route(
+            "/api/v1/direct-messages/threads",
+            axum::routing::get(direct_messages::list_direct_message_threads),
+        )
+        .route(
+            "/api/v1/direct-messages/threads/{counterpart_hunter_id}/read",
+            axum::routing::post(direct_messages::mark_direct_message_thread_read),
         )
         .route(
             "/api/v1/social/friends",

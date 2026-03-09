@@ -6,11 +6,15 @@ class SfxPlayer {
   static final SfxPlayer instance = SfxPlayer._();
   static const double _volume = 0.78;
 
-  final AudioPlayer _player = AudioPlayer(playerId: 'chen_sfx_player');
+  final AudioPlayer _player = AudioPlayer(
+    playerId: 'the_bit_and_bond_sfx_player',
+  );
 
   Future<void> playCoin() => _playAsset('audio/coin.wav');
 
   Future<void> playUseSuccess() => _playAsset('audio/use_success.wav');
+
+  Future<void> playDoorOpen() => _playAsset('audio/door_open.wav');
 
   Future<void> _playAsset(String path) async {
     try {

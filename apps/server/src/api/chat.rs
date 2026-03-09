@@ -303,9 +303,9 @@ mod tests {
         async fn create() -> Result<Self, Box<dyn Error>> {
             dotenvy::dotenv().ok();
             let base_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
-                "postgres://chen:chen@127.0.0.1:5433/chen_leveling".to_string()
+                "postgres://chen:chen@127.0.0.1:5433/the_bit_and_bond".to_string()
             });
-            let db_name = format!("chen_leveling_it_chat_{}", Uuid::new_v4().simple());
+            let db_name = format!("the_bit_and_bond_it_chat_{}", Uuid::new_v4().simple());
             let admin_url = replace_database_name(&base_url, "postgres")?;
             let test_url = replace_database_name(&base_url, &db_name)?;
 

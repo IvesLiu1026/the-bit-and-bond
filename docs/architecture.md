@@ -2,7 +2,7 @@
 
 ## Monorepo strategy
 
-`The Bit & Bond` uses a single repository to keep API contract, data model, backend logic, and client integration in lockstep.
+`The Bit and Bond` uses a single repository to keep API contract, data model, backend logic, and client integration in lockstep.
 
 ## Boundaries
 

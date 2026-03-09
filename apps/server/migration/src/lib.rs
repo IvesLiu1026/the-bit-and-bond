@@ -13,6 +13,11 @@ mod m20260306_000010_add_chat_messages;
 mod m20260306_000011_add_hunter_reward_ledger;
 mod m20260306_000012_add_shop_and_ledger_v2;
 mod m20260306_000013_add_shop_item_is_active;
+mod m20260309_000014_add_habit_challenge_fields;
+mod m20260309_000015_add_direct_messages;
+mod m20260309_000016_add_dm_e2ee_phase1;
+mod m20260309_000017_add_dm_thread_reads;
+mod m20260309_000018_add_quest_proof_media;
 
 pub struct Migrator;
 
@@ -33,6 +38,11 @@ impl MigratorTrait for Migrator {
             Box::new(m20260306_000011_add_hunter_reward_ledger::Migration),
             Box::new(m20260306_000012_add_shop_and_ledger_v2::Migration),
             Box::new(m20260306_000013_add_shop_item_is_active::Migration),
+            Box::new(m20260309_000014_add_habit_challenge_fields::Migration),
+            Box::new(m20260309_000015_add_direct_messages::Migration),
+            Box::new(m20260309_000016_add_dm_e2ee_phase1::Migration),
+            Box::new(m20260309_000017_add_dm_thread_reads::Migration),
+            Box::new(m20260309_000018_add_quest_proof_media::Migration),
         ]
     }
 }

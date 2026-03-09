@@ -20,8 +20,8 @@ class _FloatingJoystickOverlay extends PositionComponent {
     size = canvasSize;
     final compactHeight = canvasSize.y < 560;
     final center = Vector2(
-      baseRadius + 24,
-      canvasSize.y - baseRadius - (compactHeight ? 54 : 92),
+      baseRadius + 18,
+      canvasSize.y - baseRadius - (compactHeight ? 42 : 78),
     );
     _center.setFrom(_clampToCanvas(center));
     if (!_active) {
@@ -114,122 +114,142 @@ class _FloatingJoystickOverlay extends PositionComponent {
     final center = Offset(_center.x, _center.y);
     final knobCenter = Offset(_knob.x, _knob.y);
     final outerShadow = Paint()
-      ..color = const Color(0x66301E16).withValues(alpha: 0.75 * _alpha);
-    final outerFill = Paint()
-      ..color = const Color(0xFF5C4436).withValues(alpha: 0.95 * _alpha);
-    final bezelFill = Paint()
-      ..color = const Color(0xFF3B2A22).withValues(alpha: 0.96 * _alpha);
-    final faceFill = Paint()
-      ..color = const Color(0xFF8D7460).withValues(alpha: 0.94 * _alpha);
-    final grooveFill = Paint()
-      ..color = const Color(0x4D201711).withValues(alpha: _alpha);
-    final highlightFill = Paint()
-      ..color = const Color(0x66FFF5E6).withValues(alpha: 0.85 * _alpha);
+      ..color = const Color(0x55301E16).withValues(alpha: 0.64 * _alpha);
+    final baseEdge = Paint()
+      ..color = const Color(0xFF2F1D16).withValues(alpha: 0.97 * _alpha);
+    final baseFill = Paint()
+      ..color = const Color(0xFF6D4D3A).withValues(alpha: 0.96 * _alpha);
+    final innerFill = Paint()
+      ..color = const Color(0xFFC7A37A).withValues(alpha: 0.95 * _alpha);
+    final innerShade = Paint()
+      ..color = const Color(0x55372218).withValues(alpha: 0.84 * _alpha);
+    final glyphPaint = Paint()
+      ..color = const Color(0xFFF3DFC0).withValues(alpha: 0.88 * _alpha);
     final knobShadow = Paint()
-      ..color = const Color(0x6630231B).withValues(alpha: 0.85 * _alpha);
+      ..color = const Color(0x6630231B).withValues(alpha: 0.76 * _alpha);
+    final knobEdge = Paint()
+      ..color = const Color(0xFF2B1A12).withValues(alpha: 0.98 * _alpha);
     final knobFill = Paint()
-      ..color = AppColors.joystickGem.withValues(alpha: 0.96 * _alpha);
-    final knobLight = Paint()
-      ..color = AppColors.joystickGemLight.withValues(alpha: 0.96 * _alpha);
-    final knobCore = Paint()
-      ..color = const Color(0xFF0D4F92).withValues(alpha: _alpha);
+      ..color = const Color(0xFF8A6548).withValues(alpha: 0.98 * _alpha);
+    final knobHighlight = Paint()
+      ..color = const Color(0x66E7C39E).withValues(alpha: 0.9 * _alpha);
     final idleDot = Paint()
-      ..color = const Color(0x55FFF5E6).withValues(alpha: _alpha);
+      ..color = const Color(0xAAEFD7B3).withValues(alpha: _alpha);
 
-    final outerRect = Rect.fromCenter(
-      center: center.translate(0, 4),
-      width: baseRadius * 2.08,
-      height: baseRadius * 2.08,
+    final baseShadowPath = _pixelPadPath(
+      center.translate(0, 4),
+      baseRadius + 5,
+      cut: 14,
     );
-    final bezelRect = Rect.fromCenter(
-      center: center,
-      width: baseRadius * 2,
-      height: baseRadius * 2,
-    );
-    final faceRect = Rect.fromCenter(
-      center: center,
-      width: baseRadius * 1.66,
-      height: baseRadius * 1.66,
-    );
-    final grooveThickness = math.max(10.0, baseRadius * 0.24);
-    final horizontalGroove = Rect.fromCenter(
-      center: center,
-      width: faceRect.width - 24,
-      height: grooveThickness,
-    );
-    final verticalGroove = Rect.fromCenter(
-      center: center,
-      width: grooveThickness,
-      height: faceRect.height - 24,
-    );
+    final baseEdgePath = _pixelPadPath(center, baseRadius + 2.5, cut: 14);
+    final baseFillPath = _pixelPadPath(center, baseRadius - 1.5, cut: 12);
+    final innerPadPath = _pixelPadPath(center, baseRadius - 9, cut: 10);
 
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(outerRect, const Radius.circular(24)),
-      outerShadow,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(bezelRect, const Radius.circular(22)),
-      outerFill,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(bezelRect.deflate(8), const Radius.circular(18)),
-      bezelFill,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(faceRect, const Radius.circular(16)),
-      faceFill,
-    );
-    canvas.drawRect(horizontalGroove, grooveFill);
-    canvas.drawRect(verticalGroove, grooveFill);
+    canvas.drawPath(baseShadowPath, outerShadow);
+    canvas.drawPath(baseEdgePath, baseEdge);
+    canvas.drawPath(baseFillPath, baseFill);
+    canvas.drawPath(innerPadPath, innerFill);
+
+    final dPadHalf = baseRadius * 0.26;
     canvas.drawRect(
-      Rect.fromLTWH(
-        faceRect.left + 10,
-        faceRect.top + 8,
-        faceRect.width - 20,
-        5,
+      Rect.fromCenter(
+        center: center,
+        width: dPadHalf * 0.72,
+        height: dPadHalf * 2,
       ),
-      highlightFill,
-    );
-
-    final knobRect = Rect.fromCenter(
-      center: knobCenter.translate(2, 3),
-      width: knobRadius * 1.7,
-      height: knobRadius * 1.7,
-    );
-    final knobFaceRect = Rect.fromCenter(
-      center: knobCenter,
-      width: knobRadius * 1.65,
-      height: knobRadius * 1.65,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(knobRect, const Radius.circular(12)),
-      knobShadow,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(knobFaceRect, const Radius.circular(12)),
-      knobFill,
+      innerShade,
     );
     canvas.drawRect(
-      Rect.fromLTWH(
-        knobFaceRect.left + 6,
-        knobFaceRect.top + 5,
-        knobFaceRect.width - 12,
-        5,
+      Rect.fromCenter(
+        center: center,
+        width: dPadHalf * 2,
+        height: dPadHalf * 0.72,
       ),
-      knobLight,
+      innerShade,
     );
+
+    for (final offset in const [
+      Offset(0, -1),
+      Offset(1, 0),
+      Offset(0, 1),
+      Offset(-1, 0),
+    ]) {
+      final markerCenter =
+          center +
+          Offset(
+            offset.dx * (baseRadius * 0.48),
+            offset.dy * (baseRadius * 0.48),
+          );
+      canvas.drawRect(
+        Rect.fromCenter(center: markerCenter, width: 5, height: 5),
+        glyphPaint,
+      );
+    }
+
+    final knobShadowPath = _pixelPadPath(
+      knobCenter.translate(1, 2),
+      knobRadius + 3,
+      cut: 10,
+    );
+    final knobEdgePath = _pixelPadPath(knobCenter, knobRadius + 2, cut: 10);
+    final knobFillPath = _pixelPadPath(knobCenter, knobRadius - 0.5, cut: 8);
+    canvas.drawPath(knobShadowPath, knobShadow);
+    canvas.drawPath(knobEdgePath, knobEdge);
+    canvas.drawPath(knobFillPath, knobFill);
     canvas.drawRect(
-      Rect.fromLTWH(
-        knobFaceRect.left + 8,
-        knobFaceRect.top + knobFaceRect.height * 0.55,
-        knobFaceRect.width - 16,
-        knobFaceRect.height * 0.18,
+      Rect.fromCenter(
+        center: knobCenter.translate(-2, -2),
+        width: knobRadius * 0.9,
+        height: knobRadius * 0.55,
       ),
-      knobCore,
+      knobHighlight,
     );
 
     if (!_active) {
-      canvas.drawCircle(center, 4.5, idleDot);
+      canvas.drawRect(
+        Rect.fromCenter(center: center, width: 5, height: 5),
+        idleDot,
+      );
     }
+  }
+
+  Path _pixelPadPath(Offset center, double radius, {required double cut}) {
+    final left = center.dx - radius;
+    final top = center.dy - radius;
+    final right = center.dx + radius;
+    final bottom = center.dy + radius;
+    final clippedCut = math.min(cut, radius * 0.7);
+    final step = math.max(2.0, (clippedCut / 3).floorToDouble());
+    final depth = step * 3;
+    return Path()
+      ..moveTo(left + depth, top)
+      ..lineTo(right - depth, top)
+      ..lineTo(right - depth, top + step)
+      ..lineTo(right - (step * 2), top + step)
+      ..lineTo(right - (step * 2), top + (step * 2))
+      ..lineTo(right - step, top + (step * 2))
+      ..lineTo(right - step, top + depth)
+      ..lineTo(right, top + depth)
+      ..lineTo(right, bottom - depth)
+      ..lineTo(right - step, bottom - depth)
+      ..lineTo(right - step, bottom - (step * 2))
+      ..lineTo(right - (step * 2), bottom - (step * 2))
+      ..lineTo(right - (step * 2), bottom - step)
+      ..lineTo(right - depth, bottom - step)
+      ..lineTo(right - depth, bottom)
+      ..lineTo(left + depth, bottom)
+      ..lineTo(left + depth, bottom - step)
+      ..lineTo(left + (step * 2), bottom - step)
+      ..lineTo(left + (step * 2), bottom - (step * 2))
+      ..lineTo(left + step, bottom - (step * 2))
+      ..lineTo(left + step, bottom - depth)
+      ..lineTo(left, bottom - depth)
+      ..lineTo(left, top + depth)
+      ..lineTo(left + step, top + depth)
+      ..lineTo(left + step, top + (step * 2))
+      ..lineTo(left + (step * 2), top + (step * 2))
+      ..lineTo(left + (step * 2), top + step)
+      ..lineTo(left + depth, top + step)
+      ..close();
   }
 }

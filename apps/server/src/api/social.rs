@@ -1,3 +1,5 @@
+use std::collections::{HashMap, HashSet};
+
 use axum::{
     Json,
     extract::{Path, State},
@@ -255,15 +257,22 @@ pub async fn list_incoming_friend_requests(
         .all(&state.db)
         .await?;
 
+    let mut involved_ids = HashSet::new();
+    for row in &rows {
+        involved_ids.insert(row.requester_hunter_id);
+        involved_ids.insert(row.target_hunter_id);
+    }
+    let hunter_map = load_hunter_map(&state, involved_ids).await?;
+
     let mut result = Vec::with_capacity(rows.len());
     for row in rows {
-        let requester = hunter::Entity::find_by_id(row.requester_hunter_id)
-            .one(&state.db)
-            .await?
+        let requester = hunter_map
+            .get(&row.requester_hunter_id)
+            .cloned()
             .ok_or_else(|| AppError::NotFound("請求者不存在".into()))?;
-        let target = hunter::Entity::find_by_id(row.target_hunter_id)
-            .one(&state.db)
-            .await?
+        let target = hunter_map
+            .get(&row.target_hunter_id)
+            .cloned()
             .ok_or_else(|| AppError::NotFound("目標玩家不存在".into()))?;
         result.push(map_friend_request(row, requester, target));
     }
@@ -496,20 +505,41 @@ pub async fn list_my_guild_invites(
         .all(&state.db)
         .await?;
 
+    let mut involved_ids = HashSet::new();
+    for invite in &invites {
+        involved_ids.insert(invite.inviter_hunter_id);
+        involved_ids.insert(invite.invited_hunter_id);
+    }
+    let hunter_map = load_hunter_map(&state, involved_ids).await?;
+
     let mut result = Vec::with_capacity(invites.len());
     for invite in invites {
-        let inviter = hunter::Entity::find_by_id(invite.inviter_hunter_id)
-            .one(&state.db)
-            .await?
+        let inviter = hunter_map
+            .get(&invite.inviter_hunter_id)
+            .cloned()
             .ok_or_else(|| AppError::NotFound("邀請者不存在".into()))?;
-        let invited = hunter::Entity::find_by_id(invite.invited_hunter_id)
-            .one(&state.db)
-            .await?
+        let invited = hunter_map
+            .get(&invite.invited_hunter_id)
+            .cloned()
             .ok_or_else(|| AppError::NotFound("受邀者不存在".into()))?;
         result.push(map_invite(invite, inviter, invited));
     }
 
     Ok(Json(result))
+}
+
+async fn load_hunter_map(
+    state: &AppState,
+    ids: HashSet<Uuid>,
+) -> AppResult<HashMap<Uuid, hunter::Model>> {
+    if ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+    let rows = hunter::Entity::find()
+        .filter(hunter::Column::Id.is_in(ids))
+        .all(&state.db)
+        .await?;
+    Ok(rows.into_iter().map(|model| (model.id, model)).collect())
 }
 
 pub async fn respond_guild_invite(

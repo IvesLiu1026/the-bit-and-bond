@@ -1,11 +1,11 @@
 {
-    "name": "The Bit & Bond",
-    "short_name": "The Bit & Bond",
+    "name": "The Bit and Bond",
+    "short_name": "The Bit and Bond",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A cozy guild-life RPG app for The Bit & Bond.",
+    "description": "A cozy guild-life RPG app for The Bit and Bond.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

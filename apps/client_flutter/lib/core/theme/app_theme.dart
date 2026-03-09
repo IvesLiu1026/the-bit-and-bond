@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
+import 'pixel_typography.dart';
 
 class AppTheme {
   static ThemeData get cozyGuildTheme {
@@ -15,43 +16,51 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
+      fontFamilyFallback: PixelTypography.fallback,
       scaffoldBackgroundColor: AppColors.parchment,
-      fontFamily: 'Nunito',
-      textTheme: const TextTheme(
-        headlineLarge: TextStyle(
+      fontFamily: PixelTypography.family,
+      textTheme: TextTheme(
+        headlineLarge: PixelTypography.style(
           color: AppColors.inkBrown,
           fontWeight: FontWeight.w900,
-          fontSize: 34,
+          fontSize: 30,
+          height: 1.05,
         ),
-        headlineMedium: TextStyle(
+        headlineMedium: PixelTypography.style(
+          color: AppColors.inkBrown,
+          fontWeight: FontWeight.w900,
+          fontSize: 26,
+          height: 1.08,
+        ),
+        displayLarge: PixelTypography.style(
           color: AppColors.inkBrown,
           fontWeight: FontWeight.w900,
           fontSize: 28,
+          height: 1.08,
         ),
-        displayLarge: TextStyle(
+        titleLarge: PixelTypography.style(
           color: AppColors.inkBrown,
           fontWeight: FontWeight.w900,
-          fontSize: 32,
+          fontSize: 22,
+          height: 1.08,
         ),
-        titleLarge: TextStyle(
-          color: AppColors.inkBrown,
-          fontWeight: FontWeight.w900,
-          fontSize: 24,
-        ),
-        titleMedium: TextStyle(
+        titleMedium: PixelTypography.style(
           color: AppColors.inkBrown,
           fontWeight: FontWeight.w800,
-          fontSize: 18,
-        ),
-        bodyLarge: TextStyle(
-          color: AppColors.inkBrown,
           fontSize: 16,
-          fontWeight: FontWeight.w600,
+          height: 1.12,
         ),
-        bodyMedium: TextStyle(
+        bodyLarge: PixelTypography.style(
           color: AppColors.inkBrown,
-          fontSize: 14,
+          fontSize: 15,
           fontWeight: FontWeight.w500,
+          height: 1.2,
+        ),
+        bodyMedium: PixelTypography.style(
+          color: AppColors.inkBrown,
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+          height: 1.22,
         ),
       ),
 
@@ -68,18 +77,23 @@ class AppTheme {
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ButtonStyle(
           minimumSize: const WidgetStatePropertyAll(Size.fromHeight(44)),
-          foregroundColor: const WidgetStatePropertyAll(Color(0xFFF7F3E9)),
-          textStyle: const WidgetStatePropertyAll(
-            TextStyle(fontWeight: FontWeight.w900, fontSize: 17),
+          foregroundColor: const WidgetStatePropertyAll(AppColors.inkBrown),
+          textStyle: WidgetStatePropertyAll(
+            PixelTypography.style(
+              color: AppColors.inkBrown,
+              fontWeight: FontWeight.w800,
+              fontSize: 15,
+              height: 1,
+            ),
           ),
           backgroundColor: WidgetStateProperty.resolveWith((states) {
             final pressed =
                 states.contains(WidgetState.pressed) ||
                 states.contains(WidgetState.disabled);
             if (pressed) {
-              return AppColors.submitGreenEdge;
+              return const Color(0xFF9BCB91);
             }
-            return AppColors.submitGreen;
+            return const Color(0xFFAED49A);
           }),
           shape: WidgetStatePropertyAll(
             RoundedRectangleBorder(
@@ -102,7 +116,12 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
           ),
-          textStyle: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+          textStyle: PixelTypography.style(
+            color: AppColors.inkBrown,
+            fontWeight: FontWeight.w800,
+            fontSize: 14,
+            height: 1,
+          ),
         ),
       ),
 
@@ -128,22 +147,24 @@ class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         backgroundColor: const Color(0xFFECE2D0),
         side: const BorderSide(color: AppColors.woodFrame, width: 1.6),
-        labelStyle: const TextStyle(
+        labelStyle: PixelTypography.style(
           color: AppColors.inkBrown,
           fontWeight: FontWeight.w800,
+          fontSize: 12,
+          height: 1,
         ),
       ),
 
-      appBarTheme: const AppBarTheme(
+      appBarTheme: AppBarTheme(
         backgroundColor: AppColors.parchment,
         elevation: 0,
         centerTitle: true,
-        iconTheme: IconThemeData(color: AppColors.inkBrown),
-        titleTextStyle: TextStyle(
+        iconTheme: const IconThemeData(color: AppColors.inkBrown),
+        titleTextStyle: PixelTypography.style(
           color: AppColors.inkBrown,
-          fontFamily: 'Nunito',
-          fontSize: 22,
+          fontSize: 18,
           fontWeight: FontWeight.w900,
+          height: 1,
         ),
       ),
 
@@ -153,14 +174,42 @@ class AppTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: AppColors.inkBrown,
-        contentTextStyle: const TextStyle(
-          color: Color(0xFFF8F3E8),
+        backgroundColor: const Color(0xFFF3E8CC),
+        contentTextStyle: PixelTypography.style(
+          color: AppColors.inkBrown,
           fontWeight: FontWeight.w800,
+          fontSize: 13,
+          height: 1.15,
         ),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
           side: const BorderSide(color: AppColors.woodFrame, width: 2),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: const Color(0xFFF0E5CF),
+        labelStyle: PixelTypography.style(
+          color: AppColors.inkBrown.withValues(alpha: 0.82),
+          fontWeight: FontWeight.w700,
+          fontSize: 13,
+        ),
+        hintStyle: PixelTypography.style(
+          color: AppColors.inkBrown.withValues(alpha: 0.58),
+          fontWeight: FontWeight.w500,
+          fontSize: 12,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(6),
+          borderSide: const BorderSide(color: AppColors.woodFrame, width: 2),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(6),
+          borderSide: const BorderSide(color: AppColors.woodFrame, width: 2),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(6),
+          borderSide: const BorderSide(color: AppColors.apSapphire, width: 2),
         ),
       ),
     );

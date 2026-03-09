@@ -2,11 +2,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../core/auth/auth_session.dart';
+import '../core/auth/google_federated_auth_service.dart';
 import '../core/config/app_config.dart';
+import '../core/l10n/app_strings.dart';
 import '../core/network/api_client.dart';
 import '../core/network/auth_api_client.dart';
+import '../core/security/dm_e2ee_service.dart';
+import '../core/settings/app_settings.dart';
 import '../features/quests/quest_repository.dart';
 import 'auth_controller.dart';
+import 'settings_controller.dart';
 
 final appConfigProvider = Provider<AppConfig>((ref) {
   return AppConfig.fromEnvironment();
@@ -16,10 +21,29 @@ final secureStorageProvider = Provider<FlutterSecureStorage>((ref) {
   return const FlutterSecureStorage();
 });
 
+final settingsControllerProvider =
+    StateNotifierProvider<SettingsController, AppSettings>((ref) {
+      final storage = ref.watch(secureStorageProvider);
+      return SettingsController(storage: storage);
+    });
+
+final appSettingsProvider = Provider<AppSettings>((ref) {
+  return ref.watch(settingsControllerProvider);
+});
+
+final appStringsProvider = Provider<AppStrings>((ref) {
+  final settings = ref.watch(appSettingsProvider);
+  return AppStrings(settings.language);
+});
+
 final authApiClientProvider = Provider<AuthApiClient>((ref) {
   final config = ref.watch(appConfigProvider);
   return AuthApiClient(baseUrl: config.apiBaseUrl);
 });
+
+final googleFederatedAuthServiceProvider = Provider<GoogleFederatedAuthService>(
+  (ref) => const GoogleFederatedAuthService(),
+);
 
 final authControllerProvider =
     StateNotifierProvider<AuthController, AsyncValue<AuthSession?>>((ref) {
@@ -37,6 +61,12 @@ final apiClientProvider = Provider<ApiClient>((ref) {
   final config = ref.watch(appConfigProvider);
   final authSession = ref.watch(authSessionProvider);
   return ApiClient(baseUrl: config.apiBaseUrl, authSession: authSession);
+});
+
+final dmE2eeServiceProvider = Provider<DmE2eeService>((ref) {
+  final api = ref.watch(apiClientProvider);
+  final storage = ref.watch(secureStorageProvider);
+  return DmE2eeService(api: api, store: FlutterDmSecureStore(storage));
 });
 
 final questRepositoryProvider = Provider<QuestRepository>((ref) {

@@ -3,42 +3,67 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flame/game.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../../core/auth/auth_session.dart';
 import '../../core/audio/sfx_player.dart';
 import '../../core/config/app_config.dart';
+import '../../core/l10n/app_strings.dart';
 import '../../core/network/api_client.dart';
+import '../../core/security/dm_e2ee_service.dart';
+import '../../core/settings/app_settings.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/pixel_typography.dart';
+import '../../core/ui/pixel_ui.dart';
+import '../../state/direct_messages_controller.dart';
 import '../../state/hunter_directory_controller.dart';
 import '../../state/hunter_stats_controller.dart';
 import '../../state/inventory_controller.dart';
 import '../../state/progression_controller.dart';
 import '../../state/providers.dart';
 import '../../state/quest_controller.dart';
+import '../../state/settings_controller.dart';
 import '../../state/shop_controller.dart';
 import '../../state/social_controller.dart';
 import '../../state/voice_chat_controller.dart';
 import '../quests/models.dart';
 import 'chen_game.dart';
 
-part 'game_shell_page_hud.part.dart';
-part 'game_shell_page_dialogs.part.dart';
-part 'game_shell_page_presence.part.dart';
-part 'game_shell_page_actions.part.dart';
-part 'game_shell_page_rewards.part.dart';
-part 'game_shell_page_profile.part.dart';
-part 'game_shell_page_panels.part.dart';
-part 'game_shell_page_panels_social.part.dart';
-part 'game_shell_page_panels_campfire.part.dart';
-part 'game_shell_page_panels_inventory.part.dart';
-part 'game_shell_page_panels_shop.part.dart';
-part 'game_shell_page_quests_fx.part.dart';
+part 'shell/hud.part.dart';
+part 'shell/hud_icons.part.dart';
+part 'shell/hud_panels.part.dart';
+part 'shell/dialogs.part.dart';
+part 'shell/presence.part.dart';
+part 'shell/actions.part.dart';
+part 'shell/rewards.part.dart';
+part 'shell/profile.part.dart';
+part 'shell/menu.part.dart';
+part 'shell/primitives.part.dart';
+part 'shell/panels.part.dart';
+part 'shell/floorplan.part.dart';
+part 'shell/panel_social.part.dart';
+part 'shell/panel_voice.part.dart';
+part 'shell/panel_inventory.part.dart';
+part 'shell/panel_shop.part.dart';
+part 'shell/panel_shop_editor.part.dart';
+part 'shell/panel_shop_layout.part.dart';
+part 'shell/panel_shop_primitives.part.dart';
+part 'shell/quests_fx.part.dart';
+part 'shell/life.part.dart';
+part 'shell/life_habits.part.dart';
+part 'shell/life_habits_proof.part.dart';
+part 'shell/life_habits_widgets.part.dart';
+part 'shell/life_dm_shared.part.dart';
+part 'shell/life_dm_inbox.part.dart';
+part 'shell/life_dm_chat.part.dart';
+part 'shell/life_photo.part.dart';
 
 enum _StampTone { wood, green, ruby, blue }
 
@@ -58,6 +83,7 @@ class _GameShellPageState extends ConsumerState<GameShellPage> {
   static const Duration _debugMeterWindow = Duration(seconds: 1);
 
   late final TheBitAndBondGame _game;
+  late final Widget _gameWidget;
   String? _presenceConnectionKey;
   String? _presenceConnectingKey;
   WebSocketChannel? _presenceChannel;
@@ -87,14 +113,18 @@ class _GameShellPageState extends ConsumerState<GameShellPage> {
   final Set<String> _knownPendingInviteIds = <String>{};
   GuildInviteInfo? _activeGuildInvite;
   Set<String> _onlineHunterIds = <String>{};
-  String _interactionHintText = '左下固定搖桿可 360 度移動';
+  String _interactionHintText = '';
   TavernFurnitureType? _nearbyFurniture;
   TavernVisualTheme _visualTheme = TavernVisualTheme.cozyWood;
+  bool _showFloorplanOverlay = false;
+  int _sandboxCurrentRoomIndex = 0;
   ProviderSubscription<AuthSession?>? _authSessionSubscription;
   ProviderSubscription<AppConfig>? _appConfigSubscription;
+  ProviderSubscription<AppSettings>? _appSettingsSubscription;
   ProviderSubscription<AsyncValue<List<QuestInstance>>>? _questSubscription;
   ProviderSubscription<AsyncValue<List<HunterProfile>>>? _hunterSubscription;
   ProviderSubscription<AsyncValue<SocialSnapshot>>? _socialSubscription;
+  ProviderSubscription<VoiceChatState>? _voiceSubscription;
   AuthSession? _latestAuthSession;
   AppConfig? _latestAppConfig;
   final Set<String> _consumedRewardEventIds = <String>{};
@@ -110,15 +140,25 @@ class _GameShellPageState extends ConsumerState<GameShellPage> {
     _game = TheBitAndBondGame(
       onFurnitureInteracted: _handleFurnitureInteraction,
     );
+    _gameWidget = RepaintBoundary(child: GameWidget(game: _game));
     _game.setVisualTheme(_visualTheme);
     _game.interactionHintListenable.addListener(_syncInteractionHint);
     _game.activeHunterIdsListenable.addListener(_syncOnlineHunters);
     _game.nearbyFurnitureListenable.addListener(_syncNearbyFurniture);
+    _game.sandboxRoomIndexListenable.addListener(_syncSandboxRoomIndex);
+    _interactionHintText = ref.read(appStringsProvider).leftJoystickHint;
     _syncInteractionHint();
     _syncOnlineHunters();
     _syncNearbyFurniture();
+    _syncSandboxRoomIndex();
     _latestAuthSession = ref.read(authSessionProvider);
     _latestAppConfig = ref.read(appConfigProvider);
+    _game.setLanguage(ref.read(appSettingsProvider).language);
+    final initialVoiceState = ref.read(voiceChatControllerProvider);
+    _game.setCampfireVoiceActivity(
+      connected: initialVoiceState.connected,
+      hasActiveSpeaker: initialVoiceState.activeSpeakerIdentities.isNotEmpty,
+    );
     _game.setControlledHunterId(_latestAuthSession?.hunterId);
 
     _authSessionSubscription = ref.listenManual<AuthSession?>(
@@ -152,6 +192,34 @@ class _GameShellPageState extends ConsumerState<GameShellPage> {
       );
     });
 
+    _appSettingsSubscription = ref.listenManual<AppSettings>(
+      appSettingsProvider,
+      (previous, next) {
+        if (previous?.language != next.language) {
+          _game.setLanguage(next.language);
+        }
+      },
+      fireImmediately: true,
+    );
+
+    _voiceSubscription = ref.listenManual<VoiceChatState>(
+      voiceChatControllerProvider,
+      (previous, next) {
+        final previousConnected = previous?.connected ?? false;
+        final previousHasSpeaker =
+            previous?.activeSpeakerIdentities.isNotEmpty ?? false;
+        final nextHasSpeaker = next.activeSpeakerIdentities.isNotEmpty;
+        if (previousConnected != next.connected ||
+            previousHasSpeaker != nextHasSpeaker) {
+          _game.setCampfireVoiceActivity(
+            connected: next.connected,
+            hasActiveSpeaker: nextHasSpeaker,
+          );
+        }
+      },
+      fireImmediately: true,
+    );
+
     _questSubscription = ref.listenManual<AsyncValue<List<QuestInstance>>>(
       questControllerProvider,
       (previous, next) {
@@ -174,7 +242,11 @@ class _GameShellPageState extends ConsumerState<GameShellPage> {
         next.whenData((snapshot) {
           final incomingCount = snapshot.incomingFriendRequests.length;
           if (incomingCount > _lastIncomingFriendRequestCount) {
-            _showScrollNotice('收到新的好友請求捲軸');
+            _showScrollNotice(
+              ref
+                  .read(appStringsProvider)
+                  .tr(zh: '收到新的好友請求捲軸', en: 'A new friend request arrived.'),
+            );
           }
           _lastIncomingFriendRequestCount = incomingCount;
           _handleGuildInviteScroll(snapshot);
@@ -192,6 +264,9 @@ class _GameShellPageState extends ConsumerState<GameShellPage> {
       ),
     );
     _socialRefreshTimer = Timer.periodic(const Duration(seconds: 12), (_) {
+      if (_isDisposing || _latestAuthSession == null) {
+        return;
+      }
       ref.read(socialControllerProvider.notifier).refresh();
     });
     _startDebugMeter();
@@ -203,16 +278,21 @@ class _GameShellPageState extends ConsumerState<GameShellPage> {
     _game.interactionHintListenable.removeListener(_syncInteractionHint);
     _game.activeHunterIdsListenable.removeListener(_syncOnlineHunters);
     _game.nearbyFurnitureListenable.removeListener(_syncNearbyFurniture);
+    _game.sandboxRoomIndexListenable.removeListener(_syncSandboxRoomIndex);
     _authSessionSubscription?.close();
     _authSessionSubscription = null;
     _appConfigSubscription?.close();
     _appConfigSubscription = null;
+    _appSettingsSubscription?.close();
+    _appSettingsSubscription = null;
     _questSubscription?.close();
     _questSubscription = null;
     _hunterSubscription?.close();
     _hunterSubscription = null;
     _socialSubscription?.close();
     _socialSubscription = null;
+    _voiceSubscription?.close();
+    _voiceSubscription = null;
     _debugMeterTimer?.cancel();
     _debugMeterTimer = null;
     _socialRefreshTimer?.cancel();
@@ -232,15 +312,18 @@ class _GameShellPageState extends ConsumerState<GameShellPage> {
 
   @override
   Widget build(BuildContext context) {
-    final appConfig = ref.watch(appConfigProvider);
-    final lowFxMode = appConfig.lowFxMode;
+    final lowFxMode = ref.watch(
+      appConfigProvider.select((config) => config.lowFxMode),
+    );
+    final uiScale = ref.watch(
+      appSettingsProvider.select((settings) => settings.uiScale),
+    );
     final progressionState = ref.watch(progressionControllerProvider);
     final authSession = ref.watch(authSessionProvider);
-    final voiceState = ref.watch(voiceChatControllerProvider);
-    _game.setCampfireVoiceActivity(
-      connected: voiceState.connected,
-      hasActiveSpeaker: voiceState.activeSpeakerIdentities.isNotEmpty,
+    final voiceConnected = ref.watch(
+      voiceChatControllerProvider.select((state) => state.connected),
     );
+    final strings = ref.watch(appStringsProvider);
     final missingHunterIdentity =
         authSession == null || authSession.hunterId.trim().isEmpty;
 
@@ -256,27 +339,30 @@ class _GameShellPageState extends ConsumerState<GameShellPage> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
-                    '登入狀態異常',
+                  Text(
+                    strings.tr(zh: '登入狀態異常', en: 'Session Problem'),
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: AppColors.inkBrown,
                       fontSize: 22,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
                   const SizedBox(height: 10),
-                  const Text(
-                    '目前 Token 缺少玩家角色（hunter_id），無法進入可操作的酒館場景。',
+                  Text(
+                    strings.tr(
+                      zh: '目前 Token 缺少玩家角色（hunter_id），無法進入可操作的生活空間。',
+                      en: 'The current token is missing a player role (hunter_id), so the life space cannot open.',
+                    ),
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: AppColors.inkBrown,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 14),
                   _StampButton(
-                    label: '重新登入',
+                    label: strings.tr(zh: '重新登入', en: 'Sign In Again'),
                     icon: Icons.login_rounded,
                     tone: _StampTone.green,
                     onPressed: _logout,
@@ -305,10 +391,17 @@ class _GameShellPageState extends ConsumerState<GameShellPage> {
           final actionGap = isPhoneLayout ? 8.0 : 10.0;
           final sideInset = isPhoneLayout ? 10.0 : 16.0;
           final bottomInset = mediaPadding.bottom + 12;
-          final titleMaxWidth = math.max(
-            180.0,
-            constraints.maxWidth - (sideInset * 2) - 24,
-          );
+          final sandboxRooms = _game.sandboxRooms;
+          final canShowFloorplan =
+              _game.isSandboxRoomMode && sandboxRooms.length > 1;
+          final boundedSandboxIndex = sandboxRooms.isEmpty
+              ? 0
+              : _sandboxCurrentRoomIndex
+                    .clamp(0, sandboxRooms.length - 1)
+                    .toInt();
+          final currentSandboxRoom = sandboxRooms.isEmpty
+              ? null
+              : sandboxRooms[boundedSandboxIndex];
           final topOverlayMaxWidth = math.max(
             140.0,
             constraints.maxWidth - hudCompactWidth - sideInset - 32,
@@ -323,73 +416,91 @@ class _GameShellPageState extends ConsumerState<GameShellPage> {
                       20,
                 )
               : 360.0;
-          final topActionY = isPhoneLayout ? topInset + 52 : topInset + 4;
-          final avatarTop = isPhoneLayout ? topInset + 96 : topInset + 62;
+          final topBannerHeight = isPhoneLayout ? 60.0 : 60.0;
+          final topHudHeight = topBannerHeight;
+          final avatarTop = topInset + topHudHeight + 10;
+          final rightOverlayTop = avatarTop - 4;
 
           return Stack(
             children: [
-              Positioned.fill(child: GameWidget(game: _game)),
+              Positioned.fill(child: _gameWidget),
               Positioned(
                 top: topInset,
-                left: 0,
-                right: 0,
-                child: IgnorePointer(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: sideInset + 12),
-                    child: Center(
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(maxWidth: titleMaxWidth),
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
+                left: sideInset,
+                right: sideInset,
+                child: _game.isSandboxRoomMode
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: SizedBox(
+                                  height: topBannerHeight,
+                                  child: _TopHudBanner(
+                                    title: strings.appTitle,
+                                    subtitle: strings.currentSpace(
+                                      currentSandboxRoom?.label ??
+                                          strings.tr(
+                                            zh: '主接點室',
+                                            en: 'Main Link Room',
+                                          ),
+                                    ),
+                                    accentColor:
+                                        currentSandboxRoom?.accentColor ??
+                                        AppColors.submitGreen,
+                                    compact: isPhoneLayout,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (canShowFloorplan)
+                                    _TopIconButton(
+                                      icon: _PixelHudIcon.map,
+                                      label: strings.spaceMap,
+                                      tooltip: _showFloorplanOverlay
+                                          ? strings.closeMap
+                                          : strings.openMap,
+                                      compact: isPhoneLayout,
+                                      selected: _showFloorplanOverlay,
+                                      onPressed: () {
+                                        _applyState(() {
+                                          _showFloorplanOverlay =
+                                              !_showFloorplanOverlay;
+                                        });
+                                      },
+                                    ),
+                                  if (canShowFloorplan)
+                                    const SizedBox(width: 8),
+                                  _TopIconButton(
+                                    icon: _PixelHudIcon.menu,
+                                    label: strings.mainMenu,
+                                    tooltip: strings.openMainMenu,
+                                    compact: isPhoneLayout,
+                                    onPressed: _openMainMenuDialog,
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
+                      )
+                    : IgnorePointer(
+                        child: Center(
                           child: _TitleBadge(
                             lowFxMode: lowFxMode,
                             compact: isPhoneLayout,
                           ),
                         ),
                       ),
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
-                top: topActionY,
-                right: sideInset,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _TopIconButton(
-                      glyph: '退',
-                      tooltip: '登出',
-                      compact: isPhoneLayout,
-                      onPressed: _logout,
-                    ),
-                    const SizedBox(width: 6),
-                    _TopIconButton(
-                      glyph: '景',
-                      tooltip: '切換主題：$_visualThemeLabel',
-                      compact: isPhoneLayout,
-                      onPressed: _cycleVisualTheme,
-                    ),
-                    if (!isPhoneLayout) ...[
-                      const SizedBox(width: 6),
-                      _TopIconButton(
-                        glyph: '包',
-                        tooltip: '背包',
-                        onPressed: _openInventoryDialog,
-                      ),
-                      const SizedBox(width: 6),
-                      _TopIconButton(
-                        glyph: '聊',
-                        tooltip: '營火語音聊天室',
-                        onPressed: _openCampfireDialog,
-                      ),
-                    ],
-                  ],
-                ),
               ),
               if (kDebugMode && !isPhoneLayout)
                 Positioned(
-                  top: topInset + 56,
+                  top: rightOverlayTop,
                   right: sideInset,
                   child: _RealtimeDebugHud(
                     connected: _presenceConnected,
@@ -412,7 +523,7 @@ class _GameShellPageState extends ConsumerState<GameShellPage> {
               ),
               if (_scrollNoticeText != null)
                 Positioned(
-                  top: avatarTop + 50,
+                  top: rightOverlayTop,
                   right: sideInset,
                   child: AnimatedOpacity(
                     opacity: _scrollNoticeText == null ? 0 : 1,
@@ -452,7 +563,7 @@ class _GameShellPageState extends ConsumerState<GameShellPage> {
                 ),
               if (_activeGuildInvite != null)
                 Positioned(
-                  top: avatarTop + 88,
+                  top: rightOverlayTop + 46,
                   right: sideInset,
                   child: ConstrainedBox(
                     constraints: BoxConstraints(maxWidth: topOverlayMaxWidth),
@@ -504,71 +615,64 @@ class _GameShellPageState extends ConsumerState<GameShellPage> {
                     ),
                     child: Text(
                       _interactionHintText,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.inkBrown,
                         fontWeight: FontWeight.w800,
-                        fontSize: 12,
+                        fontSize: 12 * uiScale,
                       ),
                     ),
                   ),
                 ),
               ),
-              Positioned(
-                right: sideInset,
-                bottom: bottomInset,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    if (isPhoneLayout)
-                      SizedBox(
-                        width: actionButtonWidth,
-                        child: _StampButton(
-                          label: '背包',
-                          icon: Icons.backpack_outlined,
-                          tone: _StampTone.wood,
-                          onPressed: _openInventoryDialog,
+              if (voiceConnected || _nearbyFurniture != null)
+                Positioned(
+                  right: sideInset,
+                  bottom: bottomInset,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      if (voiceConnected)
+                        SizedBox(
+                          width: actionButtonWidth,
+                          child: _StampButton(
+                            label: strings.tr(
+                              zh: '離開語音房',
+                              en: 'Leave Voice Room',
+                            ),
+                            icon: Icons.logout_rounded,
+                            tone: _StampTone.ruby,
+                            onPressed: _leaveVoiceQuick,
+                          ),
                         ),
-                      ),
-                    if (isPhoneLayout) SizedBox(height: actionGap),
-                    SizedBox(
-                      width: actionButtonWidth,
-                      child: _StampButton(
-                        label: '營火聊天',
-                        iconWidget: _PixelMicStoneIcon(
-                          enabled: voiceState.micEnabled,
+                      if (voiceConnected && _nearbyFurniture != null)
+                        SizedBox(height: actionGap),
+                      if (_nearbyFurniture != null)
+                        SizedBox(
+                          width: actionButtonWidth,
+                          child: _StampButton(
+                            label: _interactButtonLabel,
+                            icon: Icons.touch_app_rounded,
+                            tone: _StampTone.green,
+                            onPressed: _interactNearbyFurniture,
+                          ),
                         ),
-                        tone: voiceState.connected
-                            ? _StampTone.blue
-                            : _StampTone.wood,
-                        onPressed: _openCampfireDialog,
-                      ),
-                    ),
-                    if (voiceState.connected) SizedBox(height: actionGap),
-                    if (voiceState.connected)
-                      SizedBox(
-                        width: actionButtonWidth,
-                        child: _StampButton(
-                          label: '離開營火',
-                          icon: Icons.logout_rounded,
-                          tone: _StampTone.ruby,
-                          onPressed: _leaveVoiceQuick,
-                        ),
-                      ),
-                    if (_nearbyFurniture != null) SizedBox(height: actionGap),
-                    if (_nearbyFurniture != null)
-                      SizedBox(
-                        width: actionButtonWidth,
-                        child: _StampButton(
-                          label: _interactButtonLabel,
-                          icon: Icons.touch_app_rounded,
-                          tone: _StampTone.green,
-                          onPressed: _interactNearbyFurniture,
-                        ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
+              if (canShowFloorplan && _showFloorplanOverlay)
+                Positioned.fill(
+                  child: _SandboxFloorplanOverlay(
+                    rooms: sandboxRooms,
+                    currentRoomIndex: _sandboxCurrentRoomIndex,
+                    compact: isPhoneLayout,
+                    onClose: () {
+                      _applyState(() {
+                        _showFloorplanOverlay = false;
+                      });
+                    },
+                  ),
+                ),
             ],
           );
         },

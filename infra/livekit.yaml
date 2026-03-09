@@ -1,4 +1,4 @@
-# Local/dev LiveKit configuration for The Bit & Bond voice MVP.
+# Local/dev LiveKit configuration for The Bit and Bond voice MVP.
 # For production, replace keys and run behind TLS.
 port: 7880
 bind_addresses:

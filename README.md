@@ -1,6 +1,6 @@
-# The Bit & Bond
+# The Bit and Bond
 
-`The Bit & Bond` 是一個「RPG 公會生活」導向的任務與社交 App，採用 Monorepo 架構，包含：
+`The Bit and Bond` 是一個「RPG 公會生活」導向的任務與社交 App，採用 Monorepo 架構，包含：
 - Rust 後端（Axum + SeaORM + PostgreSQL）
 - Flutter 前端（Flame + Riverpod）
 - 即時多人同步（WebSocket）
@@ -240,6 +240,7 @@ cp .env.example .env
 - `JWT_SECRET`（>= 32 字元）
 - `BIND_ADDR`（預設 `0.0.0.0:18080`）
 - `REDIS_URL`（選填；多節點 Realtime 才需要）
+- `FIREBASE_PROJECT_ID`（若要使用 Google Sign-In / Firebase 驗章）
 
 ### 8.3 啟動 PostgreSQL
 
@@ -252,7 +253,7 @@ docker compose -f infra/docker-compose.yml up -d
 ### 8.4 啟動後端
 
 ```bash
-cargo run -p chen_leveling_server
+cargo run -p the_bit_and_bond_server
 ```
 
 健康檢查：
@@ -283,7 +284,7 @@ flutter run -d web-server \
 ```bash
 cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
-cargo test -p chen_leveling_server --locked
+cargo test -p the_bit_and_bond_server --locked
 ```
 
 ### Flutter
