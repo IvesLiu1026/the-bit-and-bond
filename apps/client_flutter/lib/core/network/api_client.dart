@@ -14,6 +14,7 @@ part 'api_client_media.part.dart';
 part 'api_client_quests.part.dart';
 part 'api_client_shop_inventory.part.dart';
 part 'api_client_social.part.dart';
+part 'api_client_telemetry.part.dart';
 part 'api_client_transport.part.dart';
 part 'api_client_voice.part.dart';
 
@@ -39,6 +40,15 @@ class ApiClient {
   Future<void> ensureAuthorizedSession() async {
     await _authedGet('/api/v1/auth/me', const {}, role: _AuthRole.any);
   }
+
+  Future<void> sendTelemetryEvents({
+    required List<TelemetryEventPayload> events,
+    bool allowPublic = false,
+  }) => _apiClientSendTelemetryEvents(
+    this,
+    events: events,
+    allowPublic: allowPublic,
+  );
 
   Future<void> submitQuest({required String questInstanceId}) =>
       _apiClientSubmitQuest(this, questInstanceId: questInstanceId);
@@ -474,5 +484,45 @@ class RealtimeWsTicket {
       ticket: (json['ticket'] ?? '') as String,
       expiresIn: (json['expires_in'] ?? 0) as int,
     );
+  }
+}
+
+class TelemetryEventPayload {
+  const TelemetryEventPayload({
+    required this.eventName,
+    this.status,
+    this.source,
+    this.platform,
+    this.locale,
+    this.appVersion,
+    this.sessionId,
+    this.occurredAtMs,
+    this.properties = const <String, dynamic>{},
+  });
+
+  final String eventName;
+  final String? status;
+  final String? source;
+  final String? platform;
+  final String? locale;
+  final String? appVersion;
+  final String? sessionId;
+  final int? occurredAtMs;
+  final Map<String, dynamic> properties;
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'event_name': eventName,
+      if (status != null && status!.trim().isNotEmpty) 'status': status,
+      if (source != null && source!.trim().isNotEmpty) 'source': source,
+      if (platform != null && platform!.trim().isNotEmpty) 'platform': platform,
+      if (locale != null && locale!.trim().isNotEmpty) 'locale': locale,
+      if (appVersion != null && appVersion!.trim().isNotEmpty)
+        'app_version': appVersion,
+      if (sessionId != null && sessionId!.trim().isNotEmpty)
+        'session_id': sessionId,
+      if (occurredAtMs != null) 'occurred_at_ms': occurredAtMs,
+      'properties': properties,
+    };
   }
 }

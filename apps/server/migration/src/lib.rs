@@ -20,6 +20,7 @@ mod m20260309_000017_add_dm_thread_reads;
 mod m20260309_000018_add_quest_proof_media;
 mod m20260310_000019_add_media_dump_and_once;
 mod m20260310_000020_add_media_once_e2ee_fields;
+mod m20260310_000021_add_telemetry_events;
 
 pub struct Migrator;
 
@@ -47,6 +48,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260309_000018_add_quest_proof_media::Migration),
             Box::new(m20260310_000019_add_media_dump_and_once::Migration),
             Box::new(m20260310_000020_add_media_once_e2ee_fields::Migration),
+            Box::new(m20260310_000021_add_telemetry_events::Migration),
         ]
     }
 }

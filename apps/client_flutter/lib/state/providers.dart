@@ -9,6 +9,7 @@ import '../core/network/api_client.dart';
 import '../core/network/auth_api_client.dart';
 import '../core/security/dm_e2ee_service.dart';
 import '../core/settings/app_settings.dart';
+import '../core/telemetry/product_analytics.dart';
 import '../features/quests/quest_repository.dart';
 import 'auth_controller.dart';
 import 'settings_controller.dart';
@@ -78,6 +79,17 @@ final dmE2eeServiceProvider = Provider<DmE2eeService>((ref) {
   final api = ref.watch(apiClientProvider);
   final storage = ref.watch(secureStorageProvider);
   return DmE2eeService(api: api, store: FlutterDmSecureStore(storage));
+});
+
+final productAnalyticsProvider = Provider<ProductAnalytics>((ref) {
+  final api = ref.watch(apiClientProvider);
+  final config = ref.watch(appConfigProvider);
+  final settings = ref.watch(appSettingsProvider);
+  return ProductAnalytics(
+    api: api,
+    environment: config.environment,
+    language: settings.language,
+  );
 });
 
 final questRepositoryProvider = Provider<QuestRepository>((ref) {

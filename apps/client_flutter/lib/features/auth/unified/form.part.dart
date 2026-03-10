@@ -112,6 +112,16 @@ class _UnifiedAuthFormState extends ConsumerState<UnifiedAuthForm> {
       _submitting = true;
       _errorMessage = null;
     });
+    final analytics = ref.read(productAnalyticsProvider);
+    final accountKind = account.contains('@') ? 'email' : 'player_id';
+    analytics.track(
+      'auth.submit.attempt',
+      allowPublic: true,
+      properties: <String, dynamic>{
+        'mode': _mode.name,
+        'account_kind': accountKind,
+      },
+    );
     try {
       final auth = ref.read(authControllerProvider.notifier);
       if (_mode == UnifiedAuthMode.login) {
@@ -124,10 +134,35 @@ class _UnifiedAuthFormState extends ConsumerState<UnifiedAuthForm> {
           avatarType: widget.avatarType,
         );
       }
+      analytics.track(
+        _mode == UnifiedAuthMode.login
+            ? 'auth.login.success'
+            : 'auth.register.success',
+        properties: <String, dynamic>{'account_kind': accountKind},
+      );
       widget.onAuthenticated?.call();
     } on AuthApiException catch (error) {
+      analytics.track(
+        _mode == UnifiedAuthMode.login
+            ? 'auth.login.failed'
+            : 'auth.register.failed',
+        status: 'error',
+        allowPublic: true,
+        properties: <String, dynamic>{
+          'account_kind': accountKind,
+          'status_code': error.statusCode,
+        },
+      );
       _showError(error.message);
     } catch (error) {
+      analytics.track(
+        _mode == UnifiedAuthMode.login
+            ? 'auth.login.failed'
+            : 'auth.register.failed',
+        status: 'error',
+        allowPublic: true,
+        properties: <String, dynamic>{'account_kind': accountKind},
+      );
       _showError('$error');
     } finally {
       if (mounted) {

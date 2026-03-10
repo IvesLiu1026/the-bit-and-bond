@@ -934,7 +934,7 @@ class _TestDirectMessagesController extends DirectMessagesController {
   Future<void> selectCounterpart(String counterpartHunterId) async {}
 
   @override
-  Future<void> sendMessage(String content) async {}
+  Future<bool> sendMessage(String content) async => false;
 }
 
 class _TestDmStore implements DmSecureStore {

@@ -17,6 +17,7 @@ pub mod media_once_delivery;
 pub mod photo_dump_export;
 pub mod quest;
 pub mod quest_proof_media;
+pub mod telemetry_event;
 pub mod user;
 
 pub mod prelude {
@@ -39,5 +40,6 @@ pub mod prelude {
     pub use crate::photo_dump_export::Entity as PhotoDumpExport;
     pub use crate::quest::Entity as Quest;
     pub use crate::quest_proof_media::Entity as QuestProofMedia;
+    pub use crate::telemetry_event::Entity as TelemetryEvent;
     pub use crate::user::Entity as User;
 }

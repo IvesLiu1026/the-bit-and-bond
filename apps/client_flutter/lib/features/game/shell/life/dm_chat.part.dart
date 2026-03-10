@@ -273,6 +273,14 @@ class _DirectMessageConversationPageState
       if (!mounted) {
         return;
       }
+      ref
+          .read(productAnalyticsProvider)
+          .track(
+            'dm.onetime_open.success',
+            properties: <String, dynamic>{
+              'counterpart_hunter_id': senderHunterId,
+            },
+          );
       setState(() {
         _viewedOneTimeDeliveryIds.add(deliveryId);
         _openableOneTimeDeliveryIds = {..._openableOneTimeDeliveryIds}
@@ -284,6 +292,15 @@ class _DirectMessageConversationPageState
         return;
       }
       if (_isConsumedOrExpiredOnceError(error)) {
+        ref
+            .read(productAnalyticsProvider)
+            .track(
+              'dm.onetime_open.already_viewed',
+              status: 'consumed',
+              properties: <String, dynamic>{
+                'counterpart_hunter_id': senderHunterId,
+              },
+            );
         setState(() {
           _viewedOneTimeDeliveryIds.add(deliveryId);
           _openableOneTimeDeliveryIds = {..._openableOneTimeDeliveryIds}
@@ -300,6 +317,16 @@ class _DirectMessageConversationPageState
         ),
         tone: PixelTone.ruby,
       );
+      ref
+          .read(productAnalyticsProvider)
+          .track(
+            'dm.onetime_open.failed',
+            status: 'error',
+            properties: <String, dynamic>{
+              'counterpart_hunter_id': senderHunterId,
+              if (error is ApiException) 'status_code': error.statusCode,
+            },
+          );
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -343,9 +370,16 @@ class _DirectMessageConversationPageState
         return;
       }
       _messageController.clear();
-      await ref
+      final ok = await ref
           .read(directMessagesControllerProvider.notifier)
           .sendMessage(text);
+      ref
+          .read(productAnalyticsProvider)
+          .track(
+            ok ? 'dm.text_send.success' : 'dm.text_send.failed',
+            status: ok ? 'ok' : 'error',
+            properties: <String, dynamic>{'length': text.length},
+          );
     }
 
     Future<void> resend() async {
@@ -426,6 +460,15 @@ class _DirectMessageConversationPageState
         await ref
             .read(directMessagesControllerProvider.notifier)
             .sendMessage(_buildDmImageMarker(asset.contentPath));
+        ref
+            .read(productAnalyticsProvider)
+            .track(
+              'dm.image_send.success',
+              properties: <String, dynamic>{
+                'mime_type': upload.mimeType,
+                'byte_size': upload.bytes.length,
+              },
+            );
         if (!context.mounted) {
           return;
         }
@@ -435,6 +478,15 @@ class _DirectMessageConversationPageState
         ).showSnackBar(SnackBar(content: Text(strings.dmImageSent)));
       } catch (error) {
         await _handleSessionExpiryIfNeeded(ref, error);
+        ref
+            .read(productAnalyticsProvider)
+            .track(
+              'dm.image_send.failed',
+              status: 'error',
+              properties: <String, dynamic>{
+                if (error is ApiException) 'status_code': error.statusCode,
+              },
+            );
         if (!context.mounted) {
           return;
         }
@@ -536,6 +588,16 @@ class _DirectMessageConversationPageState
         await ref
             .read(directMessagesControllerProvider.notifier)
             .sendMessage(_buildDmOnceMarker(delivery.id));
+        ref
+            .read(productAnalyticsProvider)
+            .track(
+              'dm.onetime_send.success',
+              properties: <String, dynamic>{
+                'recipient_hunter_id': widget.counterpartId,
+                'mime_type': upload.mimeType,
+                'byte_size': upload.bytes.length,
+              },
+            );
         if (!context.mounted) {
           return;
         }
@@ -545,6 +607,16 @@ class _DirectMessageConversationPageState
         ).showSnackBar(SnackBar(content: Text(strings.dmOneTimeImageSent)));
       } catch (error) {
         await _handleSessionExpiryIfNeeded(ref, error);
+        ref
+            .read(productAnalyticsProvider)
+            .track(
+              'dm.onetime_send.failed',
+              status: 'error',
+              properties: <String, dynamic>{
+                'recipient_hunter_id': widget.counterpartId,
+                if (error is ApiException) 'status_code': error.statusCode,
+              },
+            );
         if (!context.mounted) {
           return;
         }

@@ -8,6 +8,7 @@ mod quests;
 mod realtime;
 mod shop;
 mod social;
+mod telemetry;
 mod voice;
 
 use axum::Router;
@@ -131,6 +132,14 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/api/v1/media/photo-dumps",
             axum::routing::get(media::list_photo_dump_exports),
+        )
+        .route(
+            "/api/v1/telemetry/public-events",
+            axum::routing::post(telemetry::ingest_public_events),
+        )
+        .route(
+            "/api/v1/telemetry/events",
+            axum::routing::post(telemetry::ingest_hunter_events),
         )
         .route(
             "/api/v1/voice/token",

@@ -64,6 +64,9 @@ class _ImmersiveOnboardingPageState
     if (_step != _OnboardingStep.greeting) {
       return;
     }
+    ref
+        .read(productAnalyticsProvider)
+        .track('onboarding.greeting.enter', allowPublic: true);
     HapticFeedback.lightImpact();
     unawaited(SfxPlayer.instance.playDoorOpen());
     if (!mounted) {
@@ -75,6 +78,13 @@ class _ImmersiveOnboardingPageState
   }
 
   void _continueToContract() {
+    ref
+        .read(productAnalyticsProvider)
+        .track(
+          'onboarding.customization.continue',
+          allowPublic: true,
+          properties: <String, dynamic>{'avatar_type': _avatarType},
+        );
     HapticFeedback.selectionClick();
     unawaited(SfxPlayer.instance.playUseSuccess());
     setState(() {
@@ -98,6 +108,13 @@ class _ImmersiveOnboardingPageState
 
   void _revealLegacyContract() {
     final strings = AppStrings.of(context);
+    ref
+        .read(productAnalyticsProvider)
+        .track(
+          'onboarding.contract.manual_register_opened',
+          allowPublic: true,
+          properties: <String, dynamic>{'avatar_type': _avatarType},
+        );
     HapticFeedback.selectionClick();
     unawaited(SfxPlayer.instance.playCoin());
     setState(() {
@@ -112,6 +129,9 @@ class _ImmersiveOnboardingPageState
 
   void _openLegacyLoginContract() {
     final strings = AppStrings.of(context);
+    ref
+        .read(productAnalyticsProvider)
+        .track('onboarding.contract.manual_login_opened', allowPublic: true);
     HapticFeedback.selectionClick();
     unawaited(SfxPlayer.instance.playCoin());
     setState(() {
@@ -148,6 +168,16 @@ class _ImmersiveOnboardingPageState
           avatarType: _avatarType,
           footerText: footer,
           onAuthenticated: () {
+            ref
+                .read(productAnalyticsProvider)
+                .track(
+                  'onboarding.completed',
+                  properties: <String, dynamic>{
+                    'entry': mode == UnifiedAuthMode.register
+                        ? 'manual_register'
+                        : 'manual_login',
+                  },
+                );
             Navigator.of(sheetContext).maybePop();
           },
         );
@@ -201,6 +231,18 @@ class _ImmersiveOnboardingPageState
             displayName: identity.displayName,
             avatarType: _avatarType,
           );
+      ref
+          .read(productAnalyticsProvider)
+          .track(
+            'onboarding.google_contract.success',
+            properties: <String, dynamic>{'avatar_type': _avatarType},
+          );
+      ref
+          .read(productAnalyticsProvider)
+          .track(
+            'onboarding.completed',
+            properties: <String, dynamic>{'entry': 'google'},
+          );
       if (!mounted) {
         return;
       }
@@ -214,6 +256,17 @@ class _ImmersiveOnboardingPageState
       HapticFeedback.heavyImpact();
       unawaited(SfxPlayer.instance.playUseSuccess());
     } on FederatedAuthException catch (error) {
+      ref
+          .read(productAnalyticsProvider)
+          .track(
+            'onboarding.google_contract.failed',
+            status: 'error',
+            allowPublic: true,
+            properties: <String, dynamic>{
+              'reason': 'federated',
+              'show_fallback': error.shouldShowFallbackForm,
+            },
+          );
       if (!mounted) {
         return;
       }
@@ -222,6 +275,17 @@ class _ImmersiveOnboardingPageState
         _showLegacyContract = error.shouldShowFallbackForm;
       });
     } on AuthApiException catch (error) {
+      ref
+          .read(productAnalyticsProvider)
+          .track(
+            'onboarding.google_contract.failed',
+            status: 'error',
+            allowPublic: true,
+            properties: <String, dynamic>{
+              'reason': 'api',
+              'status_code': error.statusCode,
+            },
+          );
       if (!mounted) {
         return;
       }
@@ -230,6 +294,14 @@ class _ImmersiveOnboardingPageState
         _showLegacyContract = true;
       });
     } catch (error) {
+      ref
+          .read(productAnalyticsProvider)
+          .track(
+            'onboarding.google_contract.failed',
+            status: 'error',
+            allowPublic: true,
+            properties: <String, dynamic>{'reason': 'unknown'},
+          );
       if (!mounted) {
         return;
       }

@@ -321,6 +321,8 @@ flutter test
 
 - 請先跑一遍：
   [docs/release_checklist.md](/Users/ivesliu/Documents/chen-leveling/docs/release_checklist.md)
+- TestFlight 內測流程：
+  [docs/testflight_internal_beta_checklist.md](/Users/ivesliu/Documents/chen-leveling/docs/testflight_internal_beta_checklist.md)
 
 ## 12. 目前已知限制
 

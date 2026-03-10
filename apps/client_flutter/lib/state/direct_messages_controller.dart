@@ -190,15 +190,15 @@ class DirectMessagesController extends StateNotifier<DirectMessagesState> {
     }
   }
 
-  Future<void> sendMessage(String content) async {
+  Future<bool> sendMessage(String content) async {
     final session = _session;
     final counterpartId = state.selectedCounterpartId;
     if (session == null || counterpartId == null || counterpartId.isEmpty) {
-      return;
+      return false;
     }
     final trimmed = content.trim();
     if (trimmed.isEmpty) {
-      return;
+      return false;
     }
 
     state = state.copyWith(sending: true, clearError: true);
@@ -263,12 +263,13 @@ class DirectMessagesController extends StateNotifier<DirectMessagesState> {
         messages: mergedMessages,
         clearError: true,
       );
+      return true;
     } catch (error) {
       if (await _handleUnauthorizedIfNeeded(error)) {
-        return;
+        return false;
       }
       if (!mounted) {
-        return;
+        return false;
       }
       state = state.copyWith(
         sending: false,
@@ -278,6 +279,7 @@ class DirectMessagesController extends StateNotifier<DirectMessagesState> {
           fallbackEn: 'Failed to send direct message',
         ),
       );
+      return false;
     }
   }
 

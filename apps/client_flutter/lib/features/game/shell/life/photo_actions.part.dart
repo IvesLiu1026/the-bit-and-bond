@@ -51,6 +51,16 @@ extension _PhotoDumpPanelActions on _PhotoDumpPanelState {
       await ref
           .read(apiClientProvider)
           .uploadVaultMedia(upload: upload, caption: _captionController.text);
+      ref
+          .read(productAnalyticsProvider)
+          .track(
+            'photo.vault_upload.success',
+            properties: <String, dynamic>{
+              'source': source.name,
+              'mime_type': upload.mimeType,
+              'byte_size': upload.bytes.length,
+            },
+          );
       _captionController.clear();
       if (mounted) {
         _setStatus(strings.photoDumpUploadSuccess, tone: PixelTone.green);
@@ -61,6 +71,16 @@ extension _PhotoDumpPanelActions on _PhotoDumpPanelState {
       await _refreshAll(showLoading: false);
     } catch (error) {
       await _handleSessionExpiryIfNeeded(ref, error);
+      ref
+          .read(productAnalyticsProvider)
+          .track(
+            'photo.vault_upload.failed',
+            status: 'error',
+            properties: <String, dynamic>{
+              'source': source.name,
+              if (error is ApiException) 'status_code': error.statusCode,
+            },
+          );
       if (mounted) {
         _setStatus(
           _friendlyShellErrorMessage(
@@ -150,6 +170,17 @@ extension _PhotoDumpPanelActions on _PhotoDumpPanelState {
             caption: _captionController.text,
             encryption: encrypted.encryption,
           );
+      ref
+          .read(productAnalyticsProvider)
+          .track(
+            'photo.onetime_send.success',
+            properties: <String, dynamic>{
+              'source': source.name,
+              'recipient_player_id': recipient.toLowerCase(),
+              'mime_type': upload.mimeType,
+              'byte_size': upload.bytes.length,
+            },
+          );
       _captionController.clear();
       if (mounted) {
         _setStatus(
@@ -163,6 +194,16 @@ extension _PhotoDumpPanelActions on _PhotoDumpPanelState {
       await _refreshAll(showLoading: false);
     } catch (error) {
       await _handleSessionExpiryIfNeeded(ref, error);
+      ref
+          .read(productAnalyticsProvider)
+          .track(
+            'photo.onetime_send.failed',
+            status: 'error',
+            properties: <String, dynamic>{
+              'source': source.name,
+              if (error is ApiException) 'status_code': error.statusCode,
+            },
+          );
       if (mounted) {
         _setStatus(
           _friendlyShellErrorMessage(
@@ -287,6 +328,15 @@ extension _PhotoDumpPanelActions on _PhotoDumpPanelState {
         builder: (dialogContext) =>
             _OneTimeViewerDialog(imageBytes: displayBytes),
       );
+      ref
+          .read(productAnalyticsProvider)
+          .track(
+            'photo.onetime_open.success',
+            properties: <String, dynamic>{
+              'delivery_id': delivery.id,
+              'encrypted': open.encryption.isEncrypted,
+            },
+          );
       _setStatus(strings.photoDumpOpenOnce, tone: PixelTone.gold);
       await _refreshAll(showLoading: false);
     } catch (error) {
@@ -295,10 +345,27 @@ extension _PhotoDumpPanelActions on _PhotoDumpPanelState {
         return;
       }
       if (_isConsumedOrExpiredOnceError(error)) {
+        ref
+            .read(productAnalyticsProvider)
+            .track(
+              'photo.onetime_open.already_viewed',
+              status: 'consumed',
+              properties: <String, dynamic>{'delivery_id': delivery.id},
+            );
         _setStatus(strings.photoDumpAlreadyViewed, tone: PixelTone.slate);
         await _refreshAll(showLoading: false);
         return;
       }
+      ref
+          .read(productAnalyticsProvider)
+          .track(
+            'photo.onetime_open.failed',
+            status: 'error',
+            properties: <String, dynamic>{
+              'delivery_id': delivery.id,
+              if (error is ApiException) 'status_code': error.statusCode,
+            },
+          );
       _setStatus(
         _friendlyShellErrorMessage(
           strings: strings,
