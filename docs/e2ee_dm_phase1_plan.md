@@ -3,7 +3,7 @@
 Last updated: 2026-03-09
 
 This document translates
-[e2ee_architecture_v1.md](/Users/ivesliu/Documents/chen-leveling/docs/e2ee_architecture_v1.md)
+[e2ee_architecture_v1.md](./e2ee_architecture_v1.md)
 into a concrete first implementation phase for direct messages.
 
 Phase 1 is intentionally narrow:

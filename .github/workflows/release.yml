@@ -39,6 +39,9 @@ jobs:
       - name: Rust tests
         run: cargo test -p the_bit_and_bond_server --locked
 
+      - name: Rust clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
       - name: Build Rust release binary
         run: cargo build -p the_bit_and_bond_server --release --locked
 
@@ -55,6 +58,14 @@ jobs:
       - name: Flutter tests
         working-directory: apps/client_flutter
         run: flutter test
+
+      - name: Flutter analyze
+        working-directory: apps/client_flutter
+        run: flutter analyze
+
+      - name: Hardcoded i18n guard
+        working-directory: apps/client_flutter
+        run: dart run tool/check_hardcoded_strings.dart --check
 
       - name: Build Flutter web release
         working-directory: apps/client_flutter

@@ -216,7 +216,7 @@ PostgreSQL (SeaORM)
 - `game_shell_page.dart`
   - HUD、互動按鈕、資料面板
   - WebSocket 連線管理與重連策略
-- `chen_game.dart`
+- `bitbond_game.dart`
   - 酒館場景、家具碰撞、互動距離判定
   - 浮動虛擬搖桿控制角色
   - 本地玩家控制 + 遠端玩家插值渲染
@@ -270,12 +270,19 @@ flutter pub get
 flutter run -d web-server \
   --web-hostname 0.0.0.0 \
   --web-port 18081 \
+  --dart-define=APP_ENV=local \
   --dart-define=API_BASE_URL=http://127.0.0.1:18080
 ```
 
 瀏覽器開啟：
 - 同機：`http://localhost:18081`
 - 區網裝置：`http://<你的電腦區網IP>:18081`
+
+可選環境參數（建議 staging / production）：
+- `APP_ENV=staging|production`
+- `STAGING_API_BASE_URL=...`
+- `PRODUCTION_API_BASE_URL=...`
+- `MOBILE_API_BASE_URL=...`（原生裝置連線後端時）
 
 ## 9. 測試與品質控管
 
@@ -295,6 +302,9 @@ flutter analyze
 flutter test
 ```
 
+效能驗證流程：
+- [docs/performance_playbook.md](/Users/ivesliu/Documents/chen-leveling/docs/performance_playbook.md)
+
 ## 10. CI/CD（GitHub Actions）
 
 - `CI`
@@ -307,12 +317,17 @@ flutter test
 - `Release`
   - Tag 觸發，建立 GitHub Release 並附上產物
 
-## 11. 目前已知限制
+## 11. 發版檢查表
+
+- 請先跑一遍：
+  [docs/release_checklist.md](/Users/ivesliu/Documents/chen-leveling/docs/release_checklist.md)
+
+## 12. 目前已知限制
 
 - Realtime 在 `REDIS_URL` 未設定時仍為單節點 in-memory
 - Pub/Sub 僅做即時位置同步；歷史回放與持久化仍在 DB 層處理
 
-## 12. 協作建議
+## 13. 協作建議
 
 - 所有新功能先補 migration + entity，再補 API/前端
 - PR 請附：

@@ -10,7 +10,7 @@ Do not ship partial cryptography without first satisfying the constraints in
 this file.
 
 Use this document together with
-[product_revamp_blueprint.md](/Users/ivesliu/Documents/chen-leveling/docs/product_revamp_blueprint.md).
+[product_revamp_blueprint.md](./product_revamp_blueprint.md).
 
 ## 1. Core Decision
 

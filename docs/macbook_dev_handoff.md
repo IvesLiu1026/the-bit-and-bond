@@ -36,10 +36,10 @@
 ### 前端核心
 
 - `apps/client_flutter/lib/features/game/game_shell_page.dart`
-- `apps/client_flutter/lib/features/game/chen_game.dart`
-- `apps/client_flutter/lib/features/game/chen_game_environment.part.dart`
-- `apps/client_flutter/lib/features/game/chen_game_furniture.part.dart`
-- `apps/client_flutter/lib/features/game/chen_game_character.part.dart`
+- `apps/client_flutter/lib/features/game/bitbond_game.dart`
+- `apps/client_flutter/lib/features/game/bitbond_game_environment.part.dart`
+- `apps/client_flutter/lib/features/game/bitbond_game_furniture.part.dart`
+- `apps/client_flutter/lib/features/game/bitbond_game_character.part.dart`
 - `apps/client_flutter/lib/state/voice_chat_controller.dart`
 - `apps/client_flutter/lib/core/network/api_client.dart`
 - `apps/client_flutter/lib/core/network/auth_api_client.dart`
@@ -170,10 +170,10 @@
 ### 代碼
 
 - `apps/client_flutter/lib/features/auth/unified_auth_page.dart`
-- `apps/client_flutter/lib/features/game/chen_game.dart`
-- `apps/client_flutter/lib/features/game/chen_game_character.part.dart`
-- `apps/client_flutter/lib/features/game/chen_game_environment.part.dart`
-- `apps/client_flutter/lib/features/game/chen_game_furniture.part.dart`
+- `apps/client_flutter/lib/features/game/bitbond_game.dart`
+- `apps/client_flutter/lib/features/game/bitbond_game_character.part.dart`
+- `apps/client_flutter/lib/features/game/bitbond_game_environment.part.dart`
+- `apps/client_flutter/lib/features/game/bitbond_game_furniture.part.dart`
 - `apps/client_flutter/lib/features/game/game_shell_page*.dart`
 - `apps/client_flutter/lib/state/voice_chat_controller.dart`
 - `apps/client_flutter/pubspec.yaml`
@@ -455,6 +455,7 @@ flutter test
 ```bash
 flutter devices
 flutter run -d ios \
+  --dart-define=APP_ENV=local \
   --dart-define=MOBILE_API_BASE_URL=http://127.0.0.1:18080
 ```
 
@@ -464,6 +465,7 @@ flutter run -d ios \
 
 ```bash
 flutter run -d <your-iphone-device-id> \
+  --dart-define=APP_ENV=local \
   --dart-define=MOBILE_API_BASE_URL=http://<macbook-lan-ip>:18080
 ```
 

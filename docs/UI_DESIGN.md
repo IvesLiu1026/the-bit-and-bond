@@ -1,4 +1,4 @@
-# Chen-Leveling UI Handoff (Auth + Cozy Guild Board)
+# The Bit & Bond UI Handoff (Auth + Cozy Guild Board)
 
 This document is the design/development handoff for the current Flutter implementation.
 Use this as the source of truth for:
