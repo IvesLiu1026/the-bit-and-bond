@@ -7,6 +7,9 @@ import '../core/auth/auth_session.dart';
 import '../core/network/api_client.dart';
 import '../core/security/dm_e2ee_service.dart';
 import '../features/quests/models.dart';
+import 'direct_messages/dm_errors.dart';
+import 'direct_messages/dm_security_maps.dart';
+import 'direct_messages/dm_utils.dart';
 import 'providers.dart';
 
 final directMessagesControllerProvider =
@@ -14,8 +17,13 @@ final directMessagesControllerProvider =
       final api = ref.watch(apiClientProvider);
       final session = ref.watch(authSessionProvider);
       final e2ee = ref.watch(dmE2eeServiceProvider);
-      return DirectMessagesController(api: api, session: session, e2ee: e2ee)
-        ..load();
+      final authController = ref.read(authControllerProvider.notifier);
+      return DirectMessagesController(
+        api: api,
+        session: session,
+        e2ee: e2ee,
+        onSessionExpired: authController.logout,
+      )..load();
     });
 
 class DirectMessagesState {
@@ -90,16 +98,20 @@ class DirectMessagesController extends StateNotifier<DirectMessagesState> {
     required ApiClient api,
     required AuthSession? session,
     required DmE2eeService e2ee,
+    Future<void> Function()? onSessionExpired,
   }) : _api = api,
        _session = session,
        _e2ee = e2ee,
+       _onSessionExpired = onSessionExpired,
        super(const DirectMessagesState.initial());
 
   final ApiClient _api;
   final AuthSession? _session;
   final DmE2eeService _e2ee;
+  final Future<void> Function()? _onSessionExpired;
   final Uuid _uuid = const Uuid();
   int _refreshEpoch = 0;
+  bool _sessionExpiredHandled = false;
 
   Future<void> load() async {
     if (_session == null) {
@@ -134,7 +146,10 @@ class DirectMessagesController extends StateNotifier<DirectMessagesState> {
       return;
     }
     try {
-      final thread = _findThread(counterpartHunterId, state.threads);
+      final thread = findDirectMessageThread(
+        counterpartHunterId,
+        state.threads,
+      );
       final security = await _resolveThreadSecurity(
         session: session,
         counterpartHunterId: counterpartHunterId,
@@ -158,7 +173,20 @@ class DirectMessagesController extends StateNotifier<DirectMessagesState> {
         await _markThreadRead(counterpartHunterId);
       }
     } catch (error) {
-      state = state.copyWith(refreshing: false, errorMessage: '私訊讀取失敗：$error');
+      if (await _handleUnauthorizedIfNeeded(error)) {
+        return;
+      }
+      if (!mounted) {
+        return;
+      }
+      state = state.copyWith(
+        refreshing: false,
+        errorMessage: humanizeDirectMessageError(
+          error,
+          fallbackZh: '私訊讀取失敗',
+          fallbackEn: 'Failed to load direct messages',
+        ),
+      );
     }
   }
 
@@ -175,8 +203,8 @@ class DirectMessagesController extends StateNotifier<DirectMessagesState> {
 
     state = state.copyWith(sending: true, clearError: true);
     try {
-      final thread = _findThread(counterpartId, state.threads);
-      final contact = _findContact(counterpartId, state.contacts);
+      final thread = findDirectMessageThread(counterpartId, state.threads);
+      final contact = findFriendProfile(counterpartId, state.contacts);
       final threadMode = thread?.encryptionMode ?? DmE2eeService.plaintextMode;
       final security =
           state.threadSecurityByCounterpart[counterpartId] ??
@@ -212,7 +240,7 @@ class DirectMessagesController extends StateNotifier<DirectMessagesState> {
         );
       }
 
-      final refreshedThreads = _sortThreads(
+      final refreshedThreads = sortDirectMessageThreads(
         await _api.listDirectMessageThreads(),
       );
       final refreshedSecurity = await _resolveSecurityMapFresh(
@@ -236,7 +264,20 @@ class DirectMessagesController extends StateNotifier<DirectMessagesState> {
         clearError: true,
       );
     } catch (error) {
-      state = state.copyWith(sending: false, errorMessage: '私訊發送失敗：$error');
+      if (await _handleUnauthorizedIfNeeded(error)) {
+        return;
+      }
+      if (!mounted) {
+        return;
+      }
+      state = state.copyWith(
+        sending: false,
+        errorMessage: humanizeDirectMessageError(
+          error,
+          fallbackZh: '私訊發送失敗',
+          fallbackEn: 'Failed to send direct message',
+        ),
+      );
     }
   }
 
@@ -260,7 +301,7 @@ class DirectMessagesController extends StateNotifier<DirectMessagesState> {
       final contactsFuture = _api.listFriends();
       final threadsFuture = _api.listDirectMessageThreads();
       final contacts = await contactsFuture;
-      final threads = _sortThreads(await threadsFuture);
+      final threads = sortDirectMessageThreads(await threadsFuture);
       String? nextSelected = preserveSelection
           ? state.selectedCounterpartId
           : null;
@@ -288,7 +329,7 @@ class DirectMessagesController extends StateNotifier<DirectMessagesState> {
 
       List<DirectMessage> messages = const <DirectMessage>[];
       if (nextSelected != null && nextSelected.isNotEmpty) {
-        final thread = _findThread(nextSelected, threads);
+        final thread = findDirectMessageThread(nextSelected, threads);
         final security =
             cachedSecurityByCounterpart[nextSelected] ??
             DmThreadSecuritySnapshot(
@@ -329,10 +370,20 @@ class DirectMessagesController extends StateNotifier<DirectMessagesState> {
         ),
       );
     } catch (error) {
+      if (await _handleUnauthorizedIfNeeded(error)) {
+        return;
+      }
+      if (!mounted) {
+        return;
+      }
       state = state.copyWith(
         loading: false,
         refreshing: false,
-        errorMessage: '私訊列表讀取失敗：$error',
+        errorMessage: humanizeDirectMessageError(
+          error,
+          fallbackZh: '私訊列表讀取失敗',
+          fallbackEn: 'Failed to load direct message inbox',
+        ),
       );
     }
   }
@@ -412,34 +463,13 @@ class DirectMessagesController extends StateNotifier<DirectMessagesState> {
     required List<DirectMessageThread> threads,
     Map<String, DmThreadSecuritySnapshot> seed = const {},
   }) {
-    final threadModeByCounterpart = <String, String>{
-      for (final contact in contacts) contact.id: DmE2eeService.plaintextMode,
-      for (final thread in threads)
-        thread.counterpartHunterId: thread.encryptionMode,
-    };
-    final ids = threadModeByCounterpart.keys.toSet().toList(growable: false);
-    if (ids.isEmpty) {
-      return <String, DmThreadSecuritySnapshot>{...seed};
-    }
-    final cachedSnapshots = _e2ee.cachedThreadSecuritySnapshots(
+    return resolveCachedDmSecurityMap(
       session: session,
-      counterpartHunterIds: ids,
-      threadModeByCounterpart: threadModeByCounterpart,
+      e2ee: _e2ee,
+      contacts: contacts,
+      threads: threads,
+      seed: seed,
     );
-    final byCounterpart = <String, DmThreadSecuritySnapshot>{};
-    for (final counterpartId in ids) {
-      final thread = _findThread(counterpartId, threads);
-      byCounterpart[counterpartId] =
-          cachedSnapshots[counterpartId] ??
-          byCounterpart[counterpartId] ??
-          DmThreadSecuritySnapshot(
-            counterpartHunterId: counterpartId,
-            threadMode: thread?.encryptionMode ?? DmE2eeService.plaintextMode,
-            localIdentity: null,
-            peerDeviceKeys: const <DmDeviceKey>[],
-          );
-    }
-    return byCounterpart;
   }
 
   Future<Map<String, DmThreadSecuritySnapshot>> _resolveSecurityMapFresh({
@@ -448,43 +478,13 @@ class DirectMessagesController extends StateNotifier<DirectMessagesState> {
     required List<DirectMessageThread> threads,
     Map<String, DmThreadSecuritySnapshot> seed = const {},
   }) async {
-    final threadModeByCounterpart = <String, String>{
-      for (final contact in contacts) contact.id: DmE2eeService.plaintextMode,
-      for (final thread in threads)
-        thread.counterpartHunterId: thread.encryptionMode,
-    };
-    final ids = threadModeByCounterpart.keys.toSet().toList(growable: false);
-    if (ids.isEmpty) {
-      return <String, DmThreadSecuritySnapshot>{...seed};
-    }
-    final byCounterpart = <String, DmThreadSecuritySnapshot>{};
-    Map<String, DmThreadSecuritySnapshot> resolved;
-    try {
-      resolved = await _e2ee.resolveThreadSecurityBatch(
-        session: session,
-        counterpartHunterIds: ids,
-        threadModeByCounterpart: threadModeByCounterpart,
-      );
-    } catch (_) {
-      resolved = _e2ee.cachedThreadSecuritySnapshots(
-        session: session,
-        counterpartHunterIds: ids,
-        threadModeByCounterpart: threadModeByCounterpart,
-      );
-    }
-    for (final counterpartId in ids) {
-      final thread = _findThread(counterpartId, threads);
-      byCounterpart[counterpartId] =
-          resolved[counterpartId] ??
-          byCounterpart[counterpartId] ??
-          DmThreadSecuritySnapshot(
-            counterpartHunterId: counterpartId,
-            threadMode: thread?.encryptionMode ?? DmE2eeService.plaintextMode,
-            localIdentity: null,
-            peerDeviceKeys: const <DmDeviceKey>[],
-          );
-    }
-    return byCounterpart;
+    return resolveFreshDmSecurityMap(
+      session: session,
+      e2ee: _e2ee,
+      contacts: contacts,
+      threads: threads,
+      seed: seed,
+    );
   }
 
   Future<DmThreadSecuritySnapshot> _resolveThreadSecurity({
@@ -521,56 +521,7 @@ class DirectMessagesController extends StateNotifier<DirectMessagesState> {
         encryptedMessages = const [];
       }
     }
-    return _mergeMessages(plaintextMessages, encryptedMessages);
-  }
-
-  List<DirectMessage> _mergeMessages(
-    List<DirectMessage> plaintextMessages,
-    List<DirectMessage> encryptedMessages,
-  ) {
-    final byKey = <String, DirectMessage>{};
-    for (final message in [...plaintextMessages, ...encryptedMessages]) {
-      final key = [
-        message.encryptionMode,
-        message.id,
-        message.clientMessageId,
-        message.sentAtMs,
-      ].join('|');
-      byKey[key] = message;
-    }
-    final merged = byKey.values.toList(growable: false)
-      ..sort((a, b) {
-        final byTime = a.sentAt.compareTo(b.sentAt);
-        if (byTime != 0) {
-          return byTime;
-        }
-        return a.id.compareTo(b.id);
-      });
-    return merged;
-  }
-
-  DirectMessageThread? _findThread(
-    String counterpartHunterId,
-    List<DirectMessageThread> threads,
-  ) {
-    for (final thread in threads) {
-      if (thread.counterpartHunterId == counterpartHunterId) {
-        return thread;
-      }
-    }
-    return null;
-  }
-
-  FriendProfile? _findContact(
-    String counterpartHunterId,
-    List<FriendProfile> contacts,
-  ) {
-    for (final contact in contacts) {
-      if (contact.id == counterpartHunterId) {
-        return contact;
-      }
-    }
-    return null;
+    return mergeDirectMessages(plaintextMessages, encryptedMessages);
   }
 
   Future<void> _markThreadRead(String counterpartHunterId) async {
@@ -601,7 +552,7 @@ class DirectMessagesController extends StateNotifier<DirectMessagesState> {
           })
           .toList(growable: false);
       state = state.copyWith(
-        threads: _sortThreads(patchedThreads),
+        threads: sortDirectMessageThreads(patchedThreads),
         clearError: true,
       );
     } catch (_) {
@@ -609,22 +560,22 @@ class DirectMessagesController extends StateNotifier<DirectMessagesState> {
     }
   }
 
-  List<DirectMessageThread> _sortThreads(List<DirectMessageThread> threads) {
-    final sorted = [...threads];
-    sorted.sort((a, b) {
-      final aUnread = a.unreadCount > 0 ? 1 : 0;
-      final bUnread = b.unreadCount > 0 ? 1 : 0;
-      if (aUnread != bUnread) {
-        return bUnread.compareTo(aUnread);
+  Future<bool> _handleUnauthorizedIfNeeded(Object error) async {
+    if (!isUnauthorizedDirectMessageError(error)) {
+      return false;
+    }
+    if (_sessionExpiredHandled) {
+      return true;
+    }
+    _sessionExpiredHandled = true;
+    final callback = _onSessionExpired;
+    if (callback != null) {
+      try {
+        await callback();
+      } catch (_) {
+        // Keep DM flow from crashing even if logout callback fails.
       }
-      if (a.unreadCount != b.unreadCount) {
-        return b.unreadCount.compareTo(a.unreadCount);
-      }
-      if (a.lastMessageAtMs != b.lastMessageAtMs) {
-        return b.lastMessageAtMs.compareTo(a.lastMessageAtMs);
-      }
-      return a.counterpartName.compareTo(b.counterpartName);
-    });
-    return sorted;
+    }
+    return true;
   }
 }

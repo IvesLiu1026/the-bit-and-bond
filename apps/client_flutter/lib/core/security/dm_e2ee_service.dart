@@ -3,120 +3,15 @@ import 'dart:math';
 
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../../features/quests/models.dart';
 import '../auth/auth_session.dart';
 import '../network/api_client.dart';
+import 'dm_e2ee_models.dart';
+import 'dm_secure_store.dart';
 
-abstract interface class DmSecureStore {
-  Future<String?> read(String key);
-  Future<void> write(String key, String value);
-  Future<void> delete(String key);
-}
-
-class FlutterDmSecureStore implements DmSecureStore {
-  const FlutterDmSecureStore(this._storage);
-
-  final FlutterSecureStorage _storage;
-
-  @override
-  Future<String?> read(String key) {
-    return _storage.read(key: key);
-  }
-
-  @override
-  Future<void> write(String key, String value) {
-    return _storage.write(key: key, value: value);
-  }
-
-  @override
-  Future<void> delete(String key) {
-    return _storage.delete(key: key);
-  }
-}
-
-class DmLocalDeviceIdentity {
-  const DmLocalDeviceIdentity({
-    required this.deviceId,
-    required this.deviceLabel,
-    required this.signingPrivateKey,
-    required this.signingPublicKey,
-    required this.encryptionPrivateKey,
-    required this.encryptionPublicKey,
-  });
-
-  final String deviceId;
-  final String deviceLabel;
-  final String signingPrivateKey;
-  final String signingPublicKey;
-  final String encryptionPrivateKey;
-  final String encryptionPublicKey;
-
-  factory DmLocalDeviceIdentity.fromJson(Map<String, dynamic> json) {
-    return DmLocalDeviceIdentity(
-      deviceId: json['device_id'] as String,
-      deviceLabel: json['device_label'] as String? ?? 'bitbond-device',
-      signingPrivateKey: json['signing_private_key'] as String,
-      signingPublicKey: json['signing_public_key'] as String,
-      encryptionPrivateKey: json['encryption_private_key'] as String,
-      encryptionPublicKey: json['encryption_public_key'] as String,
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'device_id': deviceId,
-      'device_label': deviceLabel,
-      'signing_private_key': signingPrivateKey,
-      'signing_public_key': signingPublicKey,
-      'encryption_private_key': encryptionPrivateKey,
-      'encryption_public_key': encryptionPublicKey,
-    };
-  }
-}
-
-class DmThreadSecuritySnapshot {
-  const DmThreadSecuritySnapshot({
-    required this.counterpartHunterId,
-    required this.threadMode,
-    required this.localIdentity,
-    required this.peerDeviceKeys,
-  });
-
-  final String counterpartHunterId;
-  final String threadMode;
-  final DmLocalDeviceIdentity? localIdentity;
-  final List<DmDeviceKey> peerDeviceKeys;
-
-  String? get localDeviceId => localIdentity?.deviceId;
-  bool get localIdentityReady => localIdentity != null;
-  bool get peerReady => peerDeviceKeys.isNotEmpty;
-  bool get canEncryptNewMessages => localIdentityReady && peerReady;
-  bool get isEncryptedThread => threadMode == DmE2eeService.encryptedMode;
-
-  DmDeviceKey? get preferredPeerKey {
-    if (peerDeviceKeys.isEmpty) {
-      return null;
-    }
-    final sorted = [...peerDeviceKeys]
-      ..sort((a, b) => b.lastSeenAt.compareTo(a.lastSeenAt));
-    return sorted.first;
-  }
-
-  DmThreadSecuritySnapshot copyWith({
-    String? threadMode,
-    DmLocalDeviceIdentity? localIdentity,
-    List<DmDeviceKey>? peerDeviceKeys,
-  }) {
-    return DmThreadSecuritySnapshot(
-      counterpartHunterId: counterpartHunterId,
-      threadMode: threadMode ?? this.threadMode,
-      localIdentity: localIdentity ?? this.localIdentity,
-      peerDeviceKeys: peerDeviceKeys ?? this.peerDeviceKeys,
-    );
-  }
-}
+export 'dm_e2ee_models.dart';
+export 'dm_secure_store.dart';
 
 class _DmPeerKeyCacheEntry {
   const _DmPeerKeyCacheEntry({required this.keys, required this.fetchedAt});
@@ -138,6 +33,8 @@ class DmE2eeService {
   static const int _nonceBytesLength = 12;
   static const String _storagePrefix = 'the_bit_and_bond_dm_e2ee_v1';
   static const Duration _peerKeyCacheTtl = Duration(seconds: 45);
+  static const String _textInfoLabel = 'the-bit-and-bond-dm-text';
+  static const String _mediaInfoLabel = 'the-bit-and-bond-dm-media';
 
   final ApiClient _api;
   final DmSecureStore _store;
@@ -207,7 +104,9 @@ class DmE2eeService {
     final map = await resolveThreadSecurityBatch(
       session: session,
       counterpartHunterIds: <String>[counterpartHunterId],
-      threadModeByCounterpart: <String, String>{counterpartHunterId: threadMode},
+      threadModeByCounterpart: <String, String>{
+        counterpartHunterId: threadMode,
+      },
       forceRefresh: forceRefresh,
     );
     return map[counterpartHunterId] ??
@@ -272,15 +171,19 @@ class DmE2eeService {
           _peerKeyCache[_peerCacheKey(
             selfHunterId: session.hunterId,
             counterpartHunterId: counterpartId,
-          )] = _DmPeerKeyCacheEntry(keys: keys, fetchedAt: fetchedAt);
+          )] = _DmPeerKeyCacheEntry(
+            keys: keys,
+            fetchedAt: fetchedAt,
+          );
         }
       } catch (_) {
         for (final counterpartId in pendingFetch) {
           byCounterpart.putIfAbsent(counterpartId, () {
-            final cached = _peerKeyCache[_peerCacheKey(
-              selfHunterId: session.hunterId,
-              counterpartHunterId: counterpartId,
-            )];
+            final cached =
+                _peerKeyCache[_peerCacheKey(
+                  selfHunterId: session.hunterId,
+                  counterpartHunterId: counterpartId,
+                )];
             return cached?.keys ?? const <DmDeviceKey>[];
           });
         }
@@ -311,10 +214,11 @@ class DmE2eeService {
       if (normalized.isEmpty) {
         continue;
       }
-      final cached = _peerKeyCache[_peerCacheKey(
-        selfHunterId: session.hunterId,
-        counterpartHunterId: normalized,
-      )];
+      final cached =
+          _peerKeyCache[_peerCacheKey(
+            selfHunterId: session.hunterId,
+            counterpartHunterId: normalized,
+          )];
       snapshots[normalized] = DmThreadSecuritySnapshot(
         counterpartHunterId: normalized,
         threadMode: threadModeByCounterpart[normalized] ?? plaintextMode,
@@ -329,10 +233,12 @@ class DmE2eeService {
     required String selfHunterId,
     required String counterpartHunterId,
   }) {
-    _peerKeyCache.remove(_peerCacheKey(
-      selfHunterId: selfHunterId,
-      counterpartHunterId: counterpartHunterId,
-    ));
+    _peerKeyCache.remove(
+      _peerCacheKey(
+        selfHunterId: selfHunterId,
+        counterpartHunterId: counterpartHunterId,
+      ),
+    );
   }
 
   String _peerCacheKey({
@@ -424,6 +330,95 @@ class DmE2eeService {
     );
   }
 
+  Future<DmEncryptedMediaPayload> encryptMediaBytes({
+    required DmThreadSecuritySnapshot security,
+    required List<int> plaintextBytes,
+  }) async {
+    final localIdentity = security.localIdentity;
+    final peerKey = security.preferredPeerKey;
+    if (localIdentity == null || peerKey == null) {
+      throw StateError('Encrypted media is not ready on this thread yet');
+    }
+    final secretKey = await _deriveConversationKey(
+      localPrivateKey: localIdentity.encryptionPrivateKey,
+      localPublicKey: localIdentity.encryptionPublicKey,
+      remotePublicKey: peerKey.encryptionPublicKey,
+      senderDeviceId: localIdentity.deviceId,
+      recipientDeviceId: peerKey.deviceId,
+      infoLabel: _mediaInfoLabel,
+    );
+    final nonceBytes = _newNonce();
+    final secretBox = await _aesGcm.encrypt(
+      plaintextBytes,
+      secretKey: secretKey,
+      nonce: nonceBytes,
+    );
+    return DmEncryptedMediaPayload(
+      cipherBytes: Uint8List.fromList(secretBox.cipherText),
+      encryption: MediaEncryptionMeta(
+        mode: 'e2ee',
+        protocolVersion: protocolVersion,
+        senderDeviceId: localIdentity.deviceId,
+        recipientDeviceId: peerKey.deviceId,
+        nonceBase64: base64Encode(secretBox.nonce),
+        macBase64: base64Encode(secretBox.mac.bytes),
+      ),
+    );
+  }
+
+  Future<Uint8List> decryptMediaBytes({
+    required DmThreadSecuritySnapshot security,
+    required MediaEncryptionMeta encryption,
+    required List<int> cipherBytes,
+  }) async {
+    if (!encryption.isEncrypted) {
+      return Uint8List.fromList(cipherBytes);
+    }
+    final localIdentity = security.localIdentity;
+    if (localIdentity == null) {
+      throw StateError('Encrypted media cannot be decrypted on this device');
+    }
+    final senderDeviceId = encryption.senderDeviceId?.trim();
+    final recipientDeviceId = encryption.recipientDeviceId?.trim();
+    final nonceBase64 = encryption.nonceBase64?.trim();
+    final macBase64 = encryption.macBase64?.trim();
+    if (senderDeviceId == null ||
+        senderDeviceId.isEmpty ||
+        recipientDeviceId == null ||
+        recipientDeviceId.isEmpty ||
+        nonceBase64 == null ||
+        nonceBase64.isEmpty ||
+        macBase64 == null ||
+        macBase64.isEmpty) {
+      throw StateError('Encrypted media metadata is incomplete');
+    }
+    final remoteDeviceId = senderDeviceId == localIdentity.deviceId
+        ? recipientDeviceId
+        : senderDeviceId;
+    final remoteKey = _findDeviceKey(security.peerDeviceKeys, remoteDeviceId);
+    if (remoteKey == null) {
+      throw StateError('Peer device key not found for encrypted media');
+    }
+
+    final secretKey = await _deriveConversationKey(
+      localPrivateKey: localIdentity.encryptionPrivateKey,
+      localPublicKey: localIdentity.encryptionPublicKey,
+      remotePublicKey: remoteKey.encryptionPublicKey,
+      senderDeviceId: senderDeviceId,
+      recipientDeviceId: recipientDeviceId,
+      infoLabel: _mediaInfoLabel,
+    );
+    final decrypted = await _aesGcm.decrypt(
+      SecretBox(
+        cipherBytes,
+        nonce: base64Decode(nonceBase64),
+        mac: Mac(base64Decode(macBase64)),
+      ),
+      secretKey: secretKey,
+    );
+    return Uint8List.fromList(decrypted);
+  }
+
   Future<void> _ensureRegistered(
     AuthSession session,
     DmLocalDeviceIdentity identity,
@@ -459,6 +454,7 @@ class DmE2eeService {
       remotePublicKey: peerKey.encryptionPublicKey,
       senderDeviceId: localIdentity.deviceId,
       recipientDeviceId: peerKey.deviceId,
+      infoLabel: _textInfoLabel,
     );
     final nonceBytes = _newNonce();
     final secretBox = await _aesGcm.encrypt(
@@ -506,6 +502,7 @@ class DmE2eeService {
         remotePublicKey: remoteKey.encryptionPublicKey,
         senderDeviceId: message.senderDeviceId,
         recipientDeviceId: message.recipientDeviceId,
+        infoLabel: _textInfoLabel,
       );
       final payload = jsonDecode(message.ciphertext) as Map<String, dynamic>;
       final ciphertext = base64Decode(payload['ct'] as String);
@@ -572,6 +569,7 @@ class DmE2eeService {
     required String remotePublicKey,
     required String senderDeviceId,
     required String recipientDeviceId,
+    required String infoLabel,
   }) async {
     final localKeyPair = SimpleKeyPairData(
       base64Decode(localPrivateKey),
@@ -592,7 +590,7 @@ class DmE2eeService {
     return _hkdf.deriveKey(
       secretKey: sharedSecret,
       nonce: utf8.encode('$protocolVersion|$senderDeviceId|$recipientDeviceId'),
-      info: utf8.encode('the-bit-and-bond-dm-text'),
+      info: utf8.encode(infoLabel),
     );
   }
 

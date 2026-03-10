@@ -52,24 +52,35 @@ Future<QuestProofMedia> _apiClientUploadQuestProofMedia(
   required String questInstanceId,
   required QuestProofUpload upload,
 }) async {
-  final token = api._resolveTokenForRole(_AuthRole.any);
-  final uri = Uri.parse(
-    '${api.baseUrl}/api/v1/quests/$questInstanceId/proof-media',
+  final preparedUpload = _prepareMediaUpload(
+    MediaUpload(
+      filename: upload.filename,
+      bytes: upload.bytes,
+      mimeType: upload.mimeType,
+    ),
   );
-  final request = http.MultipartRequest('POST', uri)
-    ..headers.addAll(api._bearerHeaders(token))
-    ..files.add(
-      http.MultipartFile.fromBytes(
-        'file',
-        upload.bytes,
-        filename: upload.filename,
-      ),
-    );
+  http.MultipartRequest buildRequest(String token) {
+    return http.MultipartRequest(
+        'POST',
+        Uri.parse('${api.baseUrl}/api/v1/quests/$questInstanceId/proof-media'),
+      )
+      ..persistentConnection = false
+      ..headers.addAll(api._bearerHeaders(token))
+      ..files.add(
+        http.MultipartFile.fromBytes(
+          'file',
+          preparedUpload.bytes,
+          filename: preparedUpload.filename,
+          contentType: preparedUpload.contentType,
+        ),
+      );
+  }
 
-  final streamed = await api._httpClient
-      .send(request)
-      .timeout(const Duration(seconds: 20));
-  final response = await http.Response.fromStream(streamed);
+  final response = await _sendMultipartWithRetry(
+    api,
+    role: _AuthRole.any,
+    requestBuilder: buildRequest,
+  );
   final data = api._parseResponse(response);
   return QuestProofMedia.fromJson(data as Map<String, dynamic>);
 }

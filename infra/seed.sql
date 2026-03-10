@@ -1,7 +1,7 @@
 -- Seed data aligned with default Flutter dart-defines.
 
 INSERT INTO households (id, name, created_at)
-VALUES ('00000000-0000-0000-0000-000000000001', 'Chen Family', NOW())
+VALUES ('00000000-0000-0000-0000-000000000001', 'Bit & Bond Family', NOW())
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO members (id, household_id, display_name, role, created_at)

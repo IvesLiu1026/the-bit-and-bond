@@ -67,6 +67,73 @@ void main() {
       expect(messages.first.decryptionFailed, isFalse);
     },
   );
+
+  test('dm e2ee service can encrypt and decrypt media bytes', () async {
+    final session = AuthSession(
+      accessToken: 'token-self',
+      guildId: 'guild-home',
+      hunterId: 'hunter-self',
+      guildRole: GuildRole.member,
+      displayName: 'Demo Self',
+    );
+    final remoteIdentity = await _RemoteIdentity.create(
+      hunterId: 'hunter-peer',
+      deviceId: 'peer-main',
+    );
+    final api = _FakeApiClient(
+      session: session,
+      remoteHunterId: 'hunter-peer',
+      remoteName: 'Demo Peer',
+      remotePlayerId: 'demo_peer',
+      remoteGuildId: 'guild-home',
+      seededRemoteKeys: [remoteIdentity.deviceKey],
+    );
+    final service = DmE2eeService(api: api, store: _MemoryDmStore());
+
+    await service.ensureLocalIdentity(session);
+    final security = await service.resolveThreadSecurity(
+      session: session,
+      counterpartHunterId: 'hunter-peer',
+      threadMode: DmE2eeService.encryptedMode,
+    );
+    expect(security.canEncryptNewMessages, isTrue);
+
+    final plainBytes = List<int>.generate(
+      512,
+      (index) => index % 251,
+      growable: false,
+    );
+    final encrypted = await service.encryptMediaBytes(
+      security: security,
+      plaintextBytes: plainBytes,
+    );
+    expect(encrypted.encryption.isEncrypted, isTrue);
+    expect(encrypted.cipherBytes, isNot(plainBytes));
+
+    final decrypted = await service.decryptMediaBytes(
+      security: security,
+      encryption: encrypted.encryption,
+      cipherBytes: encrypted.cipherBytes,
+    );
+    expect(decrypted, plainBytes);
+
+    final tampered = MediaEncryptionMeta(
+      mode: encrypted.encryption.mode,
+      protocolVersion: encrypted.encryption.protocolVersion,
+      senderDeviceId: encrypted.encryption.senderDeviceId,
+      recipientDeviceId: encrypted.encryption.recipientDeviceId,
+      nonceBase64: encrypted.encryption.nonceBase64,
+      macBase64: base64Encode(List<int>.filled(16, 7)),
+    );
+    await expectLater(
+      () => service.decryptMediaBytes(
+        security: security,
+        encryption: tampered,
+        cipherBytes: encrypted.cipherBytes,
+      ),
+      throwsA(isA<Object>()),
+    );
+  });
 }
 
 class _MemoryDmStore implements DmSecureStore {

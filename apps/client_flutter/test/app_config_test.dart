@@ -66,4 +66,45 @@ void main() {
 
     expect(url, 'http://127.0.0.1:18080');
   });
+
+  test('app environment parser supports local staging production', () {
+    expect(AppConfig.parseEnvironment('local'), AppEnvironment.local);
+    expect(AppConfig.parseEnvironment('staging'), AppEnvironment.staging);
+    expect(AppConfig.parseEnvironment('stage'), AppEnvironment.staging);
+    expect(AppConfig.parseEnvironment('production'), AppEnvironment.production);
+    expect(AppConfig.parseEnvironment('prod'), AppEnvironment.production);
+    expect(AppConfig.parseEnvironment('unknown'), AppEnvironment.local);
+  });
+
+  test('env specific api base urls are applied when present', () {
+    final staging = AppConfig.resolveApiBaseUrlFor(
+      apiBaseUrlFromEnv: '',
+      mobileApiBaseUrlFromEnv: '',
+      stagingApiBaseUrlFromEnv: 'https://staging.api.bitbond.app',
+      productionApiBaseUrlFromEnv: 'https://api.bitbond.app',
+      environment: AppEnvironment.staging,
+    );
+    final production = AppConfig.resolveApiBaseUrlFor(
+      apiBaseUrlFromEnv: '',
+      mobileApiBaseUrlFromEnv: '',
+      stagingApiBaseUrlFromEnv: 'https://staging.api.bitbond.app',
+      productionApiBaseUrlFromEnv: 'https://api.bitbond.app',
+      environment: AppEnvironment.production,
+    );
+
+    expect(staging, 'https://staging.api.bitbond.app');
+    expect(production, 'https://api.bitbond.app');
+  });
+
+  test('explicit API_BASE_URL has highest priority', () {
+    final url = AppConfig.resolveApiBaseUrlFor(
+      apiBaseUrlFromEnv: 'https://override.bitbond.app',
+      mobileApiBaseUrlFromEnv: 'http://192.168.0.1:18080',
+      stagingApiBaseUrlFromEnv: 'https://staging.api.bitbond.app',
+      productionApiBaseUrlFromEnv: 'https://api.bitbond.app',
+      environment: AppEnvironment.production,
+    );
+
+    expect(url, 'https://override.bitbond.app');
+  });
 }

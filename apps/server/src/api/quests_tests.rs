@@ -436,6 +436,147 @@ async fn habit_review_approves_reward_and_reopens_for_next_cycle() -> Result<(),
     Ok(())
 }
 
+#[tokio::test]
+async fn habit_review_reject_reopens_without_reward_or_streak_gain() -> Result<(), Box<dyn Error>> {
+    let ctx = TestDbContext::create().await?;
+    let (state, master_claims, hunter_claims) = ctx.seed_guild("habit_reject").await?;
+
+    let (_, created) = create_quest(
+        master_claims.clone(),
+        State(state.clone()),
+        Json(CreateQuestRequest {
+            title: "Bedtime Reset".to_string(),
+            description: Some("Take a proof photo before sleep".to_string()),
+            reward_xp: 10,
+            reward_coins: 2,
+            stat_category: QuestStatCategory::Vit,
+            category: QuestCategory::Habit,
+            assigned_hunter_id: Some(hunter_claims.0.sub),
+            cadence: Some(HabitCadence::Daily),
+        }),
+    )
+    .await?;
+
+    let submitted = super::submit_quest(
+        hunter_claims.clone(),
+        State(state.clone()),
+        Path(created.id),
+        Json(SubmitQuestRequest {
+            proof_note: Some("I cleaned my desk".to_string()),
+        }),
+    )
+    .await?;
+    assert_eq!(submitted.status, QuestStatus::PendingReview);
+
+    let reviewed = review_quest(
+        master_claims,
+        State(state.clone()),
+        Path(created.id),
+        Json(ReviewQuestRequest {
+            approved: false,
+            hunter_id: Some(hunter_claims.0.sub),
+            review_note: Some("Need a clearer photo".to_string()),
+        }),
+    )
+    .await?;
+
+    assert_eq!(reviewed.quest.status, QuestStatus::Available);
+    assert_eq!(reviewed.quest.streak_count, 0);
+    assert_eq!(reviewed.quest.best_streak, 0);
+    assert_eq!(reviewed.quest.completions_count, 0);
+    assert_eq!(
+        reviewed.quest.last_review_note.as_deref(),
+        Some("Need a clearer photo")
+    );
+    assert_eq!(
+        reviewed.quest.proof_note.as_deref(),
+        Some("I cleaned my desk")
+    );
+    assert!(reviewed.hunter.is_none());
+    assert!(reviewed.reward.is_none());
+
+    let hunter_after = hunter::Entity::find_by_id(hunter_claims.0.sub)
+        .one(&state.db)
+        .await?
+        .expect("hunter should exist");
+    assert_eq!(hunter_after.xp, 0);
+    assert_eq!(hunter_after.coins, 0);
+
+    ctx.cleanup().await?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn assigned_habit_rejects_submission_from_other_member() -> Result<(), Box<dyn Error>> {
+    let ctx = TestDbContext::create().await?;
+    let (state, master_claims, hunter_claims) = ctx.seed_guild("assigned_guard").await?;
+
+    let other_member_id = Uuid::new_v4();
+    hunter::ActiveModel {
+        id: Set(other_member_id),
+        guild_id: Set(master_claims.0.guild_id),
+        user_id: Set(None),
+        player_id: Set("hunter_assigned_guard_2".to_string()),
+        name: Set("hunter-assigned-guard-2".to_string()),
+        avatar_type: Set("novice".to_string()),
+        level: Set(1),
+        xp: Set(0),
+        coins: Set(0),
+        pin_code: Set("$argon2id$seed_member_2".to_string()),
+        guild_role: Set("member".to_string()),
+        motto: Set(None),
+    }
+    .insert(&state.db)
+    .await?;
+
+    let (_, created) = create_quest(
+        master_claims.clone(),
+        State(state.clone()),
+        Json(CreateQuestRequest {
+            title: "Assigned Habit".to_string(),
+            description: Some("Only assigned member can submit".to_string()),
+            reward_xp: 8,
+            reward_coins: 2,
+            stat_category: QuestStatCategory::Int,
+            category: QuestCategory::Habit,
+            assigned_hunter_id: Some(hunter_claims.0.sub),
+            cadence: Some(HabitCadence::Daily),
+        }),
+    )
+    .await?;
+
+    let other_member_claims = HunterClaims(Claims {
+        sub: other_member_id,
+        role: AuthRole::Player,
+        guild_role: crate::jwt::GuildRole::Member,
+        guild_id: master_claims.0.guild_id,
+        hunter_id: Some(other_member_id),
+        iat: 0,
+        exp: 9_999_999_999,
+    });
+
+    let err = super::submit_quest(
+        other_member_claims,
+        State(state.clone()),
+        Path(created.id),
+        Json(SubmitQuestRequest {
+            proof_note: Some("Trying someone else's habit".to_string()),
+        }),
+    )
+    .await
+    .expect_err("submission from non-assigned member should be rejected");
+    assert!(matches!(err, AppError::Forbidden(_)));
+
+    let quest_after = quest::Entity::find_by_id(created.id)
+        .one(&state.db)
+        .await?
+        .expect("quest should exist");
+    assert_eq!(quest_after.status, QuestStatus::Available);
+
+    ctx.cleanup().await?;
+    Ok(())
+}
+
 struct TestDbContext {
     admin_db: sea_orm::DatabaseConnection,
     app_db: sea_orm::DatabaseConnection,

@@ -3,6 +3,7 @@ mod direct_messages;
 mod health;
 mod hunters;
 mod inventory;
+mod media;
 mod quests;
 mod realtime;
 mod shop;
@@ -94,6 +95,42 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/api/v1/inventory/use/{item_id}",
             axum::routing::post(inventory::use_inventory_item),
+        )
+        .route(
+            "/api/v1/media/vault",
+            axum::routing::get(media::list_vault_media),
+        )
+        .route(
+            "/api/v1/media/vault/upload",
+            axum::routing::post(media::upload_vault_media),
+        )
+        .route(
+            "/api/v1/media/once/send",
+            axum::routing::post(media::send_once_media),
+        )
+        .route(
+            "/api/v1/media/once/inbox",
+            axum::routing::get(media::list_once_inbox),
+        )
+        .route(
+            "/api/v1/media/once/{delivery_id}/open",
+            axum::routing::post(media::open_once_media),
+        )
+        .route(
+            "/api/v1/media/once/{delivery_id}/content",
+            axum::routing::get(media::get_once_media_content),
+        )
+        .route(
+            "/api/v1/media/assets/{media_id}/content",
+            axum::routing::get(media::get_media_asset_content),
+        )
+        .route(
+            "/api/v1/media/photo-dumps/export",
+            axum::routing::post(media::create_photo_dump_export),
+        )
+        .route(
+            "/api/v1/media/photo-dumps",
+            axum::routing::get(media::list_photo_dump_exports),
         )
         .route(
             "/api/v1/voice/token",

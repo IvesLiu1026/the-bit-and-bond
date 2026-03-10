@@ -6,19 +6,18 @@ import 'hunter_directory_controller.dart';
 import 'providers.dart';
 
 final progressionControllerProvider =
-    StateNotifierProvider<ProgressionController, AsyncValue<Progression>>(
-      (ref) {
-        final repo = ref.watch(questRepositoryProvider);
-        final selectedHunterId = ref.watch(activeHunterIdProvider);
-        return ProgressionController(
-          repo: repo,
-          selectedHunterId: selectedHunterId,
-        )..load();
-      },
-    );
+    StateNotifierProvider<ProgressionController, AsyncValue<Progression>>((
+      ref,
+    ) {
+      final repo = ref.watch(questRepositoryProvider);
+      final selectedHunterId = ref.watch(activeHunterIdProvider);
+      return ProgressionController(
+        repo: repo,
+        selectedHunterId: selectedHunterId,
+      )..load();
+    });
 
-class ProgressionController
-    extends StateNotifier<AsyncValue<Progression>> {
+class ProgressionController extends StateNotifier<AsyncValue<Progression>> {
   ProgressionController({
     required QuestRepository repo,
     required String? selectedHunterId,

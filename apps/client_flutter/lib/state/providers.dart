@@ -49,7 +49,12 @@ final authControllerProvider =
     StateNotifierProvider<AuthController, AsyncValue<AuthSession?>>((ref) {
       final authApi = ref.watch(authApiClientProvider);
       final storage = ref.watch(secureStorageProvider);
-      return AuthController(authApi: authApi, storage: storage);
+      final googleAuth = ref.watch(googleFederatedAuthServiceProvider);
+      return AuthController(
+        authApi: authApi,
+        storage: storage,
+        googleAuth: googleAuth,
+      );
     });
 
 final authSessionProvider = Provider<AuthSession?>((ref) {
@@ -60,7 +65,13 @@ final authSessionProvider = Provider<AuthSession?>((ref) {
 final apiClientProvider = Provider<ApiClient>((ref) {
   final config = ref.watch(appConfigProvider);
   final authSession = ref.watch(authSessionProvider);
-  return ApiClient(baseUrl: config.apiBaseUrl, authSession: authSession);
+  return ApiClient(
+    baseUrl: config.apiBaseUrl,
+    authSession: authSession,
+    authSessionResolver: () => ref.read(authSessionProvider),
+    onUnauthorizedRecover: () =>
+        ref.read(authControllerProvider.notifier).recoverSession(),
+  );
 });
 
 final dmE2eeServiceProvider = Provider<DmE2eeService>((ref) {

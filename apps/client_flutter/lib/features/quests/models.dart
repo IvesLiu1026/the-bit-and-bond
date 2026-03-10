@@ -1,4 +1,5 @@
 part 'models_dm.part.dart';
+part 'models_media.part.dart';
 part 'models_quests.part.dart';
 part 'models_shop_voice.part.dart';
 part 'models_social.part.dart';
