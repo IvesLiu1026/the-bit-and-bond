@@ -1,4 +1,4 @@
-part of 'chen_game.dart';
+part of 'bitbond_game.dart';
 
 enum TavernFurnitureType {
   noticeBoard,

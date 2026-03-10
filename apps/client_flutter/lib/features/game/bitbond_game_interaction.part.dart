@@ -1,6 +1,6 @@
-part of 'chen_game.dart';
+part of 'bitbond_game.dart';
 
-extension _ChenGameInteraction on TheBitAndBondGame {
+extension _BitBondGameInteraction on TheBitAndBondGame {
   bool _tryInteractFurniture(Vector2 touchPoint) {
     if (TheBitAndBondGame._sandboxRoomMode) {
       return false;

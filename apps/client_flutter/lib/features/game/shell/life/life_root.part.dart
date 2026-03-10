@@ -1,4 +1,4 @@
-part of '../game_shell_page.dart';
+part of '../../game_shell_page.dart';
 
 extension _GameShellLifestylePanels on _GameShellPageState {
   Future<void> _openHabitsDialog() async {
@@ -19,7 +19,7 @@ extension _GameShellLifestylePanels on _GameShellPageState {
           apiBaseUrl: config.apiBaseUrl,
           authToken: session?.accessToken,
           onCreateHabit: _createQuest,
-          onSubmitHabit: _submitQuest,
+          onSubmitHabit: _submitHabitQuest,
           onReviewHabit: _reviewQuest,
         );
       },

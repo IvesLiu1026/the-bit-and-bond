@@ -64,11 +64,17 @@ class _GuildShopPanelState extends State<_GuildShopPanel>
   }
 
   Future<void> _buyItem(GuildShopItem item, int currentCoins) async {
+    final strings = AppStrings.of(context);
     if (_buyingItemId != null) {
       return;
     }
     if (currentCoins < item.costCoins) {
-      _triggerInsufficient('金幣不足，先完成生活任務再來兌換吧');
+      _triggerInsufficient(
+        strings.tr(
+          zh: '金幣不足，先完成生活任務再來兌換吧',
+          en: 'Not enough coins. Finish some life tasks first.',
+        ),
+      );
       return;
     }
 
@@ -85,8 +91,14 @@ class _GuildShopPanelState extends State<_GuildShopPanel>
       }
       setState(() {
         _successText = result.replayed
-            ? '偵測到重複點擊，已沿用上次購買結果'
-            : '購買成功：${result.item.name} x${result.inventoryQuantity}';
+            ? strings.tr(
+                zh: '偵測到重複點擊，已沿用上次購買結果',
+                en: 'Duplicate tap detected. Reused the previous purchase result.',
+              )
+            : strings.tr(
+                zh: '購買成功：${result.item.name} x${result.inventoryQuantity}',
+                en: 'Purchase complete: ${result.item.name} x${result.inventoryQuantity}',
+              );
       });
     } catch (error) {
       if (!mounted) {
@@ -94,10 +106,18 @@ class _GuildShopPanelState extends State<_GuildShopPanel>
       }
       final text = error.toString();
       if (text.contains('coins not enough')) {
-        _triggerInsufficient('金幣不足，先完成生活任務再來兌換吧');
+        _triggerInsufficient(
+          strings.tr(
+            zh: '金幣不足，先完成生活任務再來兌換吧',
+            en: 'Not enough coins. Finish some life tasks first.',
+          ),
+        );
       } else {
         setState(() {
-          _errorText = '購買失敗：$error';
+          _errorText = strings.tr(
+            zh: '購買失敗：$error',
+            en: 'Purchase failed: $error',
+          );
         });
       }
     } finally {
@@ -118,6 +138,7 @@ class _GuildShopPanelState extends State<_GuildShopPanel>
   }
 
   Future<void> _toggleManageMode() async {
+    final strings = AppStrings.of(context);
     if (_switchingMode) {
       return;
     }
@@ -140,7 +161,10 @@ class _GuildShopPanelState extends State<_GuildShopPanel>
         return;
       }
       setState(() {
-        _errorText = '切換管理模式失敗：$error';
+        _errorText = strings.tr(
+          zh: '切換管理模式失敗：$error',
+          en: 'Failed to toggle manage mode: $error',
+        );
       });
     } finally {
       if (mounted) {
@@ -152,6 +176,7 @@ class _GuildShopPanelState extends State<_GuildShopPanel>
   }
 
   Future<void> _createItem() async {
+    final strings = AppStrings.of(context);
     final draft = await _showItemEditorDialog();
     if (draft == null) {
       return;
@@ -172,14 +197,20 @@ class _GuildShopPanelState extends State<_GuildShopPanel>
         return;
       }
       setState(() {
-        _successText = '已上架商品：${created.name}';
+        _successText = strings.tr(
+          zh: '已上架商品：${created.name}',
+          en: 'Item published: ${created.name}',
+        );
       });
     } catch (error) {
       if (!mounted) {
         return;
       }
       setState(() {
-        _errorText = '上架失敗：$error';
+        _errorText = strings.tr(
+          zh: '上架失敗：$error',
+          en: 'Failed to publish item: $error',
+        );
       });
     } finally {
       if (mounted) {
@@ -191,6 +222,7 @@ class _GuildShopPanelState extends State<_GuildShopPanel>
   }
 
   Future<void> _editItem(GuildShopItem item) async {
+    final strings = AppStrings.of(context);
     final draft = await _showItemEditorDialog(initial: item);
     if (draft == null) {
       return;
@@ -212,14 +244,17 @@ class _GuildShopPanelState extends State<_GuildShopPanel>
         return;
       }
       setState(() {
-        _successText = '已更新商品：${updated.name}';
+        _successText = strings.tr(
+          zh: '已更新商品：${updated.name}',
+          en: 'Item updated: ${updated.name}',
+        );
       });
     } catch (error) {
       if (!mounted) {
         return;
       }
       setState(() {
-        _errorText = '更新失敗：$error';
+        _errorText = strings.tr(zh: '更新失敗：$error', en: 'Update failed: $error');
       });
     } finally {
       if (mounted) {
@@ -231,6 +266,7 @@ class _GuildShopPanelState extends State<_GuildShopPanel>
   }
 
   Future<void> _deactivateItem(GuildShopItem item) async {
+    final strings = AppStrings.of(context);
     if (!item.isActive) {
       return;
     }
@@ -245,14 +281,20 @@ class _GuildShopPanelState extends State<_GuildShopPanel>
         return;
       }
       setState(() {
-        _successText = '已下架商品：${item.name}';
+        _successText = strings.tr(
+          zh: '已下架商品：${item.name}',
+          en: 'Item deactivated: ${item.name}',
+        );
       });
     } catch (error) {
       if (!mounted) {
         return;
       }
       setState(() {
-        _errorText = '下架失敗：$error';
+        _errorText = strings.tr(
+          zh: '下架失敗：$error',
+          en: 'Deactivate failed: $error',
+        );
       });
     } finally {
       if (mounted) {
@@ -265,6 +307,7 @@ class _GuildShopPanelState extends State<_GuildShopPanel>
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppStrings.of(context);
     final currentCoins = widget.progressionState.maybeWhen(
       data: (progression) => progression.coins,
       orElse: () => 0,
@@ -273,9 +316,9 @@ class _GuildShopPanelState extends State<_GuildShopPanel>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
-          '獎勵兌換站',
-          style: TextStyle(
+        Text(
+          strings.tr(zh: '獎勵兌換站', en: 'Reward Station'),
+          style: const TextStyle(
             color: AppColors.inkBrown,
             fontSize: 22,
             fontWeight: FontWeight.w900,
@@ -307,7 +350,10 @@ class _GuildShopPanelState extends State<_GuildShopPanel>
               const _PixelShopItemIcon(iconTag: 'COIN'),
               const SizedBox(width: 8),
               Text(
-                '目前持有金幣：$currentCoins',
+                strings.tr(
+                  zh: '目前持有金幣：$currentCoins',
+                  en: 'Coins on hand: $currentCoins',
+                ),
                 style: const TextStyle(
                   color: AppColors.inkBrown,
                   fontWeight: FontWeight.w900,
@@ -344,10 +390,13 @@ class _GuildShopPanelState extends State<_GuildShopPanel>
           child: widget.shopState.when(
             data: (items) {
               if (items.isEmpty) {
-                return const Center(
+                return Center(
                   child: Text(
-                    '獎勵站暫時沒有可兌換的內容，稍後再回來看看。',
-                    style: TextStyle(
+                    strings.tr(
+                      zh: '獎勵站暫時沒有可兌換的內容，稍後再回來看看。',
+                      en: 'No rewards are available right now. Please check back soon.',
+                    ),
+                    style: const TextStyle(
                       color: AppColors.inkBrown,
                       fontWeight: FontWeight.w800,
                     ),
@@ -415,7 +464,7 @@ class _GuildShopPanelState extends State<_GuildShopPanel>
             loading: () => const Center(child: _PixelLoadingBar()),
             error: (err, _) => Center(
               child: Text(
-                '商店讀取失敗：$err',
+                strings.tr(zh: '商店讀取失敗：$err', en: 'Shop load failed: $err'),
                 style: const TextStyle(
                   color: AppColors.hpRuby,
                   fontWeight: FontWeight.w900,

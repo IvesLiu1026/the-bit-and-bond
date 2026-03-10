@@ -1,7 +1,8 @@
-part of '../game_shell_page.dart';
+part of '../../game_shell_page.dart';
 
 class _HabitCard extends StatelessWidget {
   const _HabitCard({
+    this.cardKey,
     required this.card,
     required this.isMaster,
     required this.apiBaseUrl,
@@ -11,6 +12,7 @@ class _HabitCard extends StatelessWidget {
     required this.onReject,
   });
 
+  final Key? cardKey;
   final _HabitChallengeCardData card;
   final bool isMaster;
   final String apiBaseUrl;
@@ -22,6 +24,10 @@ class _HabitCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final strings = AppStrings.of(context);
+    final canSubmitProof =
+        !isMaster &&
+        (card.proofState == _HabitProofState.pending ||
+            card.proofState == _HabitProofState.missed);
     final status = switch (card.proofState) {
       _HabitProofState.done => (
         strings.tr(zh: '完成', en: 'Done'),
@@ -42,6 +48,7 @@ class _HabitCard extends StatelessWidget {
     };
 
     return Padding(
+      key: cardKey,
       padding: const EdgeInsets.only(bottom: 8),
       child: PixelPanel(
         tone: PixelTone.parchment,
@@ -153,9 +160,11 @@ class _HabitCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 10),
-            if (!isMaster && card.proofState == _HabitProofState.pending)
+            if (canSubmitProof)
               PixelButton(
-                label: strings.tr(zh: '提交完成證明', en: 'Submit Proof'),
+                label: card.proofState == _HabitProofState.missed
+                    ? strings.tr(zh: '補交完成證明', en: 'Submit Catch-up Proof')
+                    : strings.tr(zh: '提交完成證明', en: 'Submit Proof'),
                 tone: PixelTone.green,
                 onPressed: onSubmitProof,
               ),

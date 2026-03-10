@@ -76,21 +76,10 @@ class _SocialPanelState extends State<_SocialPanel> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              TextField(
+              _PixelTextInput(
                 controller: _playerIdController,
-                decoration: InputDecoration(
-                  labelText: strings.tr(zh: '玩家 ID', en: 'Player ID'),
-                  isDense: true,
-                  filled: true,
-                  fillColor: const Color(0xFFE7DDC9),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(
-                      color: AppColors.woodFrame,
-                      width: 2,
-                    ),
-                  ),
-                ),
+                label: strings.tr(zh: '玩家 ID', en: 'Player ID'),
+                hintText: strings.tr(zh: '輸入玩家 ID', en: 'Enter player ID'),
               ),
               const SizedBox(height: 8),
               if (stackedPrimaryActions)

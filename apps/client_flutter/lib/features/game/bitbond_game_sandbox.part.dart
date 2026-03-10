@@ -1,6 +1,6 @@
-part of 'chen_game.dart';
+part of 'bitbond_game.dart';
 
-extension _ChenGameSandbox on TheBitAndBondGame {
+extension _BitBondGameSandbox on TheBitAndBondGame {
   void _updateSandboxLink(_HeroCharacterComponent player, double dt) {
     final dummy = _dummyHunter;
     if (dummy == null || !_currentSandboxRoom.hasDummy) {

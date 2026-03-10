@@ -9,16 +9,21 @@ extension _GuildShopPanelStateLayout on _GuildShopPanelState {
     required bool affordable,
     required int currentCoins,
   }) {
+    final strings = AppStrings.of(context);
     if (_manageMode) {
       final actions = <Widget>[
         _StampButton(
-          label: editing ? '處理中' : '編輯',
+          label: editing
+              ? strings.tr(zh: '處理中', en: 'Working')
+              : strings.tr(zh: '編輯', en: 'Edit'),
           tone: _StampTone.blue,
           iconWidget: const _PixelLabelGlyph(glyph: 'EDT'),
           onPressed: editing ? null : () => _editItem(item),
         ),
         _StampButton(
-          label: item.isActive ? '下架' : '已下架',
+          label: item.isActive
+              ? strings.tr(zh: '下架', en: 'Deactivate')
+              : strings.tr(zh: '已下架', en: 'Inactive'),
           tone: item.isActive ? _StampTone.ruby : _StampTone.wood,
           iconWidget: const _PixelLabelGlyph(glyph: 'OFF'),
           onPressed: editing || !item.isActive
@@ -38,7 +43,9 @@ extension _GuildShopPanelStateLayout on _GuildShopPanelState {
     }
 
     final purchaseButton = _StampButton(
-      label: buying ? '購買中' : '購買',
+      label: buying
+          ? strings.tr(zh: '購買中', en: 'Buying')
+          : strings.tr(zh: '購買', en: 'Buy'),
       tone: affordable ? _StampTone.green : _StampTone.ruby,
       iconWidget: const _PixelLabelGlyph(glyph: 'BUY'),
       onPressed: buying ? null : () => _buyItem(item, currentCoins),
@@ -57,6 +64,7 @@ extension _GuildShopPanelStateLayout on _GuildShopPanelState {
     required bool affordable,
     required int currentCoins,
   }) {
+    final strings = AppStrings.of(context);
     final detailColumn = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -96,7 +104,9 @@ extension _GuildShopPanelStateLayout on _GuildShopPanelState {
         if (_manageMode) ...[
           const SizedBox(height: 6),
           Text(
-            item.isActive ? '狀態：上架中' : '狀態：已下架',
+            item.isActive
+                ? strings.tr(zh: '狀態：上架中', en: 'Status: Active')
+                : strings.tr(zh: '狀態：已下架', en: 'Status: Inactive'),
             style: TextStyle(
               color: item.isActive ? AppColors.stampGreen : AppColors.hpRuby,
               fontWeight: FontWeight.w900,
@@ -145,15 +155,22 @@ extension _GuildShopPanelStateLayout on _GuildShopPanelState {
   }
 
   Widget _buildMasterControls(BoxConstraints constraints) {
+    final strings = AppStrings.of(context);
     final stacked = constraints.maxWidth < 440;
     final manageButton = _StampButton(
-      label: _switchingMode ? '切換中...' : (_manageMode ? '返回購買' : '管理商品'),
+      label: _switchingMode
+          ? strings.tr(zh: '切換中...', en: 'Switching...')
+          : (_manageMode
+                ? strings.tr(zh: '返回購買', en: 'Back to Shop')
+                : strings.tr(zh: '管理商品', en: 'Manage Items')),
       tone: _StampTone.wood,
       iconWidget: const _PixelLabelGlyph(glyph: 'CFG'),
       onPressed: _switchingMode ? null : _toggleManageMode,
     );
     final createButton = _StampButton(
-      label: _editingItemId == 'new' ? '上架中' : '新增商品',
+      label: _editingItemId == 'new'
+          ? strings.tr(zh: '上架中', en: 'Publishing')
+          : strings.tr(zh: '新增商品', en: 'New Item'),
       tone: _StampTone.green,
       iconWidget: const _PixelLabelGlyph(glyph: 'NEW'),
       onPressed: _editingItemId == null ? _createItem : null,

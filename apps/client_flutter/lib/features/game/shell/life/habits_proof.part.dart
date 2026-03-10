@@ -1,4 +1,4 @@
-part of '../game_shell_page.dart';
+part of '../../game_shell_page.dart';
 
 class _HabitProofDialog extends StatefulWidget {
   const _HabitProofDialog({
@@ -43,14 +43,15 @@ class _HabitProofDialogState extends State<_HabitProofDialog> {
     super.dispose();
   }
 
-  Future<void> _pickPhoto() async {
+  Future<void> _pickPhoto(ImageSource source) async {
     if (_picking || _sending) {
       return;
     }
     setState(() => _picking = true);
+    final strings = AppStrings.of(context);
     try {
       final picked = await widget.imagePicker.pickImage(
-        source: ImageSource.gallery,
+        source: source,
         maxWidth: 1800,
         imageQuality: 92,
       );
@@ -74,7 +75,13 @@ class _HabitProofDialogState extends State<_HabitProofDialog> {
       }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('選圖失敗：$error'),
+          content: Text(
+            _friendlyShellErrorMessage(
+              strings: strings,
+              error: error,
+              prefix: strings.tr(zh: '選取照片失敗。', en: 'Failed to pick photo.'),
+            ),
+          ),
           backgroundColor: AppColors.hpRuby,
         ),
       );
@@ -89,16 +96,34 @@ class _HabitProofDialogState extends State<_HabitProofDialog> {
     if (_sending) {
       return;
     }
+    final strings = AppStrings.of(context);
+    final note = _controller.text.trim();
+    if (_selectedUpload == null && note.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            strings.tr(
+              zh: '請至少附上一張照片或填寫完成說明。',
+              en: 'Please attach a photo or write a short proof note.',
+            ),
+          ),
+          backgroundColor: AppColors.hpRuby,
+        ),
+      );
+      return;
+    }
     setState(() => _sending = true);
     try {
       await widget.onSubmitHabit(
         widget.card.questId,
-        proofNote: _controller.text,
+        proofNote: note,
         proofMedia: _selectedUpload,
       );
       if (mounted) {
         Navigator.of(context).pop();
       }
+    } catch (_) {
+      // keep dialog open so players can retry immediately
     } finally {
       if (mounted) {
         setState(() => _sending = false);
@@ -109,10 +134,10 @@ class _HabitProofDialogState extends State<_HabitProofDialog> {
   @override
   Widget build(BuildContext context) {
     final strings = AppStrings.of(context);
-    return AlertDialog(
+    return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
-      content: PixelPanel(
+      child: PixelPanel(
         tone: PixelTone.parchment,
         cut: 14,
         padding: const EdgeInsets.all(16),
@@ -155,20 +180,37 @@ class _HabitProofDialogState extends State<_HabitProofDialog> {
                 ),
                 const SizedBox(height: 10),
               ],
-              Row(
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
                 children: [
-                  Expanded(
+                  SizedBox(
+                    width: 132,
                     child: PixelButton(
                       label: _picking
                           ? strings.tr(zh: '載入中...', en: 'Picking...')
-                          : strings.tr(zh: '選擇照片', en: 'Choose Photo'),
+                          : strings.tr(zh: '拍照', en: 'Camera'),
                       tone: PixelTone.blue,
-                      onPressed: _picking || _sending ? null : _pickPhoto,
+                      onPressed: _picking || _sending
+                          ? null
+                          : () => _pickPhoto(ImageSource.camera),
                     ),
                   ),
-                  if (_selectedUpload != null) ...[
-                    const SizedBox(width: 10),
-                    Expanded(
+                  SizedBox(
+                    width: 152,
+                    child: PixelButton(
+                      label: _picking
+                          ? strings.tr(zh: '載入中...', en: 'Picking...')
+                          : strings.tr(zh: '從相簿選擇', en: 'Gallery'),
+                      tone: PixelTone.plum,
+                      onPressed: _picking || _sending
+                          ? null
+                          : () => _pickPhoto(ImageSource.gallery),
+                    ),
+                  ),
+                  if (_selectedUpload != null)
+                    SizedBox(
+                      width: 116,
                       child: PixelButton(
                         label: strings.tr(zh: '移除照片', en: 'Remove'),
                         tone: PixelTone.slate,
@@ -180,22 +222,17 @@ class _HabitProofDialogState extends State<_HabitProofDialog> {
                               }),
                       ),
                     ),
-                  ],
                 ],
               ),
               const SizedBox(height: 12),
-              TextField(
+              _PixelTextInput(
                 controller: _controller,
                 minLines: 3,
                 maxLines: 5,
-                decoration: InputDecoration(
-                  hintText: strings.tr(
-                    zh: '例如：我把今天的水壺喝完了，附上桌上的照片。',
-                    en: 'Example: Finished my water bottle today and attached the desk photo.',
-                  ),
-                  filled: true,
-                  fillColor: const Color(0xFFF0E5CF),
-                  border: const OutlineInputBorder(),
+                label: strings.tr(zh: '完成說明', en: 'Proof Note'),
+                hintText: strings.tr(
+                  zh: '例如：我把今天的水壺喝完了，附上桌上的照片。',
+                  en: 'Example: Finished my water bottle today and attached the desk photo.',
                 ),
               ),
               const SizedBox(height: 12),

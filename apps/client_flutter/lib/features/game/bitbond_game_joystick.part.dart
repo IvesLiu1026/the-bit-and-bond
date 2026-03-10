@@ -1,4 +1,4 @@
-part of 'chen_game.dart';
+part of 'bitbond_game.dart';
 
 class _FloatingJoystickOverlay extends PositionComponent {
   _FloatingJoystickOverlay({required this.baseRadius, required this.knobRadius})

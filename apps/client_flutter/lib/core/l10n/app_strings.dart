@@ -61,6 +61,28 @@ class AppStrings {
   String get settings => _en ? 'Settings' : '設定';
   String get habits => _en ? 'Habits' : '習慣';
   String get directMessages => _en ? 'DM' : '私訊';
+  String get dmSendImage => _en ? 'Image' : '圖片';
+  String get dmSendOneTimeImage => _en ? 'One-Time' : '閃照';
+  String get dmSendMessage => _en ? 'Send' : '送出';
+  String get dmViewed => _en ? 'Viewed' : '已查看';
+  String get dmImagePreview => _en ? '[Photo]' : '[照片]';
+  String get dmOneTimeImagePreview => _en ? '[One-time Photo]' : '[一次照片]';
+  String get dmImageSent => _en ? 'Photo sent.' : '照片已送出。';
+  String get dmOneTimeImageSent => _en ? 'One-time photo sent.' : '一次照片已送出。';
+  String get dmImagePickCanceled => _en ? 'No image selected.' : '尚未選擇圖片。';
+  String get dmImageSendFailed => _en ? 'Failed to send image.' : '圖片送出失敗。';
+  String get dmImageOpenFailed => _en ? 'Failed to open photo.' : '照片開啟失敗。';
+  String get dmImageUploading => _en ? 'Uploading photo...' : '正在上傳圖片...';
+  String get dmOneTimeImageUploading =>
+      _en ? 'Sending one-time photo...' : '正在送出閃照...';
+  String get dmUploadingShort => _en ? 'Uploading' : '上傳中';
+  String get dmSendingShort => _en ? 'Sending' : '送出中';
+  String get dmOpeningShort => _en ? 'Opening' : '開啟中';
+  String get dmOneTimeViewed =>
+      _en ? 'This one-time photo was already viewed.' : '這張閃照已經看過。';
+  String get dmOneTimeRequiresSecure => _en
+      ? 'One-time photos require secure devices on both sides.'
+      : '閃照需要雙方都啟用安全裝置。';
   String get encrypted => _en ? 'Encrypted' : '已加密';
   String get encryptionReady => _en ? 'Ready' : '可加密';
   String get notEncrypted => _en ? 'Plain' : '未加密';
@@ -76,6 +98,65 @@ class AppStrings {
   String get encryptedMessageUnavailable =>
       _en ? '[Encrypted message unavailable]' : '[此裝置目前無法解開加密訊息]';
   String get photoDump => _en ? 'Photo Dump' : '照片牆';
+  String get photoVault => _en ? 'Vault' : '收藏庫';
+  String get photoOneTime => _en ? 'One-Time' : '一次照片';
+  String get photoExports => _en ? 'Exports' : '匯出';
+  String get photoDumpUpload => _en ? 'Upload' : '上傳';
+  String get photoDumpCamera => _en ? 'Camera' : '相機';
+  String get photoDumpGallery => _en ? 'Gallery' : '相簿';
+  String get photoDumpCaptionHint =>
+      _en ? 'Write a short note...' : '寫一段照片備註...';
+  String get photoDumpRecipientHint => _en ? 'Recipient player ID' : '收件者玩家 ID';
+  String get photoDumpEmptyVault =>
+      _en ? 'No photos yet. Upload your first memory.' : '目前還沒有照片，先上傳第一張回憶吧。';
+  String get photoDumpEmptyInbox =>
+      _en ? 'No one-time photos right now.' : '目前沒有一次照片。';
+  String get photoDumpExportSelected => _en ? 'Export selected' : '匯出已選照片';
+  String get photoDumpLoadFailed =>
+      _en ? 'Failed to load photo data.' : '照片資料載入失敗。';
+  String get photoDumpUploadSuccess =>
+      _en ? 'Photo uploaded to vault.' : '照片已加入收藏庫。';
+  String get photoDumpVaultUploading =>
+      _en ? 'Uploading to vault...' : '正在上傳到收藏庫...';
+  String get photoDumpSendSuccess => _en ? 'One-time photo sent.' : '一次照片已送出。';
+  String get photoDumpSendSuccessEncrypted =>
+      _en ? 'Encrypted one-time photo sent.' : '已送出端對端加密的一次照片。';
+  String get photoDumpOneTimeSending =>
+      _en ? 'Sending one-time photo...' : '正在送出一次照片...';
+  String get photoDumpRefresh => _en ? 'Refresh' : '重新整理';
+  String get photoDumpOpenFailed =>
+      _en ? 'Failed to open one-time photo.' : '一次照片開啟失敗。';
+  String get photoDumpAlreadyViewed =>
+      _en ? 'This one-time photo was already viewed.' : '這張一次照片已經看過。';
+  String get photoDumpInboxTitle => _en ? 'Incoming' : '收件匣';
+  String get photoDumpVaultTitle => _en ? 'My Vault' : '我的收藏';
+  String photoDumpSelectedCount(int count) =>
+      _en ? '$count selected' : '已選 $count 張';
+  String photoDumpFrom(String sender) => _en ? 'From $sender' : '來自 $sender';
+  String photoDumpExpiresAt(String value) =>
+      _en ? 'Expires $value' : '$value 到期';
+  String get photoDumpOpenOnce => _en ? 'Open Once' : '開啟一次';
+  String get photoDumpOneTimeRule =>
+      _en ? 'One-time photos expire after opening.' : '一次照片開啟後就會失效。';
+  String get photoDumpExportHint => _en
+      ? 'Select photos and export a LockIt/Retro style dump.'
+      : '勾選照片後可匯出成 LockIt / Retro 風格 Photo Dump。';
+  String get photoDumpPickFirst => _en ? 'Pick a photo first.' : '請先挑選一張照片。';
+  String get photoDumpNeedRecipient =>
+      _en ? 'Recipient player ID is required.' : '請輸入收件者玩家 ID。';
+  String get photoDumpNeedFriendForSecureSend => _en
+      ? 'Recipient must be in your friend list for secure photo sending.'
+      : '安全照片寄送需要先成為好友。';
+  String get photoDumpE2eeUnavailable => _en
+      ? 'Secure photo send unavailable: both sides need active secure devices.'
+      : '目前無法安全寄送：雙方都需要啟用中的安全裝置。';
+  String get photoDumpAuthRequired =>
+      _en ? 'Please log in again to continue.' : '請重新登入後再試一次。';
+  String get photoDumpNoSelection =>
+      _en ? 'Select at least one photo to export.' : '請至少選一張照片再匯出。';
+  String get photoDumpOpenExpired =>
+      _en ? 'This one-time photo has expired.' : '這張一次照片已過期。';
+  String get photoDumpViewCountdown => _en ? 'Viewing once...' : '一次查看中...';
   String get comingSoon => _en ? 'Coming Soon' : '即將推出';
   String get openMainMenu => _en ? 'Open main menu' : '打開主選單';
   String get closeMenu => _en ? 'Close menu' : '關閉選單';

@@ -4,6 +4,7 @@ extension _GuildShopPanelStateEditor on _GuildShopPanelState {
   Future<_ShopItemDraft?> _showItemEditorDialog({
     GuildShopItem? initial,
   }) async {
+    final strings = AppStrings.of(context);
     final nameController = TextEditingController(text: initial?.name ?? '');
     final descriptionController = TextEditingController(
       text: initial?.description ?? '',
@@ -52,7 +53,9 @@ extension _GuildShopPanelStateEditor on _GuildShopPanelState {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             Text(
-                              initial == null ? '上架商品' : '編輯商品',
+                              initial == null
+                                  ? strings.tr(zh: '上架商品', en: 'Publish Item')
+                                  : strings.tr(zh: '編輯商品', en: 'Edit Item'),
                               style: const TextStyle(
                                 color: AppColors.inkBrown,
                                 fontSize: 20,
@@ -60,32 +63,28 @@ extension _GuildShopPanelStateEditor on _GuildShopPanelState {
                               ),
                             ),
                             const SizedBox(height: 10),
-                            _ShopField(controller: nameController, label: '名稱'),
+                            _ShopField(
+                              controller: nameController,
+                              label: strings.tr(zh: '名稱', en: 'Name'),
+                            ),
                             const SizedBox(height: 8),
                             _ShopField(
                               controller: descriptionController,
-                              label: '描述（可留空）',
+                              label: strings.tr(
+                                zh: '描述（可留空）',
+                                en: 'Description (optional)',
+                              ),
                             ),
                             const SizedBox(height: 8),
                             _ShopField(
                               controller: costController,
-                              label: '價格（金幣）',
+                              label: strings.tr(zh: '價格（金幣）', en: 'Price'),
                               keyboardType: TextInputType.number,
                             ),
                             const SizedBox(height: 8),
-                            DropdownButtonFormField<String>(
+                            _PixelDropdownField<String>(
+                              label: strings.tr(zh: '圖示', en: 'Icon'),
                               initialValue: iconTag,
-                              decoration: const InputDecoration(
-                                labelText: '圖示',
-                                filled: true,
-                                fillColor: Color(0xFFE7DDC9),
-                                border: OutlineInputBorder(
-                                  borderSide: BorderSide(
-                                    color: AppColors.woodFrame,
-                                    width: 2.2,
-                                  ),
-                                ),
-                              ),
                               items: const [
                                 DropdownMenuItem(
                                   value: 'TICKET',
@@ -132,7 +131,7 @@ extension _GuildShopPanelStateEditor on _GuildShopPanelState {
                               children: [
                                 Expanded(
                                   child: _StampButton(
-                                    label: '取消',
+                                    label: strings.tr(zh: '取消', en: 'Cancel'),
                                     tone: _StampTone.wood,
                                     onPressed: () =>
                                         Navigator.of(dialogContext).pop(),
@@ -141,7 +140,7 @@ extension _GuildShopPanelStateEditor on _GuildShopPanelState {
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: _StampButton(
-                                    label: '儲存',
+                                    label: strings.tr(zh: '儲存', en: 'Save'),
                                     tone: _StampTone.green,
                                     onPressed: () {
                                       final name = nameController.text.trim();
@@ -150,13 +149,19 @@ extension _GuildShopPanelStateEditor on _GuildShopPanelState {
                                       );
                                       if (name.isEmpty) {
                                         setLocalState(() {
-                                          localError = '名稱不能空白';
+                                          localError = strings.tr(
+                                            zh: '名稱不能空白',
+                                            en: 'Name is required.',
+                                          );
                                         });
                                         return;
                                       }
                                       if (cost == null || cost < 0) {
                                         setLocalState(() {
-                                          localError = '價格必須是 0 以上整數';
+                                          localError = strings.tr(
+                                            zh: '價格必須是 0 以上整數',
+                                            en: 'Price must be a non-negative integer.',
+                                          );
                                         });
                                         return;
                                       }
@@ -226,18 +231,10 @@ class _ShopField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
+    return _PixelTextInput(
       controller: controller,
+      label: label,
       keyboardType: keyboardType,
-      decoration: InputDecoration(
-        labelText: label,
-        isDense: true,
-        filled: true,
-        fillColor: const Color(0xFFE7DDC9),
-        border: const OutlineInputBorder(
-          borderSide: BorderSide(color: AppColors.woodFrame, width: 2.2),
-        ),
-      ),
     );
   }
 }

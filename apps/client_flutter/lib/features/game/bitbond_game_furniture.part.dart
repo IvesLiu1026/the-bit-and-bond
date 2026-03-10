@@ -1,4 +1,4 @@
-part of 'chen_game.dart';
+part of 'bitbond_game.dart';
 
 enum FurnitureRenderMode { full, hotspot, flameOverlay }
 
@@ -393,7 +393,12 @@ class InteractiveFurniture extends PositionComponent {
     final fireImage = spriteImage;
     if (fireImage != null) {
       const frameSize = 32.0;
-      final sourceRect = Rect.fromLTWH(frame * frameSize, 0, frameSize, frameSize);
+      final sourceRect = Rect.fromLTWH(
+        frame * frameSize,
+        0,
+        frameSize,
+        frameSize,
+      );
       final destinationRect = Rect.fromCenter(
         center: Offset(pitRect.center.dx, pitRect.center.dy - 1),
         width: 54,
@@ -443,7 +448,8 @@ class InteractiveFurniture extends PositionComponent {
     if (_campfireConnected) {
       canvas.drawCircle(
         Offset(center.dx, center.dy + 8),
-        rect.width * (_campfireSpeaking ? (0.34 + (_campfirePulse * 0.08)) : 0.28),
+        rect.width *
+            (_campfireSpeaking ? (0.34 + (_campfirePulse * 0.08)) : 0.28),
         aura,
       );
     }
@@ -452,7 +458,12 @@ class InteractiveFurniture extends PositionComponent {
     if (fireImage != null) {
       const frameSize = 32.0;
       final frame = (DateTime.now().millisecondsSinceEpoch ~/ 115) % 4;
-      final sourceRect = Rect.fromLTWH(frame * frameSize, 0, frameSize, frameSize);
+      final sourceRect = Rect.fromLTWH(
+        frame * frameSize,
+        0,
+        frameSize,
+        frameSize,
+      );
       final destinationRect = Rect.fromCenter(
         center: Offset(center.dx, center.dy - 2),
         width: rect.width * 0.74,

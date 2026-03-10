@@ -1,4 +1,65 @@
-part of '../game_shell_page.dart';
+part of '../../game_shell_page.dart';
+
+const String _dmImageMarkerPrefix = '[[bb_img:';
+const String _dmOnceMarkerPrefix = '[[bb_once:';
+const String _dmMarkerSuffix = ']]';
+
+String _buildDmImageMarker(String contentPath) {
+  final trimmed = contentPath.trim();
+  return '$_dmImageMarkerPrefix$trimmed$_dmMarkerSuffix';
+}
+
+String _buildDmOnceMarker(String deliveryId) {
+  final trimmed = deliveryId.trim();
+  return '$_dmOnceMarkerPrefix$trimmed$_dmMarkerSuffix';
+}
+
+String? _tryParseDmImageContentPath(String raw) {
+  final trimmed = raw.trim();
+  if (!trimmed.startsWith(_dmImageMarkerPrefix) ||
+      !trimmed.endsWith(_dmMarkerSuffix)) {
+    return null;
+  }
+  final body = trimmed.substring(
+    _dmImageMarkerPrefix.length,
+    trimmed.length - _dmMarkerSuffix.length,
+  );
+  final normalized = body.trim();
+  if (normalized.isEmpty) {
+    return null;
+  }
+  return normalized;
+}
+
+String? _tryParseDmOnceDeliveryId(String raw) {
+  final trimmed = raw.trim();
+  if (!trimmed.startsWith(_dmOnceMarkerPrefix) ||
+      !trimmed.endsWith(_dmMarkerSuffix)) {
+    return null;
+  }
+  final body = trimmed.substring(
+    _dmOnceMarkerPrefix.length,
+    trimmed.length - _dmMarkerSuffix.length,
+  );
+  final normalized = body.trim();
+  if (normalized.isEmpty) {
+    return null;
+  }
+  return normalized;
+}
+
+String _directMessagePreviewLabel({
+  required AppStrings strings,
+  required String raw,
+}) {
+  if (_tryParseDmImageContentPath(raw) != null) {
+    return strings.dmImagePreview;
+  }
+  if (_tryParseDmOnceDeliveryId(raw) != null) {
+    return strings.dmOneTimeImagePreview;
+  }
+  return raw;
+}
 
 class _DirectMessageAvatar extends StatelessWidget {
   const _DirectMessageAvatar({required this.label});
@@ -33,10 +94,17 @@ class _DirectMessageAvatar extends StatelessWidget {
 }
 
 class _DmSecurityStatus {
-  const _DmSecurityStatus({required this.label, required this.tone});
+  const _DmSecurityStatus({
+    required this.label,
+    required this.tone,
+    required this.subtitle,
+    required this.canSendOneTime,
+  });
 
   final String label;
   final PixelTone tone;
+  final String subtitle;
+  final bool canSendOneTime;
 }
 
 _DmSecurityStatus _resolveDmSecurityStatus({
@@ -45,31 +113,31 @@ _DmSecurityStatus _resolveDmSecurityStatus({
   required String? serverMode,
 }) {
   final effectiveMode = serverMode ?? security?.threadMode;
+  final canEncryptNew = security?.canEncryptNewMessages ?? false;
   if (effectiveMode == DmE2eeService.encryptedMode) {
-    return _DmSecurityStatus(label: strings.encrypted, tone: PixelTone.green);
+    return _DmSecurityStatus(
+      label: strings.encrypted,
+      tone: PixelTone.green,
+      subtitle: canEncryptNew
+          ? strings.encryptedSubtitle
+          : strings.dmOneTimeRequiresSecure,
+      canSendOneTime: canEncryptNew,
+    );
   }
-  if (security?.canEncryptNewMessages ?? false) {
+  if (canEncryptNew) {
     return _DmSecurityStatus(
       label: strings.encryptionReady,
       tone: PixelTone.blue,
+      subtitle: strings.encryptionReadySubtitle,
+      canSendOneTime: true,
     );
   }
-  return _DmSecurityStatus(label: strings.notEncrypted, tone: PixelTone.slate);
-}
-
-String _resolveDmSecuritySubtitle({
-  required AppStrings strings,
-  required DmThreadSecuritySnapshot? security,
-  required String? serverMode,
-}) {
-  final effectiveMode = serverMode ?? security?.threadMode;
-  if (effectiveMode == DmE2eeService.encryptedMode) {
-    return strings.encryptedSubtitle;
-  }
-  if (security?.canEncryptNewMessages ?? false) {
-    return strings.encryptionReadySubtitle;
-  }
-  return strings.plaintextSubtitle;
+  return _DmSecurityStatus(
+    label: strings.notEncrypted,
+    tone: PixelTone.slate,
+    subtitle: strings.plaintextSubtitle,
+    canSendOneTime: false,
+  );
 }
 
 class _DirectMessageTimelineEntry {

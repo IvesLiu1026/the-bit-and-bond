@@ -1,4 +1,4 @@
-part of 'chen_game.dart';
+part of 'bitbond_game.dart';
 
 class _TavernEnvironmentLayer extends Component
     with HasGameReference<TheBitAndBondGame> {
@@ -275,7 +275,8 @@ class _TavernEnvironmentLayer extends Component
       ..color = palette.borderColor
       ..style = PaintingStyle.stroke
       ..strokeWidth = 4;
-    final wallBand = Paint()..color = palette.sideWallColor.withValues(alpha: 0.88);
+    final wallBand = Paint()
+      ..color = palette.sideWallColor.withValues(alpha: 0.88);
     final dividerShadow = Paint()
       ..color = palette.borderColor.withValues(alpha: 0.24)
       ..strokeWidth = 6;
@@ -283,10 +284,7 @@ class _TavernEnvironmentLayer extends Component
     canvas.drawRect(roomRect, wallPaint);
     canvas.drawRect(backWallRect, wallShade);
     canvas.drawRect(floorRect, floorPaint);
-    canvas.drawRect(
-      Rect.fromLTWH(0, wallHeight - 14, width, 14),
-      wallBand,
-    );
+    canvas.drawRect(Rect.fromLTWH(0, wallHeight - 14, width, 14), wallBand);
     canvas.drawLine(
       Offset(0, wallHeight),
       Offset(width, wallHeight),

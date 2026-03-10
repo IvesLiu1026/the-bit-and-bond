@@ -1,6 +1,6 @@
-part of 'chen_game.dart';
+part of 'bitbond_game.dart';
 
-extension ChenGameHunters on TheBitAndBondGame {
+extension BitBondGameHunters on TheBitAndBondGame {
   void syncHunters(
     List<HunterProfile> hunters, {
     required String? controlledHunterId,

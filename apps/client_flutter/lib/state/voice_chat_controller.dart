@@ -218,10 +218,7 @@ class VoiceChatController extends StateNotifier<VoiceChatState> {
       guildId: _session?.guildId ?? '',
       roomId: roomId,
       senderHunterId: _session?.hunterId ?? '',
-      senderName:
-          _session?.displayName ??
-          _session?.playerId ??
-          '目前玩家',
+      senderName: _session?.displayName ?? _session?.playerId ?? '目前玩家',
       clientMessageId: clientMessageId,
       content: content,
       sentAt: DateTime.fromMillisecondsSinceEpoch(sentAtMs),

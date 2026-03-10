@@ -13,6 +13,7 @@ import 'package:the_bit_and_bond_client/features/quests/models.dart';
 import 'package:the_bit_and_bond_client/state/direct_messages_controller.dart';
 import 'package:the_bit_and_bond_client/features/quests/quest_repository.dart';
 import 'package:the_bit_and_bond_client/state/auth_controller.dart';
+import 'package:the_bit_and_bond_client/state/hunter_directory_controller.dart';
 import 'package:the_bit_and_bond_client/state/inventory_controller.dart';
 import 'package:the_bit_and_bond_client/state/progression_controller.dart';
 import 'package:the_bit_and_bond_client/state/providers.dart';
@@ -489,6 +490,85 @@ void main() {
     expect(find.text('Demo Member'), findsNothing);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('Habit panel supports catch-up proof and review sort order', (
+    WidgetTester tester,
+  ) async {
+    tester.view.devicePixelRatio = 1.0;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authControllerProvider.overrideWith((ref) => _TestAuthController()),
+          questControllerProvider.overrideWith(
+            (ref) => _TestHabitQuestController(),
+          ),
+          hunterDirectoryControllerProvider.overrideWith(
+            (ref) => _TestHunterDirectoryController(),
+          ),
+          progressionControllerProvider.overrideWith(
+            (ref) => _TestProgressionController(),
+          ),
+          inventoryControllerProvider.overrideWith(
+            (ref) => _TestInventoryController(),
+          ),
+          socialControllerProvider.overrideWith(
+            (ref) => _TestSocialController(),
+          ),
+          directMessagesControllerProvider.overrideWith(
+            (ref) => _TestDirectMessagesController(),
+          ),
+        ],
+        child: const TheBitAndBondApp(),
+      ),
+    );
+
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    await tester.tap(find.text('選單').first);
+    await _pumpUi(tester);
+    final mainMenuScrollable = find.descendant(
+      of: find.byKey(const ValueKey('main_menu_grid')),
+      matching: find.byType(Scrollable),
+    );
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('main_menu_card_habits')),
+      220,
+      scrollable: mainMenuScrollable,
+    );
+    await _tapMenuCard(tester, 'habits');
+    await _pumpUi(tester);
+
+    expect(find.text('習慣養成板'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('補交完成證明'), 180);
+    await _pumpUi(tester);
+
+    final newestFinder = find.byKey(
+      const ValueKey('habit_card_active_habit-review-new'),
+    );
+    final olderFinder = find.byKey(
+      const ValueKey('habit_card_active_habit-review-old'),
+    );
+    expect(newestFinder, findsOneWidget);
+    expect(olderFinder, findsOneWidget);
+    expect(
+      tester.getTopLeft(newestFinder).dy,
+      lessThan(tester.getTopLeft(olderFinder).dy),
+    );
+
+    await tester.tap(find.text('補交完成證明').first);
+    await _pumpUi(tester);
+    expect(find.text('提交習慣證明'), findsOneWidget);
+    expect(find.text('拍照'), findsOneWidget);
+    expect(find.text('從相簿選擇'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 Future<void> _pumpUi(WidgetTester tester, {int frames = 6}) async {
@@ -550,6 +630,83 @@ class _TestQuestController extends QuestController {
   }) async {}
 }
 
+class _TestHabitQuestController extends QuestController {
+  _TestHabitQuestController() : super(repo: _NoopQuestRepository()) {
+    final now = DateTime.now();
+    state = AsyncValue.data([
+      QuestInstance(
+        id: 'habit-review-old',
+        templateId: 'habit-template-old',
+        templateTitle: 'Older Review',
+        category: QuestCategory.habit,
+        statCategory: QuestStatCategory.vitality,
+        baseXp: 12,
+        baseCoins: 3,
+        status: QuestStatus.submitted,
+        assignedHunterId: _TestProgressionController._childId,
+        cadence: HabitCadence.daily,
+        streakCount: 2,
+        bestStreak: 2,
+        completionsCount: 2,
+        proofNote: 'older proof',
+        proofSubmittedAt: now.subtract(const Duration(hours: 8)),
+        dueAt: null,
+        updatedAt: now.subtract(const Duration(hours: 8)),
+      ),
+      QuestInstance(
+        id: 'habit-review-new',
+        templateId: 'habit-template-new',
+        templateTitle: 'Newest Review',
+        category: QuestCategory.habit,
+        statCategory: QuestStatCategory.vitality,
+        baseXp: 15,
+        baseCoins: 5,
+        status: QuestStatus.submitted,
+        assignedHunterId: _TestProgressionController._childId,
+        cadence: HabitCadence.daily,
+        streakCount: 4,
+        bestStreak: 4,
+        completionsCount: 4,
+        proofNote: 'new proof',
+        proofSubmittedAt: now.subtract(const Duration(hours: 1)),
+        dueAt: null,
+        updatedAt: now.subtract(const Duration(hours: 1)),
+      ),
+      QuestInstance(
+        id: 'habit-missed',
+        templateId: 'habit-template-missed',
+        templateTitle: 'Catch-up Habit',
+        category: QuestCategory.habit,
+        statCategory: QuestStatCategory.vitality,
+        baseXp: 20,
+        baseCoins: 6,
+        status: QuestStatus.available,
+        assignedHunterId: _TestProgressionController._childId,
+        cadence: HabitCadence.daily,
+        streakCount: 1,
+        bestStreak: 3,
+        completionsCount: 8,
+        lastCompletedAt: now.subtract(const Duration(days: 2)),
+        dueAt: null,
+        updatedAt: now,
+      ),
+    ]);
+  }
+
+  @override
+  Future<void> load() async {}
+
+  @override
+  Future<void> refresh() async {}
+
+  @override
+  Future<void> submitQuest(
+    String questInstanceId, {
+    String? proofNote,
+    QuestProofUpload? proofMedia,
+  }) async {}
+}
+
 class _TestProgressionController extends ProgressionController {
   _TestProgressionController()
     : super(repo: _NoopQuestRepository(), selectedHunterId: _childId) {
@@ -566,6 +723,38 @@ class _TestProgressionController extends ProgressionController {
   }
 
   static const String _childId = '00000000-0000-0000-0000-000000000011';
+
+  @override
+  Future<void> load() async {}
+
+  @override
+  Future<void> refresh() async {}
+}
+
+class _TestHunterDirectoryController extends HunterDirectoryController {
+  _TestHunterDirectoryController()
+    : super(
+        repo: _NoopQuestRepository(),
+        authSession: const AuthSession(
+          accessToken: 'test-token',
+          guildId: '00000000-0000-0000-0000-000000000001',
+          hunterId: _TestProgressionController._childId,
+          guildRole: GuildRole.member,
+        ),
+      ) {
+    state = AsyncValue.data([
+      HunterProfile(
+        id: _TestProgressionController._childId,
+        guildId: '00000000-0000-0000-0000-000000000001',
+        playerId: 'demo_member',
+        name: 'Demo Member',
+        avatarType: 'bibon',
+        level: 2,
+        xp: 140,
+        coins: 35,
+      ),
+    ]);
+  }
 
   @override
   Future<void> load() async {}

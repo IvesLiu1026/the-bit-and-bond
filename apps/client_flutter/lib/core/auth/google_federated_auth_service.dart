@@ -150,6 +150,30 @@ class GoogleFederatedAuthService {
     }
   }
 
+  Future<GoogleFederatedIdentity?> tryRestoreIdentity() async {
+    final ready = await ensureFirebaseReady();
+    if (!ready) {
+      return null;
+    }
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        return null;
+      }
+      final firebaseIdToken = await user.getIdToken(true);
+      if (firebaseIdToken == null || firebaseIdToken.isEmpty) {
+        return null;
+      }
+      return GoogleFederatedIdentity(
+        firebaseIdToken: firebaseIdToken,
+        displayName: user.displayName,
+        email: user.email,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
   String? _clientIdForPlatform() {
     return switch (defaultTargetPlatform) {
       TargetPlatform.iOS => DefaultFirebaseOptions.ios.iosClientId,

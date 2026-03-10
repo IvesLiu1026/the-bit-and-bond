@@ -7,8 +7,8 @@ import '../theme/pixel_typography.dart';
 
 enum PixelTone { parchment, wood, gold, green, blue, ruby, plum, slate }
 
-const double kPixelButtonCompactWidth = 148;
-const double kPixelButtonRegularWidth = 172;
+const double kPixelButtonCompactWidth = 132;
+const double kPixelButtonRegularWidth = 156;
 
 class PixelPanel extends StatelessWidget {
   const PixelPanel({
@@ -163,16 +163,35 @@ class _PixelButtonState extends State<PixelButton> {
         ? panel
         : LayoutBuilder(
             builder: (context, constraints) {
-              final preferredWidth =
+              final defaultPreferred =
                   widget.maxWidth ??
                   (widget.compact
                       ? kPixelButtonCompactWidth
                       : kPixelButtonRegularWidth);
+              final dynamicPreferred =
+                  (widget.label.runes.length * (widget.compact ? 7.0 : 8.2)) +
+                  (widget.leading == null
+                      ? (widget.compact ? 20.0 : 24.0)
+                      : (widget.compact ? 44.0 : 52.0));
+              var preferredWidth =
+                  (widget.minWidth == null && widget.maxWidth == null)
+                  ? dynamicPreferred.clamp(
+                      widget.compact ? 76.0 : 92.0,
+                      defaultPreferred,
+                    )
+                  : defaultPreferred;
+              final maxWidth = widget.maxWidth;
+              if (maxWidth != null) {
+                preferredWidth = math.min(preferredWidth, maxWidth);
+              }
+              final minWidth = widget.minWidth;
+              if (minWidth != null) {
+                preferredWidth = math.max(preferredWidth, minWidth);
+              }
               final availableWidth = constraints.hasBoundedWidth
                   ? constraints.maxWidth
                   : preferredWidth;
               var resolvedWidth = math.min(preferredWidth, availableWidth);
-              final minWidth = widget.minWidth;
               if (minWidth != null && availableWidth >= minWidth) {
                 resolvedWidth = math.max(resolvedWidth, minWidth);
               }

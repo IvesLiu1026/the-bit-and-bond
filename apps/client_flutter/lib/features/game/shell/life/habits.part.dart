@@ -1,4 +1,4 @@
-part of '../game_shell_page.dart';
+part of '../../game_shell_page.dart';
 
 enum _HabitProofState { done, review, pending, missed }
 
@@ -16,6 +16,7 @@ class _HabitChallengeCardData {
     this.proofNote,
     this.reviewNote,
     this.assignedBy,
+    this.proofSubmittedAt,
     this.proofMedia = const <QuestProofMedia>[],
   });
 
@@ -31,6 +32,7 @@ class _HabitChallengeCardData {
   final String? proofNote;
   final String? reviewNote;
   final String? assignedBy;
+  final DateTime? proofSubmittedAt;
   final List<QuestProofMedia> proofMedia;
 }
 
@@ -176,9 +178,25 @@ class _HabitsPanelState extends State<_HabitsPanel> {
       0,
       (best, card) => math.max(best, card.bestStreak),
     );
-    final pendingReviewCards = cards
-        .where((card) => card.proofState == _HabitProofState.review)
-        .toList(growable: false);
+    final pendingReviewCards =
+        cards
+            .where((card) => card.proofState == _HabitProofState.review)
+            .toList(growable: false)
+          ..sort((a, b) {
+            final at = a.proofSubmittedAt;
+            final bt = b.proofSubmittedAt;
+            if (at != null && bt != null) {
+              final cmp = bt.compareTo(at);
+              if (cmp != 0) {
+                return cmp;
+              }
+            } else if (bt != null) {
+              return 1;
+            } else if (at != null) {
+              return -1;
+            }
+            return a.title.compareTo(b.title);
+          });
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -261,173 +279,23 @@ class _HabitsPanelState extends State<_HabitsPanel> {
             data: (_) => ListView(
               children: [
                 if (widget.isMaster) ...[
-                  _ParchmentSection(
-                    title: strings.tr(
-                      zh: '建立習慣挑戰',
-                      en: 'Create Habit Challenge',
-                    ),
-                    icon: Icons.post_add,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        TextField(
-                          controller: _titleController,
-                          decoration: InputDecoration(
-                            labelText: strings.tr(zh: '習慣標題', en: 'Title'),
-                            filled: true,
-                            fillColor: const Color(0xFFE7DDC9),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        TextField(
-                          controller: _descriptionController,
-                          minLines: 2,
-                          maxLines: 3,
-                          decoration: InputDecoration(
-                            labelText: strings.tr(
-                              zh: '說明 / proof 提示',
-                              en: 'Prompt / proof note',
-                            ),
-                            filled: true,
-                            fillColor: const Color(0xFFE7DDC9),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: _xpController,
-                                keyboardType: TextInputType.number,
-                                decoration: const InputDecoration(
-                                  labelText: 'XP',
-                                  filled: true,
-                                  fillColor: Color(0xFFE7DDC9),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: TextField(
-                                controller: _coinsController,
-                                keyboardType: TextInputType.number,
-                                decoration: const InputDecoration(
-                                  labelText: 'Coins',
-                                  filled: true,
-                                  fillColor: Color(0xFFE7DDC9),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            SizedBox(
-                              width: 180,
-                              child: DropdownButtonFormField<HabitCadence>(
-                                initialValue: _cadence,
-                                decoration: InputDecoration(
-                                  labelText: strings.tr(
-                                    zh: '頻率',
-                                    en: 'Cadence',
-                                  ),
-                                  filled: true,
-                                  fillColor: const Color(0xFFE7DDC9),
-                                ),
-                                items: [
-                                  DropdownMenuItem(
-                                    value: HabitCadence.daily,
-                                    child: Text(
-                                      strings.tr(zh: '每日', en: 'Daily'),
-                                    ),
-                                  ),
-                                  DropdownMenuItem(
-                                    value: HabitCadence.weekly,
-                                    child: Text(
-                                      strings.tr(zh: '每週', en: 'Weekly'),
-                                    ),
-                                  ),
-                                ],
-                                onChanged: (value) {
-                                  if (value != null) {
-                                    setState(() => _cadence = value);
-                                  }
-                                },
-                              ),
-                            ),
-                            SizedBox(
-                              width: 220,
-                              child: DropdownButtonFormField<String?>(
-                                initialValue: _assignedHunterId,
-                                decoration: InputDecoration(
-                                  labelText: strings.tr(
-                                    zh: '指派給',
-                                    en: 'Assign to',
-                                  ),
-                                  filled: true,
-                                  fillColor: const Color(0xFFE7DDC9),
-                                ),
-                                items: [
-                                  DropdownMenuItem<String?>(
-                                    value: null,
-                                    child: Text(
-                                      strings.tr(zh: '全家可用', en: 'Shared'),
-                                    ),
-                                  ),
-                                  ...hunters.map(
-                                    (hunter) => DropdownMenuItem<String?>(
-                                      value: hunter.id,
-                                      child: Text(hunter.name),
-                                    ),
-                                  ),
-                                ],
-                                onChanged: (value) {
-                                  setState(() => _assignedHunterId = value);
-                                },
-                              ),
-                            ),
-                            SizedBox(
-                              width: 220,
-                              child: DropdownButtonFormField<QuestStatCategory>(
-                                initialValue: _statCategory,
-                                decoration: InputDecoration(
-                                  labelText: strings.tr(
-                                    zh: '成長屬性',
-                                    en: 'Growth Stat',
-                                  ),
-                                  filled: true,
-                                  fillColor: const Color(0xFFE7DDC9),
-                                ),
-                                items: QuestStatCategory.values
-                                    .map(
-                                      (value) => DropdownMenuItem(
-                                        value: value,
-                                        child: Text(_statCategoryLabel(value)),
-                                      ),
-                                    )
-                                    .toList(growable: false),
-                                onChanged: (value) {
-                                  if (value != null) {
-                                    setState(() => _statCategory = value);
-                                  }
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        PixelButton(
-                          label: _submitting
-                              ? strings.tr(zh: '建立中...', en: 'Creating...')
-                              : strings.tr(zh: '建立新習慣', en: 'Create Habit'),
-                          tone: PixelTone.green,
-                          onPressed: _submitting ? null : _createHabit,
-                        ),
-                      ],
-                    ),
+                  _HabitCreationSection(
+                    titleController: _titleController,
+                    descriptionController: _descriptionController,
+                    xpController: _xpController,
+                    coinsController: _coinsController,
+                    cadence: _cadence,
+                    onCadenceChanged: (value) =>
+                        setState(() => _cadence = value),
+                    assignedHunterId: _assignedHunterId,
+                    onAssignedHunterChanged: (value) =>
+                        setState(() => _assignedHunterId = value),
+                    statCategory: _statCategory,
+                    onStatCategoryChanged: (value) =>
+                        setState(() => _statCategory = value),
+                    hunters: hunters,
+                    submitting: _submitting,
+                    onCreateHabit: _createHabit,
                   ),
                   const SizedBox(height: 10),
                 ],
@@ -450,6 +318,9 @@ class _HabitsPanelState extends State<_HabitsPanel> {
                           children: cards
                               .map(
                                 (card) => _HabitCard(
+                                  cardKey: ValueKey(
+                                    'habit_card_active_${card.questId}',
+                                  ),
                                   card: card,
                                   isMaster: widget.isMaster,
                                   apiBaseUrl: widget.apiBaseUrl,
@@ -503,6 +374,9 @@ class _HabitsPanelState extends State<_HabitsPanel> {
                           children: pendingReviewCards
                               .map(
                                 (card) => _HabitCard(
+                                  cardKey: ValueKey(
+                                    'habit_card_review_${card.questId}',
+                                  ),
                                   card: card,
                                   isMaster: widget.isMaster,
                                   apiBaseUrl: widget.apiBaseUrl,
@@ -528,133 +402,4 @@ class _HabitsPanelState extends State<_HabitsPanel> {
       ],
     );
   }
-}
-
-List<_HabitChallengeCardData> _habitCardsFromQuests({
-  required List<QuestInstance> quests,
-  required List<HunterProfile> hunters,
-  required bool isMaster,
-  required String? activeHunterId,
-  required AppStrings strings,
-}) {
-  final hunterNames = <String, String>{
-    for (final hunter in hunters) hunter.id: hunter.name,
-  };
-  final now = DateTime.now();
-  return quests
-      .where((quest) => quest.category == QuestCategory.habit)
-      .where((quest) {
-        if (isMaster) {
-          return true;
-        }
-        return quest.assignedHunterId == null ||
-            quest.assignedHunterId == activeHunterId;
-      })
-      .map((quest) {
-        final state = _habitProofStateFor(quest, now);
-        final assignedByName = quest.createdByHunterId == null
-            ? null
-            : hunterNames[quest.createdByHunterId!];
-        final rewardParts = <String>[];
-        if ((quest.baseXp ?? 0) > 0) {
-          rewardParts.add('+${quest.baseXp} XP');
-        }
-        if ((quest.baseCoins ?? 0) > 0) {
-          rewardParts.add('+${quest.baseCoins} Coins');
-        }
-        final progressDivisor = quest.cadence == HabitCadence.weekly ? 4 : 7;
-        final streakProgress = quest.streakCount <= 0
-            ? 0
-            : quest.streakCount % progressDivisor;
-        final progress = ((streakProgress / progressDivisor))
-            .clamp(0.12, 1.0)
-            .toDouble();
-        return _HabitChallengeCardData(
-          questId: quest.id,
-          title: quest.templateTitle ?? quest.templateId,
-          cadence: switch (quest.cadence) {
-            HabitCadence.weekly => strings.tr(zh: '每週', en: 'Weekly'),
-            HabitCadence.daily => strings.tr(zh: '每日', en: 'Daily'),
-            HabitCadence.none => strings.tr(zh: '彈性', en: 'Flexible'),
-          },
-          streak: quest.streakCount,
-          bestStreak: quest.bestStreak,
-          completionsCount: quest.completionsCount,
-          rewardLabel: rewardParts.isEmpty ? '+0' : rewardParts.join(' / '),
-          proofState: state,
-          progress: progress,
-          proofNote: quest.proofNote,
-          reviewNote: quest.lastReviewNote,
-          assignedBy: assignedByName,
-          proofMedia: quest.proofMedia,
-        );
-      })
-      .toList(growable: false)
-    ..sort((a, b) => a.title.compareTo(b.title));
-}
-
-_HabitProofState _habitProofStateFor(QuestInstance quest, DateTime now) {
-  if (quest.status == QuestStatus.submitted) {
-    return _HabitProofState.review;
-  }
-  if (_isHabitCompletedInCurrentCycle(quest, now)) {
-    return _HabitProofState.done;
-  }
-  final lastCompleted = quest.lastCompletedAt;
-  if (lastCompleted != null) {
-    final normalizedLast = DateTime(
-      lastCompleted.year,
-      lastCompleted.month,
-      lastCompleted.day,
-    );
-    final anchorNow = _habitCadenceAnchor(quest.cadence, now);
-    final anchorLast = _habitCadenceAnchor(quest.cadence, normalizedLast);
-    if (anchorLast.isBefore(
-      _previousHabitCadenceAnchor(quest.cadence, anchorNow),
-    )) {
-      return _HabitProofState.missed;
-    }
-  }
-  return _HabitProofState.pending;
-}
-
-bool _isHabitCompletedInCurrentCycle(QuestInstance quest, DateTime now) {
-  final lastCompleted = quest.lastCompletedAt;
-  if (lastCompleted == null) {
-    return false;
-  }
-  final normalizedLast = DateTime(
-    lastCompleted.year,
-    lastCompleted.month,
-    lastCompleted.day,
-  );
-  return _habitCadenceAnchor(quest.cadence, normalizedLast) ==
-      _habitCadenceAnchor(quest.cadence, now);
-}
-
-DateTime _habitCadenceAnchor(HabitCadence cadence, DateTime date) {
-  final normalized = DateTime(date.year, date.month, date.day);
-  if (cadence == HabitCadence.weekly) {
-    return normalized.subtract(Duration(days: normalized.weekday - 1));
-  }
-  return normalized;
-}
-
-DateTime _previousHabitCadenceAnchor(HabitCadence cadence, DateTime date) {
-  return cadence == HabitCadence.weekly
-      ? date.subtract(const Duration(days: 7))
-      : date.subtract(const Duration(days: 1));
-}
-
-List<_HabitProofState> _habitProgressTiles(_HabitChallengeCardData card) {
-  final tiles = List<_HabitProofState>.filled(14, _HabitProofState.missed);
-  var cursor = 13;
-  for (var i = 0; i < card.streak && cursor >= 0; i += 1) {
-    tiles[cursor] = _HabitProofState.done;
-    cursor -= 1;
-  }
-  if (cursor >= 0) {
-    tiles[cursor] = card.proofState;
-  }
-  return tiles;
 }
