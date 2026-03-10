@@ -323,6 +323,9 @@ flutter test
   [docs/release_checklist.md](/Users/ivesliu/Documents/chen-leveling/docs/release_checklist.md)
 - TestFlight 內測流程：
   [docs/testflight_internal_beta_checklist.md](/Users/ivesliu/Documents/chen-leveling/docs/testflight_internal_beta_checklist.md)
+- Telemetry 指標與查詢：
+  [docs/telemetry_metrics_guide.md](/Users/ivesliu/Documents/chen-leveling/docs/telemetry_metrics_guide.md)
+  與 [docs/telemetry_dashboard_queries.sql](/Users/ivesliu/Documents/chen-leveling/docs/telemetry_dashboard_queries.sql)
 
 ## 12. 目前已知限制
 
