@@ -82,6 +82,7 @@ class PixelPanel extends StatelessWidget {
 class PixelButton extends StatefulWidget {
   const PixelButton({
     super.key,
+    this.tapTargetKey,
     required this.label,
     required this.onPressed,
     this.leading,
@@ -92,6 +93,7 @@ class PixelButton extends StatefulWidget {
     this.maxWidth,
   });
 
+  final Key? tapTargetKey;
   final String label;
   final VoidCallback? onPressed;
   final Widget? leading;
@@ -202,10 +204,12 @@ class _PixelButtonState extends State<PixelButton> {
           );
 
     return GestureDetector(
+      key: widget.tapTargetKey,
       onTapDown: enabled ? (_) => setState(() => _pressed = true) : null,
       onTapUp: enabled ? (_) => setState(() => _pressed = false) : null,
       onTapCancel: enabled ? () => setState(() => _pressed = false) : null,
       onTap: widget.onPressed,
+      behavior: HitTestBehavior.opaque,
       child: AnimatedSlide(
         duration: const Duration(milliseconds: 70),
         offset: _pressed ? const Offset(0, 0.03) : Offset.zero,

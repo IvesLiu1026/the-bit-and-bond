@@ -8,7 +8,7 @@ use axum::{
 use chrono::{TimeZone, Utc};
 use entity::{
     direct_message, dm_conversation_capability, dm_conversation_capability::DmEncryptionMode,
-    dm_device_key, dm_encrypted_message, dm_thread_read, friend_link, hunter,
+    dm_device_key, dm_encrypted_message, dm_thread_read, hunter,
 };
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, Condition, ConnectionTrait, DbErr,
@@ -18,6 +18,9 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{
+    domain::social_guard::{
+        require_active_dm_device_key as require_active_dm_device_key_shared, require_friend_link,
+    },
     error::{AppError, AppResult},
     extractors::HunterClaims,
     state::AppState,
@@ -789,18 +792,13 @@ async fn ensure_friend_link(
     source_hunter_id: Uuid,
     target_hunter_id: Uuid,
 ) -> AppResult<()> {
-    let is_friend = friend_link::Entity::find()
-        .filter(friend_link::Column::PlayerId.eq(source_hunter_id))
-        .filter(friend_link::Column::FriendId.eq(target_hunter_id))
-        .one(&state.db)
-        .await?
-        .is_some();
-    if !is_friend {
-        return Err(AppError::Forbidden(
-            "direct messages are only available between friends".into(),
-        ));
-    }
-    Ok(())
+    require_friend_link(
+        &state.db,
+        source_hunter_id,
+        target_hunter_id,
+        "direct messages are only available between friends",
+    )
+    .await
 }
 
 async fn ensure_dm_device_key_access(
@@ -819,13 +817,7 @@ async fn require_active_dm_device_key(
     hunter_id: Uuid,
     device_id: &str,
 ) -> AppResult<dm_device_key::Model> {
-    dm_device_key::Entity::find()
-        .filter(dm_device_key::Column::HunterId.eq(hunter_id))
-        .filter(dm_device_key::Column::DeviceId.eq(device_id.to_string()))
-        .filter(dm_device_key::Column::RevokedAt.is_null())
-        .one(&state.db)
-        .await?
-        .ok_or_else(|| AppError::BadRequest(format!("active device key not found for {device_id}")))
+    require_active_dm_device_key_shared(&state.db, hunter_id, device_id).await
 }
 
 async fn upsert_dm_conversation_capability(

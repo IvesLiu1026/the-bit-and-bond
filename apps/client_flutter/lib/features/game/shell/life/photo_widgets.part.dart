@@ -164,6 +164,7 @@ class _OneTimeViewerDialogState extends State<_OneTimeViewerDialog> {
   Widget build(BuildContext context) {
     final strings = AppStrings.of(context);
     return Dialog.fullscreen(
+      key: AppTestIds.dmOneTimeViewerDialogKey,
       backgroundColor: const Color(0xFF19130E),
       child: Stack(
         children: [
@@ -212,6 +213,7 @@ class _OneTimeViewerDialogState extends State<_OneTimeViewerDialog> {
                 ),
                 const SizedBox(width: 8),
                 PixelButton(
+                  tapTargetKey: AppTestIds.dmOneTimeViewerCloseButtonKey,
                   label: strings.closeMenu,
                   tone: PixelTone.ruby,
                   compact: true,

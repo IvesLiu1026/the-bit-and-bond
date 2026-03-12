@@ -192,4 +192,18 @@ class ChatMessage {
           DateTime.parse(json['sent_at'] as String).millisecondsSinceEpoch,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'id': id,
+      'guild_id': guildId,
+      'room_id': roomId,
+      'sender_hunter_id': senderHunterId,
+      'sender_name': senderName,
+      'client_message_id': clientMessageId,
+      'content': content,
+      'sent_at': sentAt.toUtc().toIso8601String(),
+      'sent_at_ms': sentAtMs,
+    };
+  }
 }

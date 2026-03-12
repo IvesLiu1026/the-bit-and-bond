@@ -234,6 +234,7 @@ class _UnifiedAuthFormState extends ConsumerState<UnifiedAuthForm> {
               ? strings.tr(zh: '帳號', en: 'Account')
               : strings.tr(zh: '玩家 ID', en: 'Player ID'),
           child: TextField(
+            key: AppTestIds.authAccountFieldKey,
             controller: _accountController,
             enabled: !_submitting,
             decoration: deco(
@@ -252,6 +253,7 @@ class _UnifiedAuthFormState extends ConsumerState<UnifiedAuthForm> {
               ? strings.tr(zh: '密鑰', en: 'Secret')
               : 'PIN',
           child: TextField(
+            key: AppTestIds.authSecretFieldKey,
             controller: _secretController,
             enabled: !_submitting,
             obscureText: true,
@@ -270,6 +272,7 @@ class _UnifiedAuthFormState extends ConsumerState<UnifiedAuthForm> {
           _PixelFieldFrame(
             label: strings.tr(zh: '稱號', en: 'Name'),
             child: TextField(
+              key: AppTestIds.authDisplayNameFieldKey,
               controller: _displayNameController,
               enabled: !_submitting,
               decoration: deco(strings.tr(zh: '顯示名稱', en: 'Display name')),
@@ -279,6 +282,7 @@ class _UnifiedAuthFormState extends ConsumerState<UnifiedAuthForm> {
         if (_errorMessage != null) ...[
           const SizedBox(height: 12),
           Container(
+            key: AppTestIds.authErrorBannerKey,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
               color: const Color(0xFF7E2F21),
@@ -295,6 +299,7 @@ class _UnifiedAuthFormState extends ConsumerState<UnifiedAuthForm> {
         ],
         const SizedBox(height: 16),
         _PixelAuthButton(
+          tapTargetKey: AppTestIds.authSubmitButtonKey,
           onPressed: _submitting ? null : _submit,
           label: _submitting ? strings.tr(zh: '處理中...', en: 'Working...') : cta,
         ),

@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/models/social_models.dart';
 import '../core/network/api_client.dart';
-import '../features/quests/models.dart';
 import 'providers.dart';
 
 final socialControllerProvider =
@@ -11,20 +11,6 @@ final socialControllerProvider =
       final api = ref.watch(apiClientProvider);
       return SocialController(api: api)..load();
     });
-
-class SocialSnapshot {
-  SocialSnapshot({
-    required this.friends,
-    required this.pendingInvites,
-    required this.incomingFriendRequests,
-    required this.profile,
-  });
-
-  final List<FriendProfile> friends;
-  final List<GuildInviteInfo> pendingInvites;
-  final List<FriendRequestInfo> incomingFriendRequests;
-  final SocialProfile? profile;
-}
 
 class SocialController extends StateNotifier<AsyncValue<SocialSnapshot>> {
   SocialController({required ApiClient api})
@@ -90,14 +76,7 @@ class SocialController extends StateNotifier<AsyncValue<SocialSnapshot>> {
     final profile = await _api.updateSocialProfile(motto: motto);
     final current = state.valueOrNull;
     if (current != null) {
-      state = AsyncValue.data(
-        SocialSnapshot(
-          friends: current.friends,
-          pendingInvites: current.pendingInvites,
-          incomingFriendRequests: current.incomingFriendRequests,
-          profile: profile,
-        ),
-      );
+      state = AsyncValue.data(current.copyWith(profile: profile));
     } else {
       await _refreshInternal();
     }

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/l10n/app_strings.dart';
 import '../../core/network/auth_api_client.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/ui/app_test_ids.dart';
 import '../../state/providers.dart';
 
 part 'unified/controls.part.dart';

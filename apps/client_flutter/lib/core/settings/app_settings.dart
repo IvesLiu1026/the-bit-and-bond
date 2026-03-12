@@ -27,6 +27,7 @@ class AppSettings {
     required this.hapticsEnabled,
     required this.uiScale,
     required this.pixelFxEnabled,
+    required this.pixelFontEnabled,
   });
 
   static const double minUiScale = 0.9;
@@ -39,6 +40,7 @@ class AppSettings {
     hapticsEnabled: true,
     uiScale: 1.0,
     pixelFxEnabled: true,
+    pixelFontEnabled: true,
   );
 
   final AppLanguage language;
@@ -47,6 +49,7 @@ class AppSettings {
   final bool hapticsEnabled;
   final double uiScale;
   final bool pixelFxEnabled;
+  final bool pixelFontEnabled;
 
   Locale get locale => language.locale;
 
@@ -57,6 +60,7 @@ class AppSettings {
     bool? hapticsEnabled,
     double? uiScale,
     bool? pixelFxEnabled,
+    bool? pixelFontEnabled,
   }) {
     return AppSettings(
       language: language ?? this.language,
@@ -65,6 +69,7 @@ class AppSettings {
       hapticsEnabled: hapticsEnabled ?? this.hapticsEnabled,
       uiScale: (uiScale ?? this.uiScale).clamp(minUiScale, maxUiScale),
       pixelFxEnabled: pixelFxEnabled ?? this.pixelFxEnabled,
+      pixelFontEnabled: pixelFontEnabled ?? this.pixelFontEnabled,
     );
   }
 
@@ -76,6 +81,7 @@ class AppSettings {
       'haptics_enabled': hapticsEnabled,
       'ui_scale': uiScale,
       'pixel_fx_enabled': pixelFxEnabled,
+      'pixel_font_enabled': pixelFontEnabled,
     };
   }
 
@@ -96,6 +102,9 @@ class AppSettings {
       pixelFxEnabled:
           json['pixel_fx_enabled'] as bool? ??
           AppSettings.defaults.pixelFxEnabled,
+      pixelFontEnabled:
+          json['pixel_font_enabled'] as bool? ??
+          AppSettings.defaults.pixelFontEnabled,
     );
   }
 

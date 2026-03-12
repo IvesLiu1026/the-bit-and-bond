@@ -5,8 +5,9 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 
-import '../../features/quests/models.dart';
+import '../models/models.dart';
 import '../auth/auth_session.dart';
+import 'http_transport.dart';
 
 part 'api_client_direct_messages.part.dart';
 part 'api_client_hunters.part.dart';
@@ -314,6 +315,9 @@ class ApiClient {
 
   Future<SocialProfile> getSocialProfile() => _apiClientGetSocialProfile(this);
 
+  Future<PlayerPassQrBundle> getPlayerPassQrBundle() =>
+      _apiClientGetPlayerPassQrBundle(this);
+
   Future<SocialProfile> updateSocialProfile({String? motto}) =>
       _apiClientUpdateSocialProfile(this, motto: motto);
 
@@ -449,7 +453,9 @@ class ApiClient {
     final session = authSessionResolver?.call() ?? authSession;
     final token = session?.accessToken.trim();
     if (token == null || token.isEmpty) {
-      return const {'ngrok-skip-browser-warning': 'true'};
+      return const {
+        ngrokSkipBrowserWarningHeaderName: ngrokSkipBrowserWarningHeaderValue,
+      };
     }
     return _bearerHeaders(token);
   }

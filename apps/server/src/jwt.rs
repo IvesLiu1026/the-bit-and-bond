@@ -40,6 +40,24 @@ pub struct IssuedToken {
     pub expires_in: i64,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlayerPassQrClaims {
+    pub sub: Uuid,
+    pub guild_id: Uuid,
+    pub player_id: String,
+    pub hunter_tag: String,
+    pub typ: String,
+    pub iat: i64,
+    pub exp: i64,
+}
+
+#[derive(Debug, Clone)]
+pub struct IssuedPlayerPassQrToken {
+    pub token: String,
+    pub claims: PlayerPassQrClaims,
+    pub expires_in: i64,
+}
+
 #[derive(Clone)]
 pub struct JwtService {
     encoding_key: EncodingKey,
@@ -105,6 +123,37 @@ impl JwtService {
             .map_err(|_| AppError::Unauthorized("invalid or expired token".into()))
     }
 
+    pub fn issue_player_pass_qr_token(
+        &self,
+        hunter_id: Uuid,
+        guild_id: Uuid,
+        player_id: &str,
+        hunter_tag: &str,
+        ttl_seconds: i64,
+    ) -> AppResult<IssuedPlayerPassQrToken> {
+        let expires_in = ttl_seconds.clamp(30, 3600);
+        let now = Utc::now();
+        let exp = now + Duration::seconds(expires_in);
+        let claims = PlayerPassQrClaims {
+            sub: hunter_id,
+            guild_id,
+            player_id: player_id.to_string(),
+            hunter_tag: hunter_tag.to_string(),
+            typ: "player_pass".to_string(),
+            iat: now.timestamp(),
+            exp: exp.timestamp(),
+        };
+        let token =
+            jsonwebtoken::encode(&Header::new(Algorithm::HS256), &claims, &self.encoding_key)
+                .map_err(|_| AppError::BadRequest("failed to issue player pass qr token".into()))?;
+
+        Ok(IssuedPlayerPassQrToken {
+            token,
+            claims,
+            expires_in,
+        })
+    }
+
     fn issue(&self, claims: Claims) -> AppResult<IssuedToken> {
         let token =
             jsonwebtoken::encode(&Header::new(Algorithm::HS256), &claims, &self.encoding_key)
@@ -120,9 +169,10 @@ impl JwtService {
 
 #[cfg(test)]
 mod tests {
+    use jsonwebtoken::{Algorithm, DecodingKey, Validation};
     use uuid::Uuid;
 
-    use super::{GuildRole, JwtService};
+    use super::{GuildRole, JwtService, PlayerPassQrClaims};
 
     #[test]
     fn roundtrip_claims() {
@@ -139,5 +189,33 @@ mod tests {
         assert_eq!(decoded.role, super::AuthRole::Player);
         assert_eq!(decoded.hunter_id, Some(user));
         assert_eq!(decoded.guild_role, GuildRole::Master);
+    }
+
+    #[test]
+    fn issue_player_pass_qr_token_roundtrip() {
+        let secret = b"0123456789abcdef0123456789abcdef";
+        let svc = JwtService::new(secret, 3600);
+        let hunter_id = Uuid::new_v4();
+        let guild_id = Uuid::new_v4();
+        let issued = svc
+            .issue_player_pass_qr_token(hunter_id, guild_id, "demo_member", "ID-DEMO_MEMBER", 300)
+            .expect("issue pass qr token");
+
+        let mut validation = Validation::new(Algorithm::HS256);
+        validation.validate_exp = true;
+        let decoded = jsonwebtoken::decode::<PlayerPassQrClaims>(
+            &issued.token,
+            &DecodingKey::from_secret(secret),
+            &validation,
+        )
+        .expect("decode");
+
+        assert_eq!(issued.expires_in, 300);
+        assert_eq!(decoded.claims.sub, hunter_id);
+        assert_eq!(decoded.claims.guild_id, guild_id);
+        assert_eq!(decoded.claims.player_id, "demo_member");
+        assert_eq!(decoded.claims.hunter_tag, "ID-DEMO_MEMBER");
+        assert_eq!(decoded.claims.typ, "player_pass");
+        assert!(decoded.claims.exp > decoded.claims.iat);
     }
 }

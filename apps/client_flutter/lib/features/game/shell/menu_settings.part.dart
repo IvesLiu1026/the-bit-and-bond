@@ -55,6 +55,8 @@ class _SettingsPanel extends StatelessWidget {
         SizedBox(height: compact ? 10 : 14),
         _SettingsLanguageSection(strings: strings, compact: compact),
         SizedBox(height: sectionGap),
+        _SettingsFontStyleSection(strings: strings, compact: compact),
+        SizedBox(height: sectionGap),
         _SettingsToggleSection(
           compact: compact,
           title: strings.soundEffects,
@@ -222,6 +224,49 @@ class _SettingsUiScaleSection extends ConsumerWidget {
               fontSize: compact ? 12 : 14,
               height: 1,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SettingsFontStyleSection extends ConsumerWidget {
+  const _SettingsFontStyleSection({
+    required this.strings,
+    required this.compact,
+  });
+
+  final AppStrings strings;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final pixelFontEnabled = ref.watch(
+      appSettingsProvider.select((settings) => settings.pixelFontEnabled),
+    );
+    final controller = ref.read(settingsControllerProvider.notifier);
+    return _SettingsSection(
+      compact: compact,
+      title: strings.fontStyle,
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        alignment: WrapAlignment.center,
+        children: [
+          _SettingsChoiceButton(
+            label: strings.pixelFont,
+            selected: pixelFontEnabled,
+            onPressed: () {
+              unawaited(controller.setPixelFontEnabled(true));
+            },
+          ),
+          _SettingsChoiceButton(
+            label: strings.standardFont,
+            selected: !pixelFontEnabled,
+            onPressed: () {
+              unawaited(controller.setPixelFontEnabled(false));
+            },
           ),
         ],
       ),

@@ -389,7 +389,10 @@ lib/features/game/shell/profile.part.dart:: strings.tr(zh: '儲存格言', en: '
 lib/features/game/shell/profile.part.dart:? strings.tr(zh: '儲存中...', en: 'Saving...')
 lib/features/game/shell/profile.part.dart:? strings.tr(zh: '在線中', en: 'Online')
 lib/features/game/shell/profile.part.dart:label: strings.tr(zh: '個人格言', en: 'Motto'),
+lib/features/game/shell/profile.part.dart:label: strings.tr(zh: '刷新 QR', en: 'Refresh QR'),
+lib/features/game/shell/profile.part.dart:label: strings.tr(zh: '重新產生', en: 'Regenerate'),
 lib/features/game/shell/profile.part.dart:strings.tr(zh: '玩家通行證', en: 'Player Pass'),
+lib/features/game/shell/profile.part.dart:strings.tr(zh: '通行證 QR 讀取失敗', en: 'Failed to load pass QR'),
 lib/features/game/shell/profile.part.dart:text: strings.tr(zh: '夥伴', en: 'Friends'),
 lib/features/game/shell/profile.part.dart:text: strings.tr(zh: '通行證', en: 'Pass'),
 lib/features/game/shell/profile.part.dart:title: strings.tr(zh: '等級', en: 'Level'),
@@ -398,6 +401,7 @@ lib/features/game/shell/profile.part.dart:zh: '例如：每天前進一小步',
 lib/features/game/shell/profile.part.dart:zh: '夥伴 ${friends.length} 位',
 lib/features/game/shell/profile.part.dart:zh: '家庭：${profile?.guildName ?? '-'}｜身份：${profile?.roleTitle ?? '成員'}',
 lib/features/game/shell/profile.part.dart:zh: '最近成就：Lv.${friend.level} · ${friend.xp} XP',
+lib/features/game/shell/profile.part.dart:zh: '有效至 ${_formatPassExpiry(bundle.expiresAt)}',
 lib/features/game/shell/profile.part.dart:zh: '目前沒有夥伴，先輸入玩家 ID 發送好友請求吧。',
 lib/features/game/shell/profile_visuals.part.dart:strings.tr(zh: '能力分析', en: 'Stat Radar'),
 lib/features/game/shell/rewards.part.dart:text: '+${reward.gainedCoins} 金幣',

@@ -170,7 +170,7 @@ class _MainMenuPanel extends StatelessWidget {
         const SizedBox(height: 14),
         Expanded(
           child: GridView.builder(
-            key: const ValueKey('main_menu_grid'),
+            key: AppTestIds.mainMenuGridKey,
             padding: EdgeInsets.only(bottom: compact ? 8 : 0),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: crossAxisCount,
@@ -244,7 +244,7 @@ class _MainMenuCardState extends State<_MainMenuCard> {
         : tone.withValues(alpha: 0.08);
 
     return GestureDetector(
-      key: ValueKey('main_menu_card_${widget.entry.id}'),
+      key: AppTestIds.mainMenuCard(widget.entry.id),
       onTapDown: enabled ? (_) => setState(() => _pressed = true) : null,
       onTapUp: enabled ? (_) => setState(() => _pressed = false) : null,
       onTapCancel: enabled ? () => setState(() => _pressed = false) : null,

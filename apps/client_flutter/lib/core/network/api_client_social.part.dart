@@ -102,6 +102,17 @@ Future<SocialProfile> _apiClientGetSocialProfile(ApiClient api) async {
   return SocialProfile.fromJson(data as Map<String, dynamic>);
 }
 
+Future<PlayerPassQrBundle> _apiClientGetPlayerPassQrBundle(
+  ApiClient api,
+) async {
+  final data = await api._authedGet(
+    '/api/v1/social/profile/pass-qr',
+    const {},
+    role: _AuthRole.any,
+  );
+  return PlayerPassQrBundle.fromJson(data as Map<String, dynamic>);
+}
+
 Future<SocialProfile> _apiClientUpdateSocialProfile(
   ApiClient api, {
   String? motto,

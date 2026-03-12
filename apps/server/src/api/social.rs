@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{
+    domain::player_identity::normalize_player_id_with_messages,
     error::{AppError, AppResult},
     extractors::{AuthClaims, HunterClaims},
     jwt::GuildRole,
@@ -102,10 +103,20 @@ pub struct SocialProfileResponse {
     pub motto: Option<String>,
 }
 
+#[derive(Debug, Serialize)]
+pub struct PlayerPassQrResponse {
+    pub qr_value: String,
+    pub token_type: String,
+    pub expires_in: i64,
+    pub expires_at: DateTime<Utc>,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct UpdateSocialProfileRequest {
     pub motto: Option<String>,
 }
+
+const PLAYER_PASS_QR_TOKEN_TTL_SECONDS: i64 = 5 * 60;
 
 pub async fn add_friend(
     HunterClaims(claims): HunterClaims,
@@ -360,6 +371,38 @@ pub async fn social_profile(
         &hunter_model,
         claims.guild_role,
     )))
+}
+
+pub async fn player_pass_qr(
+    HunterClaims(claims): HunterClaims,
+    State(state): State<AppState>,
+) -> AppResult<Json<PlayerPassQrResponse>> {
+    let hunter_id = claims
+        .hunter_id
+        .ok_or_else(|| AppError::Unauthorized("hunter token missing hunter_id".into()))?;
+    let hunter_model = hunter::Entity::find_by_id(hunter_id)
+        .filter(hunter::Column::GuildId.eq(claims.guild_id))
+        .one(&state.db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("玩家不存在".into()))?;
+
+    let hunter_tag = build_hunter_tag(&hunter_model.player_id);
+    let issued = state.jwt.issue_player_pass_qr_token(
+        hunter_model.id,
+        hunter_model.guild_id,
+        &hunter_model.player_id,
+        &hunter_tag,
+        PLAYER_PASS_QR_TOKEN_TTL_SECONDS,
+    )?;
+    let expires_at = DateTime::<Utc>::from_timestamp(issued.claims.exp, 0)
+        .ok_or_else(|| AppError::BadRequest("invalid pass qr expiry timestamp".into()))?;
+
+    Ok(Json(PlayerPassQrResponse {
+        qr_value: format!("thebitandbond://player-pass?token={}", issued.token),
+        token_type: issued.claims.typ,
+        expires_in: issued.expires_in,
+        expires_at,
+    }))
 }
 
 pub async fn update_social_profile(
@@ -736,19 +779,11 @@ fn build_hunter_tag(player_id: &str) -> String {
 }
 
 fn normalize_player_id(raw: &str) -> AppResult<String> {
-    let normalized = raw.trim().to_ascii_lowercase();
-    if normalized.len() < 4 || normalized.len() > 24 {
-        return Err(AppError::BadRequest("player_id 長度需為 4~24".into()));
-    }
-    if !normalized
-        .chars()
-        .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '_')
-    {
-        return Err(AppError::BadRequest(
-            "player_id 只能使用 a-z、0-9、_".into(),
-        ));
-    }
-    Ok(normalized)
+    normalize_player_id_with_messages(
+        raw,
+        "player_id 長度需為 4~24",
+        "player_id 只能使用 a-z、0-9、_",
+    )
 }
 
 fn pin_in_use(existing: &[hunter::Model], candidate: &str) -> bool {

@@ -3,6 +3,7 @@ mod app;
 mod auth;
 mod auth_throttle;
 mod config;
+mod domain;
 mod error;
 mod extractors;
 mod firebase_identity;

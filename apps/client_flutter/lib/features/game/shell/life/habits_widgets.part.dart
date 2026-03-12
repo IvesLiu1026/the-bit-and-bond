@@ -162,6 +162,7 @@ class _HabitCard extends StatelessWidget {
             const SizedBox(height: 10),
             if (canSubmitProof)
               PixelButton(
+                tapTargetKey: AppTestIds.habitSubmitButton(card.questId),
                 label: card.proofState == _HabitProofState.missed
                     ? strings.tr(zh: '補交完成證明', en: 'Submit Catch-up Proof')
                     : strings.tr(zh: '提交完成證明', en: 'Submit Proof'),
@@ -173,6 +174,7 @@ class _HabitCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: PixelButton(
+                      tapTargetKey: AppTestIds.habitRejectButton(card.questId),
                       label: strings.tr(zh: '退回', en: 'Return'),
                       tone: PixelTone.ruby,
                       onPressed: onReject,
@@ -181,6 +183,7 @@ class _HabitCard extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: PixelButton(
+                      tapTargetKey: AppTestIds.habitApproveButton(card.questId),
                       label: strings.tr(zh: '核准', en: 'Approve'),
                       tone: PixelTone.green,
                       onPressed: onApprove,

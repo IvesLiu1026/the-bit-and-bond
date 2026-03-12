@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/network/api_client.dart';
-import '../features/quests/models.dart';
+import '../core/models/models.dart';
 import 'providers.dart';
 
 final hunterStatsControllerProvider =

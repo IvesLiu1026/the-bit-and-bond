@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-import '../../features/quests/models.dart';
+import '../models/models.dart';
 
 const String _encryptedThreadMode = 'encrypted';
 

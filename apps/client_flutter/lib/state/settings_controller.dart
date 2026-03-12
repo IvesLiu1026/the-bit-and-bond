@@ -60,6 +60,11 @@ class SettingsController extends StateNotifier<AppSettings> {
     await _persist();
   }
 
+  Future<void> setPixelFontEnabled(bool value) async {
+    state = state.copyWith(pixelFontEnabled: value);
+    await _persist();
+  }
+
   Future<void> _persist() async {
     await _storage.write(key: storageKey, value: state.encode());
   }

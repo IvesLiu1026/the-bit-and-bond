@@ -2,7 +2,19 @@
 
 set -euo pipefail
 
-BASE_URL="${BASE_URL:-http://127.0.0.1:18080}"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ENV_FILE="${REPO_ROOT}/.env"
+
+if [[ -f "$ENV_FILE" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+fi
+
+BIND_ADDR="${BIND_ADDR:-0.0.0.0:18080}"
+API_PORT="${BIND_ADDR##*:}"
+BASE_URL="${BASE_URL:-${API_BASE_URL:-http://127.0.0.1:${API_PORT}}}"
 DB_CONTAINER="${DB_CONTAINER:-the_bit_and_bond_postgres}"
 DB_NAME="${DB_NAME:-the_bit_and_bond}"
 DB_USER="${DB_USER:-chen}"
@@ -93,6 +105,216 @@ assert_db_ready() {
     echo "Seed failed: database container $DB_CONTAINER is not running" >&2
     exit 1
   fi
+}
+
+assert_dependencies() {
+  for command in curl docker jq python3; do
+    if ! command -v "$command" >/dev/null 2>&1; then
+      echo "Seed failed: required command not found: $command" >&2
+      exit 1
+    fi
+  done
+}
+
+media_upload_root() {
+  printf '%s\n' "${MEDIA_UPLOAD_ROOT:-output/uploads}"
+}
+
+write_demo_png() {
+  local destination="$1"
+  mkdir -p "$(dirname "$destination")"
+  python3 - "$destination" <<'PY'
+import base64
+import pathlib
+import sys
+
+png_base64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+y0n8AAAAASUVORK5CYII="
+path = pathlib.Path(sys.argv[1])
+path.write_bytes(base64.b64decode(png_base64))
+PY
+}
+
+seed_demo_dm_media() {
+  local friend_guild_id="$1"
+  local friend_hunter_id="$2"
+  local master_hunter_id="$3"
+
+  local regular_media_id="70000000-0000-0000-0000-000000000101"
+  local once_media_id="70000000-0000-0000-0000-000000000102"
+  local once_delivery_id="71000000-0000-0000-0000-000000000101"
+  local regular_storage_key="photo-vault/${friend_hunter_id}/${regular_media_id}.png"
+  local once_storage_key="photo-once/${friend_hunter_id}/${once_media_id}.png"
+  local upload_root
+  upload_root="$(media_upload_root)"
+  local regular_path="${upload_root}/${regular_storage_key}"
+  local once_path="${upload_root}/${once_storage_key}"
+
+  write_demo_png "$regular_path"
+  write_demo_png "$once_path"
+
+  local regular_byte_size
+  regular_byte_size="$(wc -c < "$regular_path" | tr -d ' ')"
+  local once_byte_size
+  once_byte_size="$(wc -c < "$once_path" | tr -d ' ')"
+
+  psql_exec <<SQL
+INSERT INTO media_assets (
+  id,
+  guild_id,
+  owner_hunter_id,
+  mode,
+  storage_key,
+  original_filename,
+  mime_type,
+  byte_size,
+  caption,
+  is_photo_dump_ready,
+  created_at,
+  expires_at
+)
+VALUES
+  (
+    '$regular_media_id',
+    '$friend_guild_id',
+    '$friend_hunter_id',
+    'vault',
+    '$regular_storage_key',
+    'dm-regular-seed.png',
+    'image/png',
+    $regular_byte_size,
+    'dm smoke regular image',
+    false,
+    NOW() - INTERVAL '11 minutes',
+    NULL
+  ),
+  (
+    '$once_media_id',
+    '$friend_guild_id',
+    '$friend_hunter_id',
+    'once',
+    '$once_storage_key',
+    'dm-once-seed.png',
+    'image/png',
+    $once_byte_size,
+    'dm smoke one-time image',
+    false,
+    NOW() - INTERVAL '10 minutes',
+    NOW() + INTERVAL '7 days'
+  )
+ON CONFLICT (id) DO UPDATE
+SET guild_id = EXCLUDED.guild_id,
+    owner_hunter_id = EXCLUDED.owner_hunter_id,
+    mode = EXCLUDED.mode,
+    storage_key = EXCLUDED.storage_key,
+    original_filename = EXCLUDED.original_filename,
+    mime_type = EXCLUDED.mime_type,
+    byte_size = EXCLUDED.byte_size,
+    caption = EXCLUDED.caption,
+    is_photo_dump_ready = EXCLUDED.is_photo_dump_ready,
+    created_at = EXCLUDED.created_at,
+    expires_at = EXCLUDED.expires_at;
+
+INSERT INTO media_once_deliveries (
+  id,
+  media_asset_id,
+  guild_id,
+  sender_hunter_id,
+  recipient_hunter_id,
+  remaining_views,
+  opened_at,
+  consumed_at,
+  expires_at,
+  access_token_hash,
+  access_token_expires_at,
+  encryption_mode,
+  protocol_version,
+  sender_device_id,
+  recipient_device_id,
+  encryption_nonce,
+  encryption_mac,
+  created_at
+)
+VALUES (
+  '$once_delivery_id',
+  '$once_media_id',
+  '$friend_guild_id',
+  '$friend_hunter_id',
+  '$master_hunter_id',
+  1,
+  NULL,
+  NULL,
+  NOW() + INTERVAL '7 days',
+  NULL,
+  NULL,
+  'plaintext',
+  NULL,
+  NULL,
+  NULL,
+  NULL,
+  NULL,
+  NOW() - INTERVAL '10 minutes'
+)
+ON CONFLICT (id) DO UPDATE
+SET media_asset_id = EXCLUDED.media_asset_id,
+    guild_id = EXCLUDED.guild_id,
+    sender_hunter_id = EXCLUDED.sender_hunter_id,
+    recipient_hunter_id = EXCLUDED.recipient_hunter_id,
+    remaining_views = EXCLUDED.remaining_views,
+    opened_at = EXCLUDED.opened_at,
+    consumed_at = EXCLUDED.consumed_at,
+    expires_at = EXCLUDED.expires_at,
+    access_token_hash = EXCLUDED.access_token_hash,
+    access_token_expires_at = EXCLUDED.access_token_expires_at,
+    encryption_mode = EXCLUDED.encryption_mode,
+    protocol_version = EXCLUDED.protocol_version,
+    sender_device_id = EXCLUDED.sender_device_id,
+    recipient_device_id = EXCLUDED.recipient_device_id,
+    encryption_nonce = EXCLUDED.encryption_nonce,
+    encryption_mac = EXCLUDED.encryption_mac,
+    created_at = EXCLUDED.created_at;
+
+INSERT INTO direct_messages (
+  id,
+  sender_hunter_id,
+  recipient_hunter_id,
+  conversation_key,
+  client_message_id,
+  content,
+  sent_at
+)
+VALUES
+  (
+    '60000000-0000-0000-0000-000000000104',
+    '$friend_hunter_id',
+    '$master_hunter_id',
+    CASE WHEN '$friend_hunter_id' <= '$master_hunter_id'
+      THEN '$friend_hunter_id:$master_hunter_id'
+      ELSE '$master_hunter_id:$friend_hunter_id'
+    END,
+    '60000000-0000-0000-0000-000000009104',
+    '[[bb_img:/api/v1/media/assets/$regular_media_id/content]]',
+    NOW() - INTERVAL '11 minutes'
+  ),
+  (
+    '60000000-0000-0000-0000-000000000105',
+    '$friend_hunter_id',
+    '$master_hunter_id',
+    CASE WHEN '$friend_hunter_id' <= '$master_hunter_id'
+      THEN '$friend_hunter_id:$master_hunter_id'
+      ELSE '$master_hunter_id:$friend_hunter_id'
+    END,
+    '60000000-0000-0000-0000-000000009105',
+    '[[bb_once:$once_delivery_id]]',
+    NOW() - INTERVAL '10 minutes'
+  )
+ON CONFLICT (id) DO UPDATE
+SET sender_hunter_id = EXCLUDED.sender_hunter_id,
+    recipient_hunter_id = EXCLUDED.recipient_hunter_id,
+    conversation_key = EXCLUDED.conversation_key,
+    client_message_id = EXCLUDED.client_message_id,
+    content = EXCLUDED.content,
+    sent_at = EXCLUDED.sent_at;
+SQL
 }
 
 ensure_login_or_register() {
@@ -410,6 +632,14 @@ ON CONFLICT (hunter_id, item_id) DO UPDATE
 SET quantity = EXCLUDED.quantity,
     updated_at = EXCLUDED.updated_at;
 
+DELETE FROM hunter_inventories
+WHERE hunter_id = '$master_hunter_id'
+  AND item_id IN (
+    SELECT id
+    FROM guild_items
+    WHERE guild_id = '$master_guild_id' AND name = '公會徽章貼紙'
+  );
+
 INSERT INTO friend_links (id, player_id, friend_id, created_at)
 VALUES
   ('50000000-0000-0000-0000-000000000101', '$master_hunter_id', '$member_hunter_id', NOW()),
@@ -417,6 +647,25 @@ VALUES
   ('50000000-0000-0000-0000-000000000103', '$master_hunter_id', '$friend_hunter_id', NOW()),
   ('50000000-0000-0000-0000-000000000104', '$friend_hunter_id', '$master_hunter_id', NOW())
 ON CONFLICT (player_id, friend_id) DO NOTHING;
+
+DELETE FROM direct_messages
+WHERE conversation_key IN (
+    CASE WHEN '$master_hunter_id' <= '$member_hunter_id'
+      THEN '$master_hunter_id:$member_hunter_id'
+      ELSE '$member_hunter_id:$master_hunter_id'
+    END,
+    CASE WHEN '$friend_hunter_id' <= '$master_hunter_id'
+      THEN '$friend_hunter_id:$master_hunter_id'
+      ELSE '$master_hunter_id:$friend_hunter_id'
+    END
+  )
+  AND id NOT IN (
+    '60000000-0000-0000-0000-000000000101',
+    '60000000-0000-0000-0000-000000000102',
+    '60000000-0000-0000-0000-000000000103',
+    '60000000-0000-0000-0000-000000000104',
+    '60000000-0000-0000-0000-000000000105'
+  );
 
 INSERT INTO direct_messages (id, sender_hunter_id, recipient_hunter_id, conversation_key, client_message_id, content, sent_at)
 VALUES
@@ -466,6 +715,7 @@ SET sender_hunter_id = EXCLUDED.sender_hunter_id,
 SQL
 }
 
+assert_dependencies
 assert_server_ready
 assert_db_ready
 
@@ -486,6 +736,7 @@ seed_demo_data \
   "$member_hunter_id" \
   "$friend_guild_id" \
   "$friend_hunter_id"
+seed_demo_dm_media "$friend_guild_id" "$friend_hunter_id" "$master_hunter_id"
 
 printf '\nDemo accounts are ready:\n'
 printf '  %-12s PIN %-4s role=%-6s guild=%s\n' \
@@ -499,3 +750,4 @@ printf '\nDemo data seeded:\n'
   printf '  %s\n' "遠行公會：2 個 quest、1 個 shop item"
   printf '  %s\n' "好友關係：demo_master <-> demo_member，demo_master <-> demo_friend"
   printf '  %s\n' "私訊對話：demo_master <-> demo_member、demo_master <-> demo_friend"
+  printf '  %s\n' "DM media：demo_friend -> demo_master 的普通圖片與一次性圖片 fixture"

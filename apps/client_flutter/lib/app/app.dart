@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/l10n/app_strings.dart';
 import '../core/theme/app_theme.dart';
+import '../core/theme/pixel_typography.dart';
 import '../features/auth/immersive_onboarding_page.dart';
 import '../features/game/game_shell_page.dart';
 import '../state/providers.dart';
@@ -18,6 +19,7 @@ class TheBitAndBondApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final appSettings = ref.watch(appSettingsProvider);
     final strings = ref.watch(appStringsProvider);
+    PixelTypography.setPixelMode(appSettings.pixelFontEnabled);
 
     return MaterialApp(
       title: strings.appTitle,
@@ -32,7 +34,9 @@ class TheBitAndBondApp extends ConsumerWidget {
         GlobalCupertinoLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
       ],
-      theme: AppTheme.cozyGuildTheme,
+      theme: AppTheme.cozyGuildTheme(
+        pixelFontEnabled: appSettings.pixelFontEnabled,
+      ),
       home: AppStringsScope(strings: strings, child: const _AuthGate()),
     );
   }

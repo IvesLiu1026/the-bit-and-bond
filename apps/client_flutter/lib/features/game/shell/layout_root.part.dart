@@ -154,6 +154,7 @@ extension _GameShellRootLayout on _GameShellPageState {
                                   if (canShowFloorplan)
                                     const SizedBox(width: 8),
                                   _TopIconButton(
+                                    key: AppTestIds.mainMenuOpenButtonKey,
                                     icon: _PixelHudIcon.menu,
                                     label: strings.mainMenu,
                                     tooltip: strings.openMainMenu,

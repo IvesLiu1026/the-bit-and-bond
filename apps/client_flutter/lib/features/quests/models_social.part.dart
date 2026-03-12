@@ -165,6 +165,29 @@ class SocialProfile {
   }
 }
 
+class PlayerPassQrBundle {
+  PlayerPassQrBundle({
+    required this.qrValue,
+    required this.tokenType,
+    required this.expiresIn,
+    required this.expiresAt,
+  });
+
+  final String qrValue;
+  final String tokenType;
+  final int expiresIn;
+  final DateTime expiresAt;
+
+  factory PlayerPassQrBundle.fromJson(Map<String, dynamic> json) {
+    return PlayerPassQrBundle(
+      qrValue: json['qr_value'] as String? ?? '',
+      tokenType: json['token_type'] as String? ?? '',
+      expiresIn: (json['expires_in'] as num?)?.toInt() ?? 0,
+      expiresAt: DateTime.parse(json['expires_at'] as String),
+    );
+  }
+}
+
 class HunterStatsSummary {
   HunterStatsSummary({
     required this.hunterId,

@@ -16,6 +16,12 @@
 	<string>6.0</string>
 	<key>CFBundleName</key>
 	<string>The Bit and Bond</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(FLUTTER_BUILD_NAME)</string>
+	<key>CFBundleSignature</key>
+	<string>????</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -27,24 +33,25 @@
 			</array>
 		</dict>
 	</array>
-	<key>CFBundlePackageType</key>
-	<string>APPL</string>
-	<key>CFBundleShortVersionString</key>
-	<string>$(FLUTTER_BUILD_NAME)</string>
-	<key>CFBundleSignature</key>
-	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>GIDClientID</key>
 	<string>734293236922-ao6auqqm4nsq0n4f1s70n26qgk58qpgk.apps.googleusercontent.com</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>需要相機權限以拍下生活紀錄、習慣證明與回憶相片。</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>需要本機網路權限以連線到開發中的 The Bit and Bond API 與語音服務。</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>需要麥克風權限以加入酒館營火語音聊天。</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>需要照片權限以上傳生活紀錄、習慣證明與回憶相片。</string>
-	<key>NSCameraUsageDescription</key>
-	<string>需要相機權限以拍下生活紀錄、習慣證明與回憶相片。</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

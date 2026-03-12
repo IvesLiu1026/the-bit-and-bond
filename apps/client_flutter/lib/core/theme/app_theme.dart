@@ -4,7 +4,7 @@ import 'app_colors.dart';
 import 'pixel_typography.dart';
 
 class AppTheme {
-  static ThemeData get cozyGuildTheme {
+  static ThemeData cozyGuildTheme({bool pixelFontEnabled = true}) {
     final colorScheme = ColorScheme.fromSeed(
       seedColor: AppColors.apSapphire,
       brightness: Brightness.light,
@@ -12,13 +12,17 @@ class AppTheme {
       primary: AppColors.apSapphire,
       secondary: AppColors.stampGreen,
     );
+    final appFontFamily = pixelFontEnabled
+        ? PixelTypography.family
+        : PixelTypography.nonPixelFamily;
+    final appFontFallback = pixelFontEnabled ? PixelTypography.fallback : null;
 
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
-      fontFamilyFallback: PixelTypography.fallback,
+      fontFamilyFallback: appFontFallback,
       scaffoldBackgroundColor: AppColors.parchment,
-      fontFamily: PixelTypography.family,
+      fontFamily: appFontFamily,
       textTheme: TextTheme(
         headlineLarge: PixelTypography.style(
           color: AppColors.inkBrown,

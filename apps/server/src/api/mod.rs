@@ -218,6 +218,10 @@ pub fn router(state: AppState) -> Router {
             axum::routing::get(social::social_profile).patch(social::update_social_profile),
         )
         .route(
+            "/api/v1/social/profile/pass-qr",
+            axum::routing::get(social::player_pass_qr),
+        )
+        .route(
             "/api/v1/social/guild/invites",
             axum::routing::get(social::list_my_guild_invites).post(social::invite_friend_to_guild),
         )

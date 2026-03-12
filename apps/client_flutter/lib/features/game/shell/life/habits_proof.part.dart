@@ -114,13 +114,17 @@ class _HabitProofDialogState extends State<_HabitProofDialog> {
     }
     setState(() => _sending = true);
     try {
+      final optimisticUpdate = _HabitProofOptimisticUpdate(
+        submittedAt: DateTime.now(),
+        proofNote: note.isEmpty ? null : note,
+      );
       await widget.onSubmitHabit(
         widget.card.questId,
         proofNote: note,
         proofMedia: _selectedUpload,
       );
       if (mounted) {
-        Navigator.of(context).pop();
+        Navigator.of(context).pop(optimisticUpdate);
       }
     } catch (_) {
       // keep dialog open so players can retry immediately
@@ -134,6 +138,17 @@ class _HabitProofDialogState extends State<_HabitProofDialog> {
   @override
   Widget build(BuildContext context) {
     final strings = AppStrings.of(context);
+    final media = MediaQuery.of(context);
+    final maxDialogHeight = math.max(
+      320.0,
+      math.min(
+        560.0,
+        media.size.height -
+            media.padding.vertical -
+            media.viewInsets.bottom -
+            32,
+      ),
+    );
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
@@ -142,11 +157,13 @@ class _HabitProofDialogState extends State<_HabitProofDialog> {
         cut: 14,
         padding: const EdgeInsets.all(16),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 440),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+          constraints: BoxConstraints(maxWidth: 440, maxHeight: maxDialogHeight),
+          child: SingleChildScrollView(
+            padding: EdgeInsets.only(bottom: media.viewInsets.bottom > 0 ? 8 : 0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
               Text(
                 strings.tr(zh: '提交習慣證明', en: 'Submit Proof'),
                 style: const TextStyle(
@@ -226,6 +243,7 @@ class _HabitProofDialogState extends State<_HabitProofDialog> {
               ),
               const SizedBox(height: 12),
               _PixelTextInput(
+                key: AppTestIds.habitProofNoteFieldKey,
                 controller: _controller,
                 minLines: 3,
                 maxLines: 5,
@@ -250,6 +268,7 @@ class _HabitProofDialogState extends State<_HabitProofDialog> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: PixelButton(
+                      tapTargetKey: AppTestIds.habitProofSendButtonKey,
                       label: _sending
                           ? strings.tr(zh: '送審中...', en: 'Sending...')
                           : strings.tr(zh: '送審', en: 'Send'),
@@ -259,7 +278,8 @@ class _HabitProofDialogState extends State<_HabitProofDialog> {
                   ),
                 ],
               ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

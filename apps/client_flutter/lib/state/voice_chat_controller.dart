@@ -7,15 +7,17 @@ import 'package:livekit_client/livekit_client.dart' as lk;
 import 'package:uuid/uuid.dart';
 
 import '../core/auth/auth_session.dart';
+import '../core/l10n/app_strings.dart';
+import '../core/models/models.dart';
 import '../core/network/api_client.dart';
-import '../features/quests/models.dart';
 import 'providers.dart';
 
 final voiceChatControllerProvider =
     StateNotifierProvider<VoiceChatController, VoiceChatState>((ref) {
       final api = ref.watch(apiClientProvider);
       final session = ref.watch(authSessionProvider);
-      return VoiceChatController(api: api, session: session);
+      final strings = ref.watch(appStringsProvider);
+      return VoiceChatController(api: api, session: session, strings: strings);
     });
 
 class VoiceChatState {
@@ -81,33 +83,50 @@ class VoiceChatState {
 }
 
 class VoiceChatController extends StateNotifier<VoiceChatState> {
-  VoiceChatController({required ApiClient api, required AuthSession? session})
-    : _api = api,
-      _session = session,
-      super(const VoiceChatState.initial());
+  VoiceChatController({
+    required ApiClient api,
+    required AuthSession? session,
+    required AppStrings strings,
+  }) : _api = api,
+       _session = session,
+       _strings = strings,
+       super(const VoiceChatState.initial());
 
   final ApiClient _api;
   final AuthSession? _session;
+  final AppStrings _strings;
   final Uuid _uuid = const Uuid();
 
   lk.Room? _room;
   lk.EventsListener<lk.RoomEvent>? _listener;
   int _roomEpoch = 0;
 
+  void _applyState(VoiceChatState Function(VoiceChatState current) update) {
+    if (!mounted) {
+      return;
+    }
+    state = update(state);
+  }
+
   Future<void> joinCampfire() async {
     if (state.connected || state.connecting) {
       return;
     }
     if (_session == null) {
-      state = state.copyWith(errorMessage: '尚未登入，無法加入營火語音');
+      state = state.copyWith(errorMessage: _strings.voiceLoginRequiredError);
       return;
     }
 
     final epoch = ++_roomEpoch;
-    state = state.copyWith(connecting: true, clearError: true);
+    _applyState(
+      (current) => current.copyWith(connecting: true, clearError: true),
+    );
     try {
       final bundle = await _api.issueVoiceToken();
       await _teardown();
+      if (!mounted) {
+        return;
+      }
       if (epoch != _roomEpoch) {
         return;
       }
@@ -116,16 +135,21 @@ class VoiceChatController extends StateNotifier<VoiceChatState> {
       final listener = room.createListener();
       listener
         ..on<lk.RoomDisconnectedEvent>((_) {
+          if (!mounted) {
+            return;
+          }
           if (epoch != _roomEpoch) {
             return;
           }
-          state = state.copyWith(
-            connected: false,
-            connecting: false,
-            micEnabled: false,
-            participantCount: 0,
-            activeSpeakerIdentities: <String>{},
-            clearError: true,
+          _applyState(
+            (current) => current.copyWith(
+              connected: false,
+              connecting: false,
+              micEnabled: false,
+              participantCount: 0,
+              activeSpeakerIdentities: <String>{},
+              clearError: true,
+            ),
           );
         })
         ..on<lk.ParticipantConnectedEvent>((_) => _syncParticipantStatus())
@@ -133,7 +157,14 @@ class VoiceChatController extends StateNotifier<VoiceChatState> {
         ..on<lk.ActiveSpeakersChangedEvent>((_) => _syncParticipantStatus())
         ..on<lk.DataReceivedEvent>(_onDataReceived);
 
-      await room.connect(bundle.url, bundle.token);
+      await room
+          .connect(bundle.url, bundle.token)
+          .timeout(const Duration(seconds: 12));
+      if (!mounted) {
+        await room.disconnect();
+        await room.dispose();
+        return;
+      }
       if (epoch != _roomEpoch) {
         await room.disconnect();
         await room.dispose();
@@ -143,32 +174,61 @@ class VoiceChatController extends StateNotifier<VoiceChatState> {
       _room = room;
       _listener = listener;
 
-      await _setMicrophoneEnabled(true);
-      final history = await _api.getChatHistory(
-        roomId: bundle.roomId,
-        limit: 80,
-      );
-
-      state = state.copyWith(
-        connecting: false,
-        connected: true,
-        micEnabled: true,
-        roomId: bundle.roomId,
-        chatTopic: bundle.chatTopic,
-        messages: history,
-        clearError: true,
+      _applyState(
+        (current) => current.copyWith(
+          connecting: false,
+          connected: true,
+          micEnabled: false,
+          roomId: bundle.roomId,
+          chatTopic: bundle.chatTopic,
+          clearError: true,
+        ),
       );
       _syncParticipantStatus();
+
+      try {
+        await _setMicrophoneEnabled(true).timeout(const Duration(seconds: 6));
+        _applyState(
+          (current) => current.copyWith(micEnabled: true, clearError: true),
+        );
+      } catch (error) {
+        _applyState(
+          (current) => current.copyWith(
+            errorMessage: _strings.voiceMicStartFailed(error),
+          ),
+        );
+      }
+
+      try {
+        final history = await _api.getChatHistory(
+          roomId: bundle.roomId,
+          limit: 80,
+        );
+        _applyState((current) => current.copyWith(messages: history));
+      } catch (error) {
+        _applyState(
+          (current) => current.copyWith(
+            errorMessage: _strings.voiceHistorySyncFailed(error),
+          ),
+        );
+      }
     } catch (error) {
       await _teardown();
+      if (!mounted) {
+        return;
+      }
       if (epoch != _roomEpoch) {
         return;
       }
-      state = state.copyWith(
-        connecting: false,
-        connected: false,
-        micEnabled: false,
-        errorMessage: '語音連線失敗：$error',
+      _applyState(
+        (current) => current.copyWith(
+          connecting: false,
+          connected: false,
+          micEnabled: false,
+          participantCount: 0,
+          activeSpeakerIdentities: <String>{},
+          errorMessage: _strings.voiceConnectFailed(error),
+        ),
       );
     }
   }
@@ -176,14 +236,16 @@ class VoiceChatController extends StateNotifier<VoiceChatState> {
   Future<void> leaveVoice() async {
     _roomEpoch++;
     await _teardown();
-    state = state.copyWith(
-      connecting: false,
-      connected: false,
-      micEnabled: false,
-      participantCount: 0,
-      activeSpeakerIdentities: <String>{},
-      clearRoomId: true,
-      clearError: true,
+    _applyState(
+      (current) => current.copyWith(
+        connecting: false,
+        connected: false,
+        micEnabled: false,
+        participantCount: 0,
+        activeSpeakerIdentities: <String>{},
+        clearRoomId: true,
+        clearError: true,
+      ),
     );
   }
 
@@ -194,9 +256,15 @@ class VoiceChatController extends StateNotifier<VoiceChatState> {
     final next = !state.micEnabled;
     try {
       await _setMicrophoneEnabled(next);
-      state = state.copyWith(micEnabled: next, clearError: true);
+      _applyState(
+        (current) => current.copyWith(micEnabled: next, clearError: true),
+      );
     } catch (error) {
-      state = state.copyWith(errorMessage: '切換麥克風失敗：$error');
+      _applyState(
+        (current) => current.copyWith(
+          errorMessage: _strings.voiceToggleMicFailed(error),
+        ),
+      );
     }
   }
 
@@ -207,7 +275,10 @@ class VoiceChatController extends StateNotifier<VoiceChatState> {
     }
     final roomId = state.roomId;
     if (roomId == null || roomId.isEmpty) {
-      state = state.copyWith(errorMessage: '尚未加入語音吧台，無法發送訊息');
+      _applyState(
+        (current) =>
+            current.copyWith(errorMessage: _strings.voiceSendRequiresJoinError),
+      );
       return;
     }
 
@@ -218,22 +289,17 @@ class VoiceChatController extends StateNotifier<VoiceChatState> {
       guildId: _session?.guildId ?? '',
       roomId: roomId,
       senderHunterId: _session?.hunterId ?? '',
-      senderName: _session?.displayName ?? _session?.playerId ?? '目前玩家',
+      senderName:
+          _session?.displayName ??
+          _session?.playerId ??
+          _strings.currentPlayerLabel,
       clientMessageId: clientMessageId,
       content: content,
       sentAt: DateTime.fromMillisecondsSinceEpoch(sentAtMs),
       sentAtMs: sentAtMs,
     );
     _mergeMessage(optimistic);
-    final payload = {
-      'type': 'chat.message',
-      'content': content,
-      'client_message_id': clientMessageId,
-      'sent_at_ms': sentAtMs,
-    };
-
     try {
-      await _publishData(payload);
       final persisted = await _api.persistChatMessage(
         content: content,
         roomId: roomId,
@@ -241,8 +307,12 @@ class VoiceChatController extends StateNotifier<VoiceChatState> {
         sentAtMs: sentAtMs,
       );
       _mergeMessage(persisted);
+      await _publishData(buildVoiceRoomChatPayload(persisted));
     } catch (error) {
-      state = state.copyWith(errorMessage: '聊天室送出失敗：$error');
+      _applyState(
+        (current) =>
+            current.copyWith(errorMessage: _strings.voiceChatSendFailed(error)),
+      );
     }
   }
 
@@ -287,41 +357,25 @@ class VoiceChatController extends StateNotifier<VoiceChatState> {
   }
 
   Future<void> _onDataReceived(lk.DataReceivedEvent event) async {
-    final roomId = state.roomId;
-    if (roomId == null || roomId.isEmpty) {
-      return;
-    }
-
     try {
       final jsonRaw = utf8.decode(event.data);
       final decoded = jsonDecode(jsonRaw);
       if (decoded is! Map<String, dynamic>) {
         return;
       }
-      if (decoded['type'] != 'chat.message') {
-        return;
+      final message = parseVoiceRoomChatPayload(decoded);
+      if (message != null) {
+        _mergeMessage(message);
       }
-
-      final content = (decoded['content'] as String?)?.trim();
-      if (content == null || content.isEmpty) {
-        return;
-      }
-      final clientMessageId = decoded['client_message_id'] as String?;
-      final sentAtMs = decoded['sent_at_ms'] as int?;
-
-      final persisted = await _api.persistChatMessage(
-        content: content,
-        roomId: roomId,
-        clientMessageId: clientMessageId,
-        sentAtMs: sentAtMs,
-      );
-      _mergeMessage(persisted);
     } catch (error) {
       debugPrint('handle data channel message failed: $error');
     }
   }
 
   void _mergeMessage(ChatMessage message) {
+    if (!mounted) {
+      return;
+    }
     final merged = [...state.messages];
     final sameIdIndex = merged.indexWhere((item) => item.id == message.id);
     if (sameIdIndex != -1) {
@@ -337,10 +391,15 @@ class VoiceChatController extends StateNotifier<VoiceChatState> {
       }
     }
     merged.sort((a, b) => a.sentAtMs.compareTo(b.sentAtMs));
-    state = state.copyWith(messages: merged, clearError: true);
+    _applyState(
+      (current) => current.copyWith(messages: merged, clearError: true),
+    );
   }
 
   void _syncParticipantStatus() {
+    if (!mounted) {
+      return;
+    }
     final room = _room;
     if (room == null) {
       return;
@@ -364,9 +423,11 @@ class VoiceChatController extends StateNotifier<VoiceChatState> {
       }
     }
 
-    state = state.copyWith(
-      participantCount: participantCount,
-      activeSpeakerIdentities: activeSpeakerIdentities,
+    _applyState(
+      (current) => current.copyWith(
+        participantCount: participantCount,
+        activeSpeakerIdentities: activeSpeakerIdentities,
+      ),
     );
   }
 
@@ -396,4 +457,61 @@ class VoiceChatController extends StateNotifier<VoiceChatState> {
     unawaited(_teardown());
     super.dispose();
   }
+}
+
+Map<String, dynamic> buildVoiceRoomChatPayload(ChatMessage message) {
+  return <String, dynamic>{'type': 'chat.message', 'message': message.toJson()};
+}
+
+ChatMessage? parseVoiceRoomChatPayload(Map<String, dynamic> payload) {
+  if (payload['type'] != 'chat.message') {
+    return null;
+  }
+  final message = payload['message'];
+  if (message is Map<String, dynamic>) {
+    return ChatMessage.fromJson(message);
+  }
+  if (message is Map) {
+    return ChatMessage.fromJson(Map<String, dynamic>.from(message));
+  }
+
+  final content = (payload['content'] as String?)?.trim();
+  final roomId = (payload['room_id'] as String?)?.trim();
+  final senderHunterId = (payload['sender_hunter_id'] as String?)?.trim();
+  if (content == null ||
+      content.isEmpty ||
+      roomId == null ||
+      roomId.isEmpty ||
+      senderHunterId == null ||
+      senderHunterId.isEmpty) {
+    return null;
+  }
+
+  final sentAtMs =
+      (payload['sent_at_ms'] as num?)?.toInt() ??
+      DateTime.now().millisecondsSinceEpoch;
+  final sentAt = DateTime.fromMillisecondsSinceEpoch(sentAtMs);
+  final rawClientMessageId = (payload['client_message_id'] as String?)
+      ?.trim()
+      .replaceAll('local:', '');
+  final clientMessageId =
+      (rawClientMessageId == null || rawClientMessageId.isEmpty)
+      ? 'live:$senderHunterId:$sentAtMs'
+      : rawClientMessageId;
+
+  return ChatMessage(
+    id: ((payload['id'] as String?)?.trim())?.isNotEmpty == true
+        ? (payload['id'] as String).trim()
+        : 'live:$clientMessageId',
+    guildId: (payload['guild_id'] as String?)?.trim() ?? '',
+    roomId: roomId,
+    senderHunterId: senderHunterId,
+    senderName: (payload['sender_name'] as String?)?.trim().isNotEmpty == true
+        ? (payload['sender_name'] as String).trim()
+        : senderHunterId,
+    clientMessageId: clientMessageId,
+    content: content,
+    sentAt: sentAt,
+    sentAtMs: sentAtMs,
+  );
 }

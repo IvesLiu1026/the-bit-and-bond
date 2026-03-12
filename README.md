@@ -1,6 +1,6 @@
 # The Bit and Bond
 
-`The Bit and Bond` 是一個「RPG 公會生活」導向的任務與社交 App，採用 Monorepo 架構，包含：
+`The Bit and Bond` 是一個以 `Gamify your life` 為核心的像素風格生活遊戲化 App。它先從家庭協作出發，再延伸到朋友、私訊、語音房、習慣挑戰與照片記錄。採用 Monorepo 架構，包含：
 - Rust 後端（Axum + SeaORM + PostgreSQL）
 - Flutter 前端（Flame + Riverpod）
 - 即時多人同步（WebSocket）
@@ -9,10 +9,10 @@
 
 ## 1. 專案目標
 
-- 讓玩家在酒館場景中移動、互動、接取任務
-- 提供玩家註冊/登入、任務流程、社交關係與公會邀請
-- 支援同公會多人即時位置同步
-- 使用單一倉庫維護前後端與資料模型一致性
+- 把任務、習慣、獎勵、私訊與生活記錄整合到同一個 playful hub
+- 支援家庭 first 的建立任務、提交證明、審核與回饋流程
+- 支援朋友向的私訊、閃照、語音房與 accountability 場景
+- 使用單一倉庫維護前後端、資料模型與客戶端契約一致性
 
 ## 2. Monorepo 結構
 
@@ -57,7 +57,7 @@
 ```text
 Flutter Client
   ├─ REST (/api/v1/auth, /hunters, /quests, /social...)
-  └─ WS   (/api/v1/realtime/ws?token=...)
+  └─ WS   (/api/v1/realtime/ticket -> /api/v1/realtime/ws?ticket=...)
         ↓
 Axum Server
   ├─ Auth + JWT + Extractors (角色/權限)
@@ -94,7 +94,7 @@ PostgreSQL (SeaORM)
   - `FromRequestParts` 權限抽取器
   - `AuthClaims` / `GuildMasterClaims` / `HunterClaims`
 - `apps/server/src/presence.rs`
-  - Guild 房間即時同步 hub（in-memory）
+  - 同 guild 空間的即時同步 hub（in-memory）
 
 ### 5.2 API 路由概覽（現況）
 
@@ -121,7 +121,8 @@ PostgreSQL (SeaORM)
   - `GET/POST /api/v1/social/guild/invites`
   - `POST /api/v1/social/guild/invites/{invite_id}/respond`
 - Realtime
-  - `GET /api/v1/realtime/ws?token=<jwt>`
+  - `POST /api/v1/realtime/ticket`
+  - `GET /api/v1/realtime/ws?ticket=<short-lived ticket>`
 
 ### 5.3 認證與權限模型
 
@@ -183,7 +184,7 @@ PostgreSQL (SeaORM)
 - `000004`：`users.hunter_tag/current_role`、`friend_requests`
 - `000005`：`hunters.user_id/guild_role` 與 owner hunter backfill
 - `000006`：`hunters.motto`
-- `000007`：`quests.stat_category`（RPG 能力標籤）
+- `000007`：`quests.stat_category`（成長能力標籤）
 - `000008`：`hunters.pin_code` 擴充為 hash 長度並批次遷移 Argon2
 - `000009`：`quests.stat_category` 轉為 PostgreSQL ENUM（含 `NONE` 預設）
 
@@ -217,7 +218,7 @@ PostgreSQL (SeaORM)
   - HUD、互動按鈕、資料面板
   - WebSocket 連線管理與重連策略
 - `bitbond_game.dart`
-  - 酒館場景、家具碰撞、互動距離判定
+  - 主生活空間、家具碰撞、互動距離判定
   - 浮動虛擬搖桿控制角色
   - 本地玩家控制 + 遠端玩家插值渲染
 
@@ -242,13 +243,23 @@ cp .env.example .env
 - `REDIS_URL`（選填；多節點 Realtime 才需要）
 - `FIREBASE_PROJECT_ID`（若要使用 Google Sign-In / Firebase 驗章）
 
-### 8.3 啟動 PostgreSQL
+### 8.3 啟動支援服務
 
 ```bash
-docker compose -f infra/docker-compose.yml up -d
+./scripts/start_local_support_services.sh
 ```
 
-預設 host port 為 `5433`，避免與本機 `5432` 衝突。
+這會啟動：
+- PostgreSQL
+- LiveKit / Redis / Coturn（預設）
+
+如果只想先起 DB：
+
+```bash
+START_VOICE=0 ./scripts/start_local_support_services.sh
+```
+
+預設 host port 會讀 `.env` 的 `POSTGRES_PORT`，若未設定則為 `5433`。
 
 ### 8.4 啟動後端
 
@@ -284,6 +295,30 @@ flutter run -d web-server \
 - `PRODUCTION_API_BASE_URL=...`
 - `MOBILE_API_BASE_URL=...`（原生裝置連線後端時）
 
+### 8.6 建立可登入的 demo 資料
+
+repo 內正式的 demo bootstrap 流程是：
+
+```bash
+./scripts/bootstrap_local_demo.sh
+```
+
+如果 API server 已經在跑，這支腳本會：
+- 啟動本機支援服務
+- 建立或登入 `demo_master / demo_member / demo_friend`
+- 補齊 quest、habit、商店、背包、好友與私訊測試資料
+
+如果 API server 還沒跑，它會先把支援服務起好，並提示你接著執行：
+
+```bash
+cargo run -p the_bit_and_bond_server
+./scripts/seed_demo_accounts.sh
+```
+
+注意：
+- `infra/seed.sql` 是舊 schema，不要再拿來初始化現在這版系統
+- 正式 demo seed 入口是 [scripts/seed_demo_accounts.sh](/Users/ivesliu/Documents/the-bit-and-bond/scripts/seed_demo_accounts.sh)
+
 ## 9. 測試與品質控管
 
 ### Rust
@@ -292,6 +327,7 @@ flutter run -d web-server \
 cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test -p the_bit_and_bond_server --locked
+python3 scripts/check_openapi_routes.py
 ```
 
 ### Flutter
@@ -302,13 +338,56 @@ flutter analyze
 flutter test
 ```
 
+app-first 的 iOS simulator smoke：
+
+```bash
+./scripts/run_ios_local_smoke.sh
+```
+
+這條會：
+- 確認本機支援服務已啟動
+- 驗證 API health 並補齊 demo seed
+- 啟動 iPhone simulator
+- 在 iOS app 上跑 `onboarding -> manual login -> DM text -> DM media -> voice -> habits -> rewards -> bag -> profile`
+- `DM image / one-time image` 會使用 smoke fixture 走真實 upload API，不會打開系統相簿 picker
+- simulator 預設使用 `VOICE_SMOKE_MODE=graceful`
+  - voice 會接受「成功連線」或「顯示可恢復的 RTC / ICE 錯誤且不崩潰」
+  - 真機驗證仍然要補 `voice join / leave` 的實際 RTC smoke
+
+真機 smoke：
+
+```bash
+./scripts/run_ios_device_smoke.sh
+```
+
+這條會：
+- 自動找已連線的實體 iPhone / iPad
+- 先檢查 `Developer Mode`、本機 `iOS Development` 簽名憑證、`Runner` 的 `Development Team`
+- 重用同一套 local API + seed
+- 以 `VOICE_SMOKE_MODE=connect` 跑真機版 app smoke
+- 如果目前沒有接上裝置，或真機開發前置設定沒完成，會直接提示下一步而不是假裝已驗完
+
+第一次在新 Mac 跑真機前，通常還需要：
+- 在 iPhone 上打開 `Settings > Privacy & Security > Developer Mode`
+- 在 Xcode 登入 Apple ID，產生 `iOS Development` certificate
+- 在 `apps/client_flutter/ios/Runner.xcworkspace` 的 `Runner > Signing & Capabilities` 選好 `Team`
+- 在 `Xcode > Settings > Components` 安裝至少一個 `iOS Simulator` runtime
+  - 即使是跑真機 build，Xcode 仍會在 storyboard / asset catalog 編譯階段依賴 simulator runtime
+
+或直接從 repo root 跑整套：
+
+```bash
+./scripts/run_quality_gates.sh
+```
+
 效能驗證流程：
-- [docs/performance_playbook.md](/Users/ivesliu/Documents/chen-leveling/docs/performance_playbook.md)
+- [docs/performance_playbook.md](/Users/ivesliu/Documents/the-bit-and-bond/docs/performance_playbook.md)
 
 ## 10. CI/CD（GitHub Actions）
 
 - `CI`
   - Rust：fmt / clippy / test
+  - Contract：OpenAPI route coverage
   - Flutter：analyze / test
 - `PR Preview Build`
   - 建置 Flutter web preview artifact
@@ -320,12 +399,12 @@ flutter test
 ## 11. 發版檢查表
 
 - 請先跑一遍：
-  [docs/release_checklist.md](/Users/ivesliu/Documents/chen-leveling/docs/release_checklist.md)
+  [docs/release_checklist.md](/Users/ivesliu/Documents/the-bit-and-bond/docs/release_checklist.md)
 - TestFlight 內測流程：
-  [docs/testflight_internal_beta_checklist.md](/Users/ivesliu/Documents/chen-leveling/docs/testflight_internal_beta_checklist.md)
+  [docs/testflight_internal_beta_checklist.md](/Users/ivesliu/Documents/the-bit-and-bond/docs/testflight_internal_beta_checklist.md)
 - Telemetry 指標與查詢：
-  [docs/telemetry_metrics_guide.md](/Users/ivesliu/Documents/chen-leveling/docs/telemetry_metrics_guide.md)
-  與 [docs/telemetry_dashboard_queries.sql](/Users/ivesliu/Documents/chen-leveling/docs/telemetry_dashboard_queries.sql)
+  [docs/telemetry_metrics_guide.md](/Users/ivesliu/Documents/the-bit-and-bond/docs/telemetry_metrics_guide.md)
+  與 [docs/telemetry_dashboard_queries.sql](/Users/ivesliu/Documents/the-bit-and-bond/docs/telemetry_dashboard_queries.sql)
 
 ## 12. 目前已知限制
 

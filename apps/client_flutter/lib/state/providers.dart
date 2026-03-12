@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
@@ -5,6 +7,7 @@ import '../core/auth/auth_session.dart';
 import '../core/auth/google_federated_auth_service.dart';
 import '../core/config/app_config.dart';
 import '../core/l10n/app_strings.dart';
+import '../core/models/models.dart';
 import '../core/network/api_client.dart';
 import '../core/network/auth_api_client.dart';
 import '../core/security/dm_e2ee_service.dart';
@@ -95,4 +98,18 @@ final productAnalyticsProvider = Provider<ProductAnalytics>((ref) {
 final questRepositoryProvider = Provider<QuestRepository>((ref) {
   final api = ref.watch(apiClientProvider);
   return QuestRepository(api);
+});
+
+final dmSmokeMediaUploadProvider = Provider<MediaUpload?>((ref) {
+  final config = ref.watch(appConfigProvider);
+  if (!config.smokeMediaUploadsEnabled) {
+    return null;
+  }
+  return MediaUpload(
+    filename: 'dm-smoke-upload-fixture.png',
+    bytes: base64Decode(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+y0n8AAAAASUVORK5CYII=',
+    ),
+    mimeType: 'image/png',
+  );
 });

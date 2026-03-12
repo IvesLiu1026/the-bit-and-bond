@@ -216,58 +216,21 @@ AuthSession _apiClientRequireSession(ApiClient api) {
 }
 
 Map<String, String> _apiClientBearerHeaders(String token) => {
-  'Authorization': 'Bearer $token',
-  'Accept': 'application/json',
-  'ngrok-skip-browser-warning': 'true',
+  ...bearerHeaders(token),
 };
 
 Map<String, String> _apiClientJsonBearerHeaders(String token) => {
-  'Content-Type': 'application/json',
-  'Accept': 'application/json',
-  'Authorization': 'Bearer $token',
-  'ngrok-skip-browser-warning': 'true',
+  ...jsonHeaders(bearerToken: token),
 };
 
 dynamic _apiClientParseResponse(ApiClient api, http.Response response) {
-  final rawBody = response.body;
-  dynamic body = <String, dynamic>{};
-  if (rawBody.isNotEmpty) {
-    try {
-      body = jsonDecode(rawBody) as dynamic;
-    } on FormatException {
-      final snippet = _apiClientCompactSnippet(api, rawBody);
-      if (snippet.contains('ERR_NGROK_6024')) {
-        throw ApiException(
-          'ngrok warning page intercepted the API response; please refresh the app and retry',
-          response.statusCode,
-        );
-      }
-      throw ApiException(
-        'expected JSON response but received: $snippet',
-        response.statusCode,
-      );
-    }
-  }
-
-  if (response.statusCode >= 200 && response.statusCode < 300) {
-    return body;
-  }
-
-  if (body is Map<String, dynamic> && body['error'] is String) {
-    throw ApiException(body['error'] as String, response.statusCode);
-  }
-
-  throw ApiException(
-    'API request failed with status ${response.statusCode}'
-    '${rawBody.isEmpty ? '' : ' (${_apiClientCompactSnippet(api, rawBody)})'}',
-    response.statusCode,
+  return parseJsonResponse<ApiException>(
+    response,
+    invalidJsonMessage: 'expected JSON response but received',
+    ngrokInterceptMessage:
+        'ngrok warning page intercepted the API response; please refresh the app and retry',
+    fallbackErrorLabel: 'API request failed',
+    errorFactory: ApiException.new,
+    maxErrorSnippetLength: ApiClient._maxErrorSnippetLength,
   );
-}
-
-String _apiClientCompactSnippet(ApiClient api, String body) {
-  final compact = body.replaceAll(RegExp(r'\s+'), ' ').trim();
-  if (compact.length <= ApiClient._maxErrorSnippetLength) {
-    return compact;
-  }
-  return '${compact.substring(0, ApiClient._maxErrorSnippetLength)}...';
 }

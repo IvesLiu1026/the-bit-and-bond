@@ -19,38 +19,6 @@ extension _GameShellActionsCommon on _GameShellPageState {
     });
   }
 
-  void _handleGuildInviteScroll(SocialSnapshot snapshot) {
-    final pendingIds = snapshot.pendingInvites
-        .map((invite) => invite.id)
-        .toSet();
-    if (!_socialSnapshotBootstrapped) {
-      _knownPendingInviteIds
-        ..clear()
-        ..addAll(pendingIds);
-      _socialSnapshotBootstrapped = true;
-      if (_activeGuildInvite == null && snapshot.pendingInvites.isNotEmpty) {
-        _showSummonScroll(snapshot.pendingInvites.first);
-      }
-    } else {
-      final newcomers = snapshot.pendingInvites
-          .where((invite) => !_knownPendingInviteIds.contains(invite.id))
-          .toList(growable: false);
-      if (newcomers.isNotEmpty) {
-        _showSummonScroll(newcomers.first);
-      }
-      _knownPendingInviteIds
-        ..clear()
-        ..addAll(pendingIds);
-    }
-
-    final active = _activeGuildInvite;
-    if (active != null && !pendingIds.contains(active.id)) {
-      _applyState(() {
-        _activeGuildInvite = null;
-      });
-    }
-  }
-
   void _showSummonScroll(GuildInviteInfo invite) {
     if (!mounted) {
       return;

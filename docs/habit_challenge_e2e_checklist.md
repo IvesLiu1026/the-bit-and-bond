@@ -11,6 +11,7 @@ This checklist validates the family habit loop end-to-end:
 ## Test Environment
 - Client: iOS Simulator (recommended: 390x844 and 844x390)
 - Server running on `http://127.0.0.1:18080`
+- Demo data can be prepared with `./scripts/seed_demo_accounts.sh`
 - Database seeded with at least:
   - 1 guild master account
   - 1 member account (assigned target)

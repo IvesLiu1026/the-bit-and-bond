@@ -19,9 +19,9 @@
 - 語音房：LiveKit token 由 Rust 後端發，Flutter 前端加入房間
 - 聊天：後端有 chat API，前端已有 campfire/chat UI 與 controller
 
-目前前端主場景已經不再是單純米色 dashboard，而是 tavern / guild hall 路線：
+目前前端主場景已經是像素化的主生活空間，雖然內部資料模型仍有 `guild` 命名，但產品方向已經轉向 `Gamify your life`：
 
-- 主背景已切成像素酒館圖
+- 主背景已切成像素風主空間
 - 角色採 top-down sprite animation
 - 有浮動虛擬搖桿
 - 有互動家具熱區：
@@ -146,22 +146,22 @@
 
 - 不要執行 `infra/seed.sql`
 - 不要期待它能建立現在可登入的 demo 帳號
-- MacBook agent 應該補新的 seed / bootstrap 流程
+- 正式 demo bootstrap 改用 `./scripts/bootstrap_local_demo.sh` 與 `./scripts/seed_demo_accounts.sh`
 
-### 陷阱 B：`demo_master` / `demo_member` 不是 repo 真相
+### 陷阱 B：不要再假設 demo 帳號是「神祕本機狀態」
 
-目前能用的 demo 帳號，是 Windows / WSL 本機資料庫內的狀態，不是 repo 內可重建的資料。
+現在 repo 已經內建新的 demo seed 流程，但前提是你要走新的腳本入口，而不是舊 `infra/seed.sql`。
 
 這代表：
 
 - 你在 Mac 上 pull 下來之後，不會自然擁有 `demo_master`
-- 你也不會自然擁有商店商品、背包、現成聊天紀錄
-- 這些都需要重新建立或補 seed script
+- 但你可以用 `./scripts/seed_demo_accounts.sh` 重建 `demo_master / demo_member / demo_friend`
+- 商店商品、背包、現成聊天紀錄也會一起補進去
 
 正確心態是：
 
-- repo 提供的是程式碼與 migration
-- demo data 目前還不是正式基礎設施的一部分
+- repo 提供的是程式碼、migration 與正式 demo seed 腳本
+- demo data 現在可以重建，但仍然不該用舊 `infra/seed.sql`
 
 ## 5. 這次 Windows / WSL 開發新增、應該推上去的內容
 
@@ -280,25 +280,31 @@ docker --version
 
 ### 7.5 Demo 測試資料
 
-現在 repo 裡沒有新的正式 seed 流程來建立：
+現在 repo 內正式的 demo seed 流程是：
+
+```bash
+./scripts/bootstrap_local_demo.sh
+```
+
+或在 API server 已經啟動時直接跑：
+
+```bash
+./scripts/seed_demo_accounts.sh
+```
+
+這會建立或重用：
 
 - `demo_master`
 - `demo_member`
+- `demo_friend`
 - 商店商品
 - 背包物品
+- 基本 quest / habit / DM 測試資料
 
-也就是說，這些 demo 帳號目前是「本機資料庫狀態」，不是 repo 內可重建真相。
+仍然要記得：
 
-MacBook agent 應該把這件事視為待補技術債：
-
-1. 新增新的 seed script，對齊現在的 unified auth / guild / hunter / shop schema
-2. 不要使用 `infra/seed.sql`
-
-原因：
-
-- `infra/seed.sql` 仍然是舊 `households / members / characters / quest_templates` 模型
-- 跟現在後端 schema 不一致
-- 不能拿來初始化目前這版系統
+- `infra/seed.sql` 是舊 `households / members / characters / quest_templates` 世界
+- 現在不要再用它初始化這版系統
 
 ## 8. 資料庫建立流程
 

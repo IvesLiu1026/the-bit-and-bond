@@ -7,6 +7,7 @@ class _PlayerProfileDialog extends StatefulWidget {
     required this.statsState,
     required this.onlineHunterIds,
     required this.onSaveMotto,
+    required this.onLoadPlayerPassQr,
   });
 
   final AsyncValue<SocialSnapshot> socialState;
@@ -14,6 +15,7 @@ class _PlayerProfileDialog extends StatefulWidget {
   final AsyncValue<HunterStatsSummary?> statsState;
   final Set<String> onlineHunterIds;
   final Future<void> Function(String motto) onSaveMotto;
+  final Future<PlayerPassQrBundle> Function() onLoadPlayerPassQr;
 
   @override
   State<_PlayerProfileDialog> createState() => _PlayerProfileDialogState();
@@ -23,6 +25,13 @@ class _PlayerProfileDialogState extends State<_PlayerProfileDialog> {
   final TextEditingController _mottoController = TextEditingController();
   bool _savingMotto = false;
   String? _mottoSeed;
+  late Future<PlayerPassQrBundle> _playerPassQrFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _playerPassQrFuture = widget.onLoadPlayerPassQr();
+  }
 
   @override
   void dispose() {
@@ -57,6 +66,114 @@ class _PlayerProfileDialogState extends State<_PlayerProfileDialog> {
         });
       }
     }
+  }
+
+  void _refreshPlayerPassQr() {
+    setState(() {
+      _playerPassQrFuture = widget.onLoadPlayerPassQr();
+    });
+  }
+
+  String _formatPassExpiry(DateTime value) {
+    final local = value.toLocal();
+    final month = local.month.toString().padLeft(2, '0');
+    final day = local.day.toString().padLeft(2, '0');
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
+    return '$month/$day $hour:$minute';
+  }
+
+  Widget _buildPlayerPassQr(AppStrings strings) {
+    return FutureBuilder<PlayerPassQrBundle>(
+      future: _playerPassQrFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return SizedBox(
+            width: 168,
+            height: 168,
+            child: const Center(child: _PixelLoadingBar()),
+          );
+        }
+
+        if (snapshot.hasError || !snapshot.hasData) {
+          return SizedBox(
+            width: 220,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  strings.tr(zh: '通行證 QR 讀取失敗', en: 'Failed to load pass QR'),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: AppColors.inkBrown,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: 170,
+                  child: _StampButton(
+                    label: strings.tr(zh: '重新產生', en: 'Regenerate'),
+                    icon: Icons.refresh_rounded,
+                    tone: _StampTone.blue,
+                    onPressed: _refreshPlayerPassQr,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        final bundle = snapshot.data!;
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 176,
+              height: 176,
+              color: Colors.white,
+              padding: const EdgeInsets.all(6),
+              child: QrImageView(
+                data: bundle.qrValue,
+                version: QrVersions.auto,
+                size: 160,
+                backgroundColor: Colors.white,
+                eyeStyle: const QrEyeStyle(
+                  eyeShape: QrEyeShape.square,
+                  color: AppColors.inkBrown,
+                ),
+                dataModuleStyle: const QrDataModuleStyle(
+                  dataModuleShape: QrDataModuleShape.square,
+                  color: AppColors.inkBrown,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              strings.tr(
+                zh: '有效至 ${_formatPassExpiry(bundle.expiresAt)}',
+                en: 'Valid until ${_formatPassExpiry(bundle.expiresAt)}',
+              ),
+              style: const TextStyle(
+                color: AppColors.inkBrown,
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: 150,
+              child: _StampButton(
+                label: strings.tr(zh: '刷新 QR', en: 'Refresh QR'),
+                icon: Icons.qr_code_2_rounded,
+                tone: _StampTone.wood,
+                onPressed: _refreshPlayerPassQr,
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -169,6 +286,7 @@ class _PlayerProfileDialogState extends State<_PlayerProfileDialog> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: _StatTile(
+                            key: AppTestIds.profileCoinsTileKey,
                             title: strings.tr(zh: '金幣', en: 'Coins'),
                             value: '$coins',
                           ),
@@ -192,10 +310,7 @@ class _PlayerProfileDialogState extends State<_PlayerProfileDialog> {
                           width: 2,
                         ),
                       ),
-                      child: CustomPaint(
-                        size: const Size(168, 168),
-                        painter: _PseudoQrPainter(seed: tag),
-                      ),
+                      child: _buildPlayerPassQr(strings),
                     ),
                     const SizedBox(height: 12),
                     _PixelTextInput(

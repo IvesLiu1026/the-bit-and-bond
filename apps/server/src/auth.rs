@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{
+    domain::player_identity::normalize_player_id_with_messages,
     error::{AppError, AppResult},
     extractors::AuthClaims,
     firebase_identity::{FirebaseIdentity, verify_firebase_id_token},
@@ -681,21 +682,11 @@ where
 }
 
 fn normalize_player_id(raw: &str) -> AppResult<String> {
-    let normalized = raw.trim().to_ascii_lowercase();
-    if normalized.len() < 4 || normalized.len() > 24 {
-        return Err(AppError::BadRequest(
-            "player_id length must be 4..24".into(),
-        ));
-    }
-    if !normalized
-        .chars()
-        .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '_')
-    {
-        return Err(AppError::BadRequest(
-            "player_id can only contain a-z, 0-9, _".into(),
-        ));
-    }
-    Ok(normalized)
+    normalize_player_id_with_messages(
+        raw,
+        "player_id length must be 4..24",
+        "player_id can only contain a-z, 0-9, _",
+    )
 }
 
 fn normalize_avatar_type(raw: Option<&str>) -> Option<&str> {

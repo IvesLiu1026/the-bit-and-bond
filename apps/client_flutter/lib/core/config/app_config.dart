@@ -7,11 +7,13 @@ class AppConfig {
     required this.apiBaseUrl,
     required this.lowFxMode,
     required this.environment,
+    required this.smokeMediaUploadsEnabled,
   });
 
   final String apiBaseUrl;
   final bool lowFxMode;
   final AppEnvironment environment;
+  final bool smokeMediaUploadsEnabled;
 
   static AppConfig fromEnvironment() {
     const apiBaseUrlFromEnv = String.fromEnvironment('API_BASE_URL');
@@ -32,6 +34,10 @@ class AppConfig {
       'LOW_FX',
       defaultValue: 'false',
     );
+    const smokeMediaUploadsFromEnv = String.fromEnvironment(
+      'SMOKE_MEDIA_UPLOADS',
+      defaultValue: 'false',
+    );
     final environment = parseEnvironment(appEnvironmentRaw);
 
     return AppConfig(
@@ -44,6 +50,7 @@ class AppConfig {
       ),
       lowFxMode: _parseBool(lowFxFromEnv),
       environment: environment,
+      smokeMediaUploadsEnabled: _parseBool(smokeMediaUploadsFromEnv),
     );
   }
 

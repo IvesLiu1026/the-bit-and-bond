@@ -5,11 +5,13 @@ class _ParchmentSection extends StatelessWidget {
     required this.title,
     required this.icon,
     required this.child,
+    this.expandChild = false,
   });
 
   final String title;
   final IconData icon;
   final Widget child;
+  final bool expandChild;
 
   @override
   Widget build(BuildContext context) {
@@ -43,7 +45,7 @@ class _ParchmentSection extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          child,
+          if (expandChild) Expanded(child: child) else child,
         ],
       ),
     );
@@ -375,7 +377,7 @@ class _PixelStatPainter extends CustomPainter {
 }
 
 class _StatTile extends StatelessWidget {
-  const _StatTile({required this.title, required this.value});
+  const _StatTile({super.key, required this.title, required this.value});
 
   final String title;
   final String value;

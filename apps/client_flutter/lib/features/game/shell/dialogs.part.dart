@@ -361,6 +361,8 @@ extension _GameShellDialogs on _GameShellPageState {
               statsState: statsState,
               onlineHunterIds: _onlineHunterIds,
               onSaveMotto: _savePlayerMotto,
+              onLoadPlayerPassQr: () =>
+                  ref.read(apiClientProvider).getPlayerPassQrBundle(),
             );
           },
         );

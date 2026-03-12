@@ -6,10 +6,11 @@ import 'package:http/http.dart' as http;
 
 import 'package:the_bit_and_bond_client/app/app.dart';
 import 'package:the_bit_and_bond_client/core/auth/auth_session.dart';
+import 'package:the_bit_and_bond_client/core/ui/app_test_ids.dart';
 import 'package:the_bit_and_bond_client/core/network/api_client.dart';
 import 'package:the_bit_and_bond_client/core/security/dm_e2ee_service.dart';
 import 'package:the_bit_and_bond_client/core/network/auth_api_client.dart';
-import 'package:the_bit_and_bond_client/features/quests/models.dart';
+import 'package:the_bit_and_bond_client/core/models/models.dart';
 import 'package:the_bit_and_bond_client/state/direct_messages_controller.dart';
 import 'package:the_bit_and_bond_client/features/quests/quest_repository.dart';
 import 'package:the_bit_and_bond_client/state/auth_controller.dart';
@@ -427,6 +428,113 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'Initial social snapshot does not show new friend request notice',
+    (WidgetTester tester) async {
+      tester.view.devicePixelRatio = 1.0;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      final socialController = _TestSocialController(
+        initialSnapshot: _buildSocialSnapshot(
+          incomingFriendRequests: [
+            _buildFriendRequest(id: 'friend-request-existing'),
+          ],
+        ),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authControllerProvider.overrideWith((ref) => _TestAuthController()),
+            questControllerProvider.overrideWith(
+              (ref) => _TestQuestController(),
+            ),
+            progressionControllerProvider.overrideWith(
+              (ref) => _TestProgressionController(),
+            ),
+            inventoryControllerProvider.overrideWith(
+              (ref) => _TestInventoryController(),
+            ),
+            socialControllerProvider.overrideWith((ref) => socialController),
+            directMessagesControllerProvider.overrideWith(
+              (ref) => _TestDirectMessagesController(),
+            ),
+          ],
+          child: const TheBitAndBondApp(),
+        ),
+      );
+
+      await _pumpUi(tester);
+
+      expect(find.text('收到新的好友請求捲軸'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Game shell notice reacts to new friend request ids even when total count stays the same',
+    (WidgetTester tester) async {
+      tester.view.devicePixelRatio = 1.0;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      final socialController = _TestSocialController(
+        initialSnapshot: _buildSocialSnapshot(
+          incomingFriendRequests: [
+            _buildFriendRequest(id: 'friend-request-original'),
+          ],
+        ),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authControllerProvider.overrideWith((ref) => _TestAuthController()),
+            questControllerProvider.overrideWith(
+              (ref) => _TestQuestController(),
+            ),
+            progressionControllerProvider.overrideWith(
+              (ref) => _TestProgressionController(),
+            ),
+            inventoryControllerProvider.overrideWith(
+              (ref) => _TestInventoryController(),
+            ),
+            socialControllerProvider.overrideWith((ref) => socialController),
+            directMessagesControllerProvider.overrideWith(
+              (ref) => _TestDirectMessagesController(),
+            ),
+          ],
+          child: const TheBitAndBondApp(),
+        ),
+      );
+
+      await _pumpUi(tester);
+      expect(find.text('收到新的好友請求捲軸'), findsNothing);
+
+      socialController.emitSnapshot(
+        _buildSocialSnapshot(
+          incomingFriendRequests: [
+            _buildFriendRequest(id: 'friend-request-replacement'),
+          ],
+        ),
+      );
+      await _pumpUi(tester);
+
+      expect(find.text('收到新的好友請求捲軸'), findsOneWidget);
+
+      await tester.pump(const Duration(seconds: 4));
+      expect(find.text('收到新的好友請求捲軸'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('DM inbox supports unread sections and search', (
     WidgetTester tester,
   ) async {
@@ -569,6 +677,191 @@ void main() {
     expect(find.text('從相簿選擇'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('Habit dialog reacts to proof submission updates', (
+    WidgetTester tester,
+  ) async {
+    tester.view.devicePixelRatio = 1.0;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authControllerProvider.overrideWith((ref) => _TestAuthController()),
+          questControllerProvider.overrideWith(
+            (ref) => _ReactiveHabitQuestController(),
+          ),
+          hunterDirectoryControllerProvider.overrideWith(
+            (ref) => _TestHunterDirectoryController(),
+          ),
+          progressionControllerProvider.overrideWith(
+            (ref) => _TestProgressionController(),
+          ),
+          inventoryControllerProvider.overrideWith(
+            (ref) => _TestInventoryController(),
+          ),
+          socialControllerProvider.overrideWith(
+            (ref) => _TestSocialController(),
+          ),
+          directMessagesControllerProvider.overrideWith(
+            (ref) => _TestDirectMessagesController(),
+          ),
+        ],
+        child: const TheBitAndBondApp(),
+      ),
+    );
+
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    await tester.tap(find.text('選單').first);
+    await _pumpUi(tester);
+    final mainMenuScrollable = find.descendant(
+      of: find.byKey(AppTestIds.mainMenuGridKey),
+      matching: find.byType(Scrollable),
+    );
+    await tester.scrollUntilVisible(
+      find.byKey(AppTestIds.mainMenuCard('habits')),
+      220,
+      scrollable: mainMenuScrollable,
+    );
+    await _tapMenuCard(tester, 'habits');
+    await _pumpUi(tester);
+
+    final habitsScrollable = find
+        .descendant(
+          of: find.byKey(AppTestIds.habitsPanelKey),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    final submitButton = find.byKey(
+      AppTestIds.habitSubmitButton('habit-missed'),
+    );
+    await tester.scrollUntilVisible(
+      submitButton,
+      180,
+      scrollable: habitsScrollable,
+    );
+    await _pumpUi(tester);
+    expect(submitButton, findsOneWidget);
+    await tester.tap(submitButton);
+    await _pumpUi(tester);
+
+    await tester.enterText(
+      find.byKey(AppTestIds.habitProofNoteFieldKey),
+      'Updated proof note',
+    );
+    await tester.tap(find.byKey(AppTestIds.habitProofSendButtonKey));
+    await _pumpUi(tester, frames: 10);
+
+    expect(find.byKey(AppTestIds.habitProofNoteFieldKey), findsNothing);
+    expect(
+      find.byKey(AppTestIds.habitSubmitButton('habit-missed')),
+      findsNothing,
+    );
+
+    await tester.scrollUntilVisible(
+      find.byKey(AppTestIds.habitReviewCard('habit-missed')),
+      180,
+      scrollable: habitsScrollable,
+    );
+    await _pumpUi(tester);
+
+    expect(
+      find.byKey(AppTestIds.habitReviewCard('habit-missed')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Habit dialog reacts to master review approvals', (
+    WidgetTester tester,
+  ) async {
+    tester.view.devicePixelRatio = 1.0;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authControllerProvider.overrideWith(
+            (ref) => _TestMasterAuthController(),
+          ),
+          questControllerProvider.overrideWith(
+            (ref) => _ReactiveHabitQuestController(),
+          ),
+          hunterDirectoryControllerProvider.overrideWith(
+            (ref) => _TestHunterDirectoryController(),
+          ),
+          progressionControllerProvider.overrideWith(
+            (ref) => _TestProgressionController(),
+          ),
+          inventoryControllerProvider.overrideWith(
+            (ref) => _TestInventoryController(),
+          ),
+          socialControllerProvider.overrideWith(
+            (ref) => _TestSocialController(),
+          ),
+          directMessagesControllerProvider.overrideWith(
+            (ref) => _TestDirectMessagesController(),
+          ),
+        ],
+        child: const TheBitAndBondApp(),
+      ),
+    );
+
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    await tester.tap(find.text('選單').first);
+    await _pumpUi(tester);
+    final mainMenuScrollable = find.descendant(
+      of: find.byKey(AppTestIds.mainMenuGridKey),
+      matching: find.byType(Scrollable),
+    );
+    await tester.scrollUntilVisible(
+      find.byKey(AppTestIds.mainMenuCard('habits')),
+      220,
+      scrollable: mainMenuScrollable,
+    );
+    await _tapMenuCard(tester, 'habits');
+    await _pumpUi(tester);
+
+    final habitsScrollable = find
+        .descendant(
+          of: find.byKey(AppTestIds.habitsPanelKey),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await tester.scrollUntilVisible(
+      find.byKey(AppTestIds.habitApproveButton('habit-review-new')),
+      180,
+      scrollable: habitsScrollable,
+    );
+    await _pumpUi(tester);
+
+    await tester.tap(
+      find.byKey(AppTestIds.habitApproveButton('habit-review-new')),
+    );
+    await _pumpUi(tester, frames: 10);
+
+    expect(
+      find.byKey(AppTestIds.habitReviewCard('habit-review-new')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(AppTestIds.habitApproveButton('habit-review-new')),
+      findsNothing,
+    );
+    expect(tester.takeException(), isNull);
+  });
 }
 
 Future<void> _pumpUi(WidgetTester tester, {int frames = 6}) async {
@@ -582,6 +875,45 @@ Future<void> _tapMenuCard(WidgetTester tester, String id) async {
   await tester.ensureVisible(finder);
   final rect = tester.getRect(finder);
   await tester.tapAt(rect.topLeft + const Offset(18, 18));
+}
+
+SocialSnapshot _buildSocialSnapshot({
+  List<FriendProfile> friends = const [],
+  List<GuildInviteInfo> pendingInvites = const [],
+  List<FriendRequestInfo> incomingFriendRequests = const [],
+  SocialProfile? profile,
+}) {
+  return SocialSnapshot(
+    friends: friends,
+    pendingInvites: pendingInvites,
+    incomingFriendRequests: incomingFriendRequests,
+    profile: profile,
+  );
+}
+
+FriendRequestInfo _buildFriendRequest({
+  required String id,
+  String requesterHunterId = '00000000-0000-0000-0000-000000000099',
+  String requesterPlayerId = 'demo_friend',
+  String requesterName = 'Demo Friend',
+  String targetHunterId = '00000000-0000-0000-0000-000000000011',
+  String targetPlayerId = 'demo_member',
+  String targetName = 'Demo Member',
+  String status = 'pending',
+  DateTime? createdAt,
+}) {
+  return FriendRequestInfo(
+    id: id,
+    requesterHunterId: requesterHunterId,
+    requesterPlayerId: requesterPlayerId,
+    requesterName: requesterName,
+    targetHunterId: targetHunterId,
+    targetPlayerId: targetPlayerId,
+    targetName: targetName,
+    status: status,
+    createdAt: createdAt ?? DateTime(2026, 3, 11, 12, 0),
+    respondedAt: null,
+  );
 }
 
 class _TestQuestController extends QuestController {
@@ -707,6 +1039,172 @@ class _TestHabitQuestController extends QuestController {
   }) async {}
 }
 
+class _ReactiveHabitQuestController extends QuestController {
+  _ReactiveHabitQuestController() : super(repo: _NoopQuestRepository()) {
+    _quests = _buildReactiveHabitQuests();
+    state = AsyncValue.data(_quests);
+  }
+
+  late List<QuestInstance> _quests;
+
+  @override
+  Future<void> load() async {}
+
+  @override
+  Future<void> refresh() async {
+    state = AsyncValue.data(_quests);
+  }
+
+  @override
+  Future<void> submitQuest(
+    String questInstanceId, {
+    String? proofNote,
+    QuestProofUpload? proofMedia,
+  }) async {
+    final submittedAt = DateTime(2026, 3, 11, 19, 30);
+    _quests = _quests
+        .map((quest) {
+          if (quest.id != questInstanceId) {
+            return quest;
+          }
+          return _copyQuest(
+            quest,
+            status: QuestStatus.submitted,
+            proofNote: proofNote,
+            proofSubmittedAt: submittedAt,
+            lastReviewNote: null,
+            updatedAt: submittedAt,
+          );
+        })
+        .toList(growable: false);
+    state = AsyncValue.data(_quests);
+  }
+
+  @override
+  Future<QuestReviewResult> reviewQuest({
+    required String questId,
+    required bool approve,
+    String? hunterId,
+    String? reviewNote,
+  }) async {
+    late QuestInstance updatedQuest;
+    final reviewedAt = DateTime(2026, 3, 11, 20, 0);
+    _quests = _quests
+        .map((quest) {
+          if (quest.id != questId) {
+            return quest;
+          }
+          updatedQuest = _copyQuest(
+            quest,
+            status: QuestStatus.available,
+            lastReviewNote: reviewNote,
+            lastCompletedAt: approve ? reviewedAt : quest.lastCompletedAt,
+            updatedAt: reviewedAt,
+          );
+          return updatedQuest;
+        })
+        .toList(growable: false);
+    state = AsyncValue.data(_quests);
+    return QuestReviewResult(quest: updatedQuest, hunter: null, reward: null);
+  }
+
+  static List<QuestInstance> _buildReactiveHabitQuests() {
+    final now = DateTime(2026, 3, 11, 18, 0);
+    return [
+      QuestInstance(
+        id: 'habit-review-old',
+        templateId: 'habit-template-old',
+        templateTitle: 'Older Review',
+        category: QuestCategory.habit,
+        statCategory: QuestStatCategory.vitality,
+        baseXp: 12,
+        baseCoins: 3,
+        status: QuestStatus.submitted,
+        assignedHunterId: _TestProgressionController._childId,
+        cadence: HabitCadence.daily,
+        streakCount: 2,
+        bestStreak: 2,
+        completionsCount: 2,
+        proofNote: 'older proof',
+        proofSubmittedAt: now.subtract(const Duration(hours: 8)),
+        dueAt: null,
+        updatedAt: now.subtract(const Duration(hours: 8)),
+      ),
+      QuestInstance(
+        id: 'habit-review-new',
+        templateId: 'habit-template-new',
+        templateTitle: 'Newest Review',
+        category: QuestCategory.habit,
+        statCategory: QuestStatCategory.vitality,
+        baseXp: 15,
+        baseCoins: 5,
+        status: QuestStatus.submitted,
+        assignedHunterId: _TestProgressionController._childId,
+        cadence: HabitCadence.daily,
+        streakCount: 4,
+        bestStreak: 4,
+        completionsCount: 4,
+        proofNote: 'new proof',
+        proofSubmittedAt: now.subtract(const Duration(hours: 1)),
+        dueAt: null,
+        updatedAt: now.subtract(const Duration(hours: 1)),
+      ),
+      QuestInstance(
+        id: 'habit-missed',
+        templateId: 'habit-template-missed',
+        templateTitle: 'Catch-up Habit',
+        category: QuestCategory.habit,
+        statCategory: QuestStatCategory.vitality,
+        baseXp: 20,
+        baseCoins: 6,
+        status: QuestStatus.available,
+        assignedHunterId: _TestProgressionController._childId,
+        cadence: HabitCadence.daily,
+        streakCount: 1,
+        bestStreak: 3,
+        completionsCount: 8,
+        lastCompletedAt: now.subtract(const Duration(days: 2)),
+        dueAt: null,
+        updatedAt: now,
+      ),
+    ];
+  }
+
+  static QuestInstance _copyQuest(
+    QuestInstance quest, {
+    QuestStatus? status,
+    String? proofNote,
+    DateTime? proofSubmittedAt,
+    DateTime? lastCompletedAt,
+    String? lastReviewNote,
+    DateTime? updatedAt,
+  }) {
+    return QuestInstance(
+      id: quest.id,
+      templateId: quest.templateId,
+      templateTitle: quest.templateTitle,
+      category: quest.category,
+      statCategory: quest.statCategory,
+      baseXp: quest.baseXp,
+      baseCoins: quest.baseCoins,
+      status: status ?? quest.status,
+      assignedHunterId: quest.assignedHunterId,
+      createdByHunterId: quest.createdByHunterId,
+      cadence: quest.cadence,
+      streakCount: quest.streakCount,
+      bestStreak: quest.bestStreak,
+      completionsCount: quest.completionsCount,
+      proofNote: proofNote ?? quest.proofNote,
+      proofSubmittedAt: proofSubmittedAt ?? quest.proofSubmittedAt,
+      lastCompletedAt: lastCompletedAt ?? quest.lastCompletedAt,
+      lastReviewNote: lastReviewNote ?? quest.lastReviewNote,
+      proofMedia: quest.proofMedia,
+      dueAt: quest.dueAt,
+      updatedAt: updatedAt ?? quest.updatedAt,
+    );
+  }
+}
+
 class _TestProgressionController extends ProgressionController {
   _TestProgressionController()
     : super(repo: _NoopQuestRepository(), selectedHunterId: _childId) {
@@ -796,7 +1294,7 @@ class _TestInventoryController extends InventoryController {
 }
 
 class _TestSocialController extends SocialController {
-  _TestSocialController()
+  _TestSocialController({SocialSnapshot? initialSnapshot})
     : super(
         api: ApiClient(
           baseUrl: 'http://127.0.0.1:18080',
@@ -809,14 +1307,11 @@ class _TestSocialController extends SocialController {
           httpClient: _NeverHttpClient(),
         ),
       ) {
-    state = AsyncValue.data(
-      SocialSnapshot(
-        friends: const [],
-        pendingInvites: const [],
-        incomingFriendRequests: const [],
-        profile: null,
-      ),
-    );
+    state = AsyncValue.data(initialSnapshot ?? _buildSocialSnapshot());
+  }
+
+  void emitSnapshot(SocialSnapshot snapshot) {
+    state = AsyncValue.data(snapshot);
   }
 
   @override
@@ -998,6 +1493,32 @@ class _TestAuthController extends AuthController {
         guildId: '00000000-0000-0000-0000-000000000001',
         hunterId: '00000000-0000-0000-0000-000000000011',
         guildRole: GuildRole.member,
+      ),
+    );
+  }
+
+  @override
+  Future<void> logout() async {
+    state = const AsyncValue.data(null);
+  }
+}
+
+class _TestMasterAuthController extends AuthController {
+  _TestMasterAuthController()
+    : super(
+        authApi: AuthApiClient(
+          baseUrl: 'http://127.0.0.1:18080',
+          httpClient: _NeverHttpClient(),
+        ),
+        storage: const FlutterSecureStorage(),
+        restoreOnInit: false,
+      ) {
+    state = const AsyncValue.data(
+      AuthSession(
+        accessToken: 'test-token',
+        guildId: '00000000-0000-0000-0000-000000000001',
+        hunterId: '00000000-0000-0000-0000-000000000099',
+        guildRole: GuildRole.master,
       ),
     );
   }

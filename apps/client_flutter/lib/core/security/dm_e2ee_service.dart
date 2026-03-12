@@ -4,7 +4,7 @@ import 'dart:math';
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter/foundation.dart';
 
-import '../../features/quests/models.dart';
+import '../models/models.dart';
 import '../auth/auth_session.dart';
 import '../network/api_client.dart';
 import 'dm_e2ee_models.dart';

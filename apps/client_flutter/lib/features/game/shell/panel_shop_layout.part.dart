@@ -43,6 +43,7 @@ extension _GuildShopPanelStateLayout on _GuildShopPanelState {
     }
 
     final purchaseButton = _StampButton(
+      key: AppTestIds.rewardBuyButton(item.id),
       label: buying
           ? strings.tr(zh: '購買中', en: 'Buying')
           : strings.tr(zh: '購買', en: 'Buy'),

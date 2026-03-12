@@ -4,6 +4,7 @@ enum _PixelHudIcon { map, menu, quest, desk, shop, bag, fire, theme, logout }
 
 class _TopIconButton extends StatefulWidget {
   const _TopIconButton({
+    super.key,
     required this.icon,
     required this.label,
     required this.tooltip,

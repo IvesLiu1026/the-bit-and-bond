@@ -19,6 +19,7 @@ class _GreetingStep extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
+          key: AppTestIds.onboardingEnterSpaceButtonKey,
           onTap: onTap,
           splashColor: Colors.transparent,
           highlightColor: Colors.transparent,
@@ -230,6 +231,8 @@ class _CustomizationStep extends StatelessWidget {
                     const SizedBox(width: 10),
                     Expanded(
                       child: PixelButton(
+                        tapTargetKey:
+                            AppTestIds.onboardingContinueToContractButtonKey,
                         label: strings.tr(zh: '前往契約', en: 'Go to Contract'),
                         tone: PixelTone.gold,
                         compact: true,
@@ -256,6 +259,8 @@ class _CustomizationStep extends StatelessWidget {
                     SizedBox(
                       width: 220,
                       child: PixelButton(
+                        tapTargetKey:
+                            AppTestIds.onboardingContinueToContractButtonKey,
                         label: strings.tr(
                           zh: '裝扮完成，簽署契約',
                           en: 'Look Ready, Sign Contract',

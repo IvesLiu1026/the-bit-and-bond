@@ -128,6 +128,7 @@ class _ParchmentContractCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 PixelButton(
+                  tapTargetKey: AppTestIds.onboardingManualRegisterButtonKey,
                   label: strings.tr(zh: '手動註冊新角色', en: 'Register Manually'),
                   tone: PixelTone.parchment,
                   compact: true,
@@ -136,6 +137,7 @@ class _ParchmentContractCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 PixelButton(
+                  tapTargetKey: AppTestIds.onboardingManualLoginButtonKey,
                   label: strings.tr(
                     zh: '已有角色，用玩家 ID 登入',
                     en: 'Use Player ID to Sign In',
@@ -155,6 +157,7 @@ class _ParchmentContractCard extends StatelessWidget {
                 SizedBox(
                   width: 200,
                   child: PixelButton(
+                    tapTargetKey: AppTestIds.onboardingManualRegisterButtonKey,
                     label: strings.tr(zh: '手動註冊新角色', en: 'Register Manually'),
                     tone: PixelTone.parchment,
                     onPressed: onLegacyRegister,
@@ -163,6 +166,7 @@ class _ParchmentContractCard extends StatelessWidget {
                 SizedBox(
                   width: 240,
                   child: PixelButton(
+                    tapTargetKey: AppTestIds.onboardingManualLoginButtonKey,
                     label: strings.tr(
                       zh: '已有角色，用玩家 ID 登入',
                       en: 'Use Player ID to Sign In',

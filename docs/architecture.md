@@ -13,10 +13,11 @@
 ## State authority
 
 - Client can stage interactions, but quest approval and progression rewards are server-authoritative.
-- `point_ledger` is append-only source of truth for rewards.
-- `characters` is a snapshot table optimized for fast reads.
+- `hunter_reward_ledger` is the append-only source of truth for XP and coin changes.
+- `hunters` stores the current player snapshot used for fast reads.
 
 ## Transport
 
-- Baseline: REST for all core task/progression flows.
-- Future optional add-on: WebSocket only for guardian approval push events.
+- Baseline: REST for auth, quests, DM, media, shop, inventory, telemetry, and voice token issuance.
+- Realtime presence uses `POST /api/v1/realtime/ticket` followed by `GET /api/v1/realtime/ws?ticket=...`.
+- OpenAPI lives in `packages/api-spec/openapi.yaml`, and CI verifies every `/api/v1/*` router path is documented there.

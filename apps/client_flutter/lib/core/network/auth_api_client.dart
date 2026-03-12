@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../auth/auth_session.dart';
+import 'http_transport.dart';
 
 class AuthApiClient {
   AuthApiClient({required this.baseUrl, http.Client? httpClient})
@@ -10,7 +11,6 @@ class AuthApiClient {
 
   final String baseUrl;
   final http.Client _httpClient;
-  static const int _maxErrorSnippetLength = 180;
 
   Future<AuthSession> registerPlayer({
     required String playerId,
@@ -101,60 +101,19 @@ class AuthApiClient {
     );
   }
 
-  Map<String, String> _jsonHeaders() => const {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-    'ngrok-skip-browser-warning': 'true',
-  };
+  Map<String, String> _jsonHeaders() => jsonHeaders();
 
-  Map<String, String> _bearerHeaders(String token) => {
-    'Authorization': 'Bearer $token',
-    'Accept': 'application/json',
-    'ngrok-skip-browser-warning': 'true',
-  };
+  Map<String, String> _bearerHeaders(String token) => bearerHeaders(token);
 
   dynamic _parseResponse(http.Response response) {
-    final rawBody = response.body;
-    dynamic body = <String, dynamic>{};
-    if (rawBody.isNotEmpty) {
-      try {
-        body = jsonDecode(rawBody) as dynamic;
-      } on FormatException {
-        final snippet = _compactSnippet(rawBody);
-        if (snippet.contains('ERR_NGROK_6024')) {
-          throw AuthApiException(
-            'ngrok warning page intercepted auth API response; please refresh and retry',
-            response.statusCode,
-          );
-        }
-        throw AuthApiException(
-          'expected JSON auth response but received: $snippet',
-          response.statusCode,
-        );
-      }
-    }
-
-    if (response.statusCode >= 200 && response.statusCode < 300) {
-      return body;
-    }
-
-    if (body is Map<String, dynamic> && body['error'] is String) {
-      throw AuthApiException(body['error'] as String, response.statusCode);
-    }
-
-    throw AuthApiException(
-      'auth request failed with status ${response.statusCode}'
-      '${rawBody.isEmpty ? '' : ' (${_compactSnippet(rawBody)})'}',
-      response.statusCode,
+    return parseJsonResponse<AuthApiException>(
+      response,
+      invalidJsonMessage: 'expected JSON auth response but received',
+      ngrokInterceptMessage:
+          'ngrok warning page intercepted auth API response; please refresh and retry',
+      fallbackErrorLabel: 'auth request failed',
+      errorFactory: AuthApiException.new,
     );
-  }
-
-  String _compactSnippet(String body) {
-    final compact = body.replaceAll(RegExp(r'\s+'), ' ').trim();
-    if (compact.length <= _maxErrorSnippetLength) {
-      return compact;
-    }
-    return '${compact.substring(0, _maxErrorSnippetLength)}...';
   }
 
   AuthSession _sessionFromAuthJson(Map<String, dynamic> json) {

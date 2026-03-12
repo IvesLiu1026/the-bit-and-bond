@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/auth/auth_session.dart';
-import '../features/quests/models.dart';
+import '../core/models/models.dart';
 import '../features/quests/quest_repository.dart';
 import 'providers.dart';
 

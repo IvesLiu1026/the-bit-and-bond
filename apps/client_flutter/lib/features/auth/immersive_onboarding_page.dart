@@ -9,6 +9,7 @@ import '../../core/audio/sfx_player.dart';
 import '../../core/l10n/app_strings.dart';
 import '../../core/network/auth_api_client.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/ui/app_test_ids.dart';
 import '../../core/ui/pixel_ui.dart';
 import '../../features/avatar/avatar_appearance.dart';
 import '../../state/providers.dart';
@@ -148,6 +149,7 @@ class _ImmersiveOnboardingPageState
     if (!mounted) {
       return;
     }
+    final analytics = ref.read(productAnalyticsProvider);
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -168,17 +170,17 @@ class _ImmersiveOnboardingPageState
           avatarType: _avatarType,
           footerText: footer,
           onAuthenticated: () {
-            ref
-                .read(productAnalyticsProvider)
-                .track(
-                  'onboarding.completed',
-                  properties: <String, dynamic>{
-                    'entry': mode == UnifiedAuthMode.register
-                        ? 'manual_register'
-                        : 'manual_login',
-                  },
-                );
-            Navigator.of(sheetContext).maybePop();
+            analytics.track(
+              'onboarding.completed',
+              properties: <String, dynamic>{
+                'entry': mode == UnifiedAuthMode.register
+                    ? 'manual_register'
+                    : 'manual_login',
+              },
+            );
+            if (sheetContext.mounted) {
+              Navigator.of(sheetContext).maybePop();
+            }
           },
         );
       },
@@ -211,6 +213,9 @@ class _ImmersiveOnboardingPageState
     if (_googleSubmitting) {
       return;
     }
+    final analytics = ref.read(productAnalyticsProvider);
+    final googleAuth = ref.read(googleFederatedAuthServiceProvider);
+    final authController = ref.read(authControllerProvider.notifier);
     HapticFeedback.mediumImpact();
     setState(() {
       _googleSubmitting = true;
@@ -221,28 +226,20 @@ class _ImmersiveOnboardingPageState
     });
 
     try {
-      final identity = await ref
-          .read(googleFederatedAuthServiceProvider)
-          .signIn();
-      await ref
-          .read(authControllerProvider.notifier)
-          .loginWithFirebaseIdToken(
-            idToken: identity.firebaseIdToken,
-            displayName: identity.displayName,
-            avatarType: _avatarType,
-          );
-      ref
-          .read(productAnalyticsProvider)
-          .track(
-            'onboarding.google_contract.success',
-            properties: <String, dynamic>{'avatar_type': _avatarType},
-          );
-      ref
-          .read(productAnalyticsProvider)
-          .track(
-            'onboarding.completed',
-            properties: <String, dynamic>{'entry': 'google'},
-          );
+      final identity = await googleAuth.signIn();
+      await authController.loginWithFirebaseIdToken(
+        idToken: identity.firebaseIdToken,
+        displayName: identity.displayName,
+        avatarType: _avatarType,
+      );
+      analytics.track(
+        'onboarding.google_contract.success',
+        properties: <String, dynamic>{'avatar_type': _avatarType},
+      );
+      analytics.track(
+        'onboarding.completed',
+        properties: <String, dynamic>{'entry': 'google'},
+      );
       if (!mounted) {
         return;
       }
@@ -256,17 +253,15 @@ class _ImmersiveOnboardingPageState
       HapticFeedback.heavyImpact();
       unawaited(SfxPlayer.instance.playUseSuccess());
     } on FederatedAuthException catch (error) {
-      ref
-          .read(productAnalyticsProvider)
-          .track(
-            'onboarding.google_contract.failed',
-            status: 'error',
-            allowPublic: true,
-            properties: <String, dynamic>{
-              'reason': 'federated',
-              'show_fallback': error.shouldShowFallbackForm,
-            },
-          );
+      analytics.track(
+        'onboarding.google_contract.failed',
+        status: 'error',
+        allowPublic: true,
+        properties: <String, dynamic>{
+          'reason': 'federated',
+          'show_fallback': error.shouldShowFallbackForm,
+        },
+      );
       if (!mounted) {
         return;
       }
@@ -275,17 +270,15 @@ class _ImmersiveOnboardingPageState
         _showLegacyContract = error.shouldShowFallbackForm;
       });
     } on AuthApiException catch (error) {
-      ref
-          .read(productAnalyticsProvider)
-          .track(
-            'onboarding.google_contract.failed',
-            status: 'error',
-            allowPublic: true,
-            properties: <String, dynamic>{
-              'reason': 'api',
-              'status_code': error.statusCode,
-            },
-          );
+      analytics.track(
+        'onboarding.google_contract.failed',
+        status: 'error',
+        allowPublic: true,
+        properties: <String, dynamic>{
+          'reason': 'api',
+          'status_code': error.statusCode,
+        },
+      );
       if (!mounted) {
         return;
       }
@@ -294,14 +287,12 @@ class _ImmersiveOnboardingPageState
         _showLegacyContract = true;
       });
     } catch (error) {
-      ref
-          .read(productAnalyticsProvider)
-          .track(
-            'onboarding.google_contract.failed',
-            status: 'error',
-            allowPublic: true,
-            properties: <String, dynamic>{'reason': 'unknown'},
-          );
+      analytics.track(
+        'onboarding.google_contract.failed',
+        status: 'error',
+        allowPublic: true,
+        properties: <String, dynamic>{'reason': 'unknown'},
+      );
       if (!mounted) {
         return;
       }
@@ -347,13 +338,13 @@ class _ImmersiveOnboardingPageState
                 },
                 child: switch (_step) {
                   _OnboardingStep.greeting => _GreetingStep(
-                    key: const ValueKey('greeting'),
+                    key: AppTestIds.onboardingGreetingStepKey,
                     blink: _blinkController,
                     compact: compact,
                     onTap: _enterTavern,
                   ),
                   _OnboardingStep.customization => _CustomizationStep(
-                    key: const ValueKey('customization'),
+                    key: AppTestIds.onboardingCustomizationStepKey,
                     hairStyle: _hairStyle,
                     clothTone: _clothTone,
                     compact: compact,
@@ -371,7 +362,7 @@ class _ImmersiveOnboardingPageState
                     onContinue: _continueToContract,
                   ),
                   _OnboardingStep.contract => _ContractStep(
-                    key: const ValueKey('contract'),
+                    key: AppTestIds.onboardingContractStepKey,
                     compact: compact,
                     hairStyle: _hairStyle,
                     clothTone: _clothTone,

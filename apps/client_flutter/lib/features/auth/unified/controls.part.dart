@@ -81,10 +81,15 @@ class _PixelModeTab extends StatelessWidget {
 }
 
 class _PixelAuthButton extends StatefulWidget {
-  const _PixelAuthButton({required this.onPressed, required this.label});
+  const _PixelAuthButton({
+    required this.onPressed,
+    required this.label,
+    this.tapTargetKey,
+  });
 
   final VoidCallback? onPressed;
   final String label;
+  final Key? tapTargetKey;
 
   @override
   State<_PixelAuthButton> createState() => _PixelAuthButtonState();
@@ -97,10 +102,12 @@ class _PixelAuthButtonState extends State<_PixelAuthButton> {
   Widget build(BuildContext context) {
     final disabled = widget.onPressed == null;
     return GestureDetector(
+      key: widget.tapTargetKey,
       onTapDown: disabled ? null : (_) => setState(() => _pressed = true),
       onTapCancel: disabled ? null : () => setState(() => _pressed = false),
       onTapUp: disabled ? null : (_) => setState(() => _pressed = false),
       onTap: widget.onPressed,
+      behavior: HitTestBehavior.opaque,
       child: AnimatedSlide(
         duration: const Duration(milliseconds: 80),
         offset: _pressed ? const Offset(0, 0.05) : Offset.zero,

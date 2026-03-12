@@ -2,6 +2,8 @@ part of '../game_shell_page.dart';
 
 class _StampButton extends StatefulWidget {
   const _StampButton({
+    super.key,
+    this.tapTargetKey,
     required this.label,
     this.icon,
     this.iconWidget,
@@ -9,6 +11,7 @@ class _StampButton extends StatefulWidget {
     required this.onPressed,
   });
 
+  final Key? tapTargetKey;
   final String label;
   final IconData? icon;
   final Widget? iconWidget;
@@ -28,6 +31,7 @@ class _StampButtonState extends State<_StampButton> {
             ? null
             : _PixelLabelGlyph(glyph: _iconGlyph(widget.icon!)));
     final button = PixelButton(
+      tapTargetKey: widget.tapTargetKey,
       label: widget.label,
       tone: _pixelToneForStampTone(widget.tone),
       compact: true,

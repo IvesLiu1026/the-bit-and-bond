@@ -168,6 +168,9 @@ class AppStrings {
   String get settingsSubtitle =>
       _en ? 'System language and experience options.' : '系統語言與體驗設定。';
   String get systemLanguage => _en ? 'System Language' : '系統語言';
+  String get fontStyle => _en ? 'Font Style' : '字體風格';
+  String get pixelFont => _en ? 'Pixel' : '像素';
+  String get standardFont => _en ? 'Standard' : '標準';
   String get soundEffects => _en ? 'Sound Effects' : '音效';
   String get music => _en ? 'Music' : '音樂';
   String get haptics => _en ? 'Haptics' : '震動';
@@ -187,6 +190,26 @@ class AppStrings {
   String get campfireRoom => _en ? 'Voice Room' : '語音房';
   String get leftJoystickHint =>
       _en ? 'Use the bottom-left joystick to move.' : '左下固定搖桿可 360 度移動';
+  String get newFriendRequestNotice =>
+      _en ? 'A new friend request arrived.' : '收到新的好友請求捲軸';
+  String get currentPlayerLabel => _en ? 'Current Player' : '目前玩家';
+  String get voiceLoginRequiredError => _en
+      ? 'Please sign in before joining the campfire voice room.'
+      : '尚未登入，無法加入營火語音';
+  String voiceMicStartFailed(Object error) =>
+      _en ? 'Failed to start the microphone: $error' : '麥克風啟動失敗：$error';
+  String voiceHistorySyncFailed(Object error) =>
+      _en ? 'Failed to sync voice-room chat history: $error' : '聊天室同步失敗：$error';
+  String voiceConnectFailed(Object error) =>
+      _en ? 'Voice connection failed: $error' : '語音連線失敗：$error';
+  String voiceToggleMicFailed(Object error) =>
+      _en ? 'Failed to toggle the microphone: $error' : '切換麥克風失敗：$error';
+  String get voiceSendRequiresJoinError => _en
+      ? 'Join the voice room before sending a room message.'
+      : '尚未加入語音吧台，無法發送訊息';
+  String voiceChatSendFailed(Object error) => _en
+      ? 'Failed to send the voice-room chat message: $error'
+      : '聊天室送出失敗：$error';
 }
 
 class AppStringsScope extends InheritedWidget {

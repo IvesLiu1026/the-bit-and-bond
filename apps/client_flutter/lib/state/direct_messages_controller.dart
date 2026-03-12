@@ -6,7 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../core/auth/auth_session.dart';
 import '../core/network/api_client.dart';
 import '../core/security/dm_e2ee_service.dart';
-import '../features/quests/models.dart';
+import '../core/models/models.dart';
 import 'direct_messages/dm_errors.dart';
 import 'direct_messages/dm_security_maps.dart';
 import 'direct_messages/dm_utils.dart';

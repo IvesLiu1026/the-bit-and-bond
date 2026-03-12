@@ -42,6 +42,9 @@ jobs:
       - name: Rust clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
 
+      - name: OpenAPI route coverage
+        run: python3 scripts/check_openapi_routes.py
+
       - name: Build Rust release binary
         run: cargo build -p the_bit_and_bond_server --release --locked
 

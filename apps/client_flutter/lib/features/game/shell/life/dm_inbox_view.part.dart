@@ -56,7 +56,7 @@ class _DirectMessageRoster extends StatelessWidget {
               children: [
                 Expanded(
                   child: _PixelTextInput(
-                    key: const ValueKey('dm_inbox_search'),
+                    key: AppTestIds.dmInboxSearchKey,
                     controller: searchController,
                     label: strings.tr(zh: '搜尋', en: 'Search'),
                     hintText: strings.tr(
@@ -176,6 +176,7 @@ class _DirectMessageRosterCard extends StatelessWidget {
       serverMode: entry.thread?.encryptionMode,
     );
     return InkWell(
+      key: AppTestIds.dmRosterCard(entry.playerId),
       onTap: onTap,
       child: PixelPanel(
         tone: selected ? PixelTone.blue : PixelTone.parchment,

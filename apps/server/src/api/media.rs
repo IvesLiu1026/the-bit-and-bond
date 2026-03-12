@@ -21,6 +21,9 @@ use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 use crate::{
+    domain::social_guard::{
+        require_active_dm_device_key as require_active_dm_device_key_shared, require_friend_link,
+    },
     error::{AppError, AppResult},
     extractors::{AuthClaims, HunterClaims},
     state::AppState,
@@ -1084,18 +1087,13 @@ async fn ensure_friendship(
     sender_hunter_id: Uuid,
     recipient_hunter_id: Uuid,
 ) -> AppResult<()> {
-    let linked = friend_link::Entity::find()
-        .filter(friend_link::Column::PlayerId.eq(sender_hunter_id))
-        .filter(friend_link::Column::FriendId.eq(recipient_hunter_id))
-        .one(&state.db)
-        .await?
-        .is_some();
-    if linked {
-        return Ok(());
-    }
-    Err(AppError::Forbidden(
-        "one-time media can only be sent to friends".into(),
-    ))
+    require_friend_link(
+        &state.db,
+        sender_hunter_id,
+        recipient_hunter_id,
+        "one-time media can only be sent to friends",
+    )
+    .await
 }
 
 async fn require_active_dm_device_key(
@@ -1103,13 +1101,7 @@ async fn require_active_dm_device_key(
     hunter_id: Uuid,
     device_id: &str,
 ) -> AppResult<dm_device_key::Model> {
-    dm_device_key::Entity::find()
-        .filter(dm_device_key::Column::HunterId.eq(hunter_id))
-        .filter(dm_device_key::Column::DeviceId.eq(device_id.to_string()))
-        .filter(dm_device_key::Column::RevokedAt.is_null())
-        .one(&state.db)
-        .await?
-        .ok_or_else(|| AppError::BadRequest(format!("active device key not found for {device_id}")))
+    require_active_dm_device_key_shared(&state.db, hunter_id, device_id).await
 }
 
 fn media_upload_root() -> PathBuf {

@@ -43,6 +43,7 @@ class _GuildShopPanelState extends State<_GuildShopPanel>
   late final AnimationController _shakeController;
   String? _buyingItemId;
   String? _editingItemId;
+  int? _optimisticCoinsOnHand;
   bool _switchingMode = false;
   bool _manageMode = false;
   String? _errorText;
@@ -61,6 +62,18 @@ class _GuildShopPanelState extends State<_GuildShopPanel>
   void dispose() {
     _shakeController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant _GuildShopPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final latestCoins = widget.progressionState.maybeWhen(
+      data: (progression) => progression.coins,
+      orElse: () => null,
+    );
+    if (_optimisticCoinsOnHand != null && latestCoins == _optimisticCoinsOnHand) {
+      _optimisticCoinsOnHand = null;
+    }
   }
 
   Future<void> _buyItem(GuildShopItem item, int currentCoins) async {
@@ -90,6 +103,7 @@ class _GuildShopPanelState extends State<_GuildShopPanel>
         return;
       }
       setState(() {
+        _optimisticCoinsOnHand = math.max(0, currentCoins - result.spentCoins);
         _successText = result.replayed
             ? strings.tr(
                 zh: '偵測到重複點擊，已沿用上次購買結果',
@@ -308,12 +322,15 @@ class _GuildShopPanelState extends State<_GuildShopPanel>
   @override
   Widget build(BuildContext context) {
     final strings = AppStrings.of(context);
-    final currentCoins = widget.progressionState.maybeWhen(
-      data: (progression) => progression.coins,
-      orElse: () => 0,
-    );
+    final int currentCoins =
+        _optimisticCoinsOnHand ??
+        widget.progressionState.maybeWhen<int>(
+          data: (progression) => progression.coins,
+          orElse: () => 0,
+        );
 
     return Column(
+      key: AppTestIds.rewardsPanelKey,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
@@ -350,6 +367,7 @@ class _GuildShopPanelState extends State<_GuildShopPanel>
               const _PixelShopItemIcon(iconTag: 'COIN'),
               const SizedBox(width: 8),
               Text(
+                key: AppTestIds.rewardsCoinsLabelKey,
                 strings.tr(
                   zh: '目前持有金幣：$currentCoins',
                   en: 'Coins on hand: $currentCoins',
@@ -379,6 +397,7 @@ class _GuildShopPanelState extends State<_GuildShopPanel>
           Padding(
             padding: const EdgeInsets.only(bottom: 6),
             child: Text(
+              key: AppTestIds.rewardsSuccessTextKey,
               _successText!,
               style: const TextStyle(
                 color: AppColors.stampGreen,
@@ -425,6 +444,7 @@ class _GuildShopPanelState extends State<_GuildShopPanel>
                       );
                     },
                     child: Container(
+                      key: AppTestIds.rewardItemCard(item.id),
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF4ECE1),

@@ -1,4 +1,4 @@
-import '../../features/quests/models.dart';
+import '../../core/models/models.dart';
 
 DirectMessageThread? findDirectMessageThread(
   String counterpartHunterId,

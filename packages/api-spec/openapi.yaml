@@ -1,297 +1,2602 @@
 openapi: 3.1.0
 info:
   title: The Bit and Bond API
-  version: 0.1.0
+  version: 0.2.0
+  description: >
+    Client-facing REST contract for the current The Bit and Bond product shape.
+    This spec reflects the guild/hunter/social/media architecture used by the
+    Rust server and Flutter client. It intentionally replaces the old
+    household/member contract.
 servers:
-  - url: http://localhost:8080
+  - url: http://127.0.0.1:18080
+    description: Local development server
+tags:
+  - name: Health
+  - name: Auth
+  - name: Hunters
+  - name: Quests
+  - name: Social
+  - name: Direct Messages
+  - name: Media
+  - name: Shop
+  - name: Inventory
+  - name: Voice
+  - name: Chat
+  - name: Realtime
+security:
+  - bearerAuth: []
 paths:
   /api/v1/health:
     get:
+      tags: [Health]
+      security: []
       summary: Health check
       responses:
         '200':
-          description: ok
+          description: Server is healthy
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                  now:
-                    type: string
-                    format: date-time
-  /api/v1/quest-templates:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /api/v1/auth/register:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Register a new player account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UnifiedRegisterRequest'
+      responses:
+        '201':
+          description: Account created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Login with player ID or email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UnifiedLoginRequest'
+      responses:
+        '200':
+          description: Authenticated session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/auth/firebase:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Login or create account with Firebase ID token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FirebaseLoginRequest'
+      responses:
+        '200':
+          description: Authenticated session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/auth/me:
     get:
-      summary: List quest templates for household
+      tags: [Auth]
+      summary: Validate and resolve the current session
+      responses:
+        '200':
+          description: Current session information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/hunters:
+    get:
+      tags: [Hunters]
+      summary: List hunters in the current guild
+      responses:
+        '200':
+          description: Guild hunters
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Hunter'
+    post:
+      tags: [Hunters]
+      summary: Create a member hunter in the current guild
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateHunterRequest'
+      responses:
+        '201':
+          description: Hunter created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Hunter'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/hunters/roster:
+    get:
+      tags: [Hunters]
+      summary: List guild roster for any authenticated hunter
+      responses:
+        '200':
+          description: Guild roster
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Hunter'
+
+  /api/v1/hunters/me:
+    get:
+      tags: [Hunters]
+      summary: Get current hunter profile
+      responses:
+        '200':
+          description: Current hunter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Hunter'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/hunters/{hunter_id}/stats:
+    get:
+      tags: [Hunters]
+      summary: Get hunter stat XP breakdown
       parameters:
-        - $ref: '#/components/parameters/AuthMemberIdHeader'
+        - $ref: '#/components/parameters/HunterIdPath'
+      responses:
+        '200':
+          description: Aggregated reward ledger stats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HunterStats'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/hunters/{hunter_id}/pin:
+    patch:
+      tags: [Hunters]
+      summary: Reset a member PIN
+      parameters:
+        - $ref: '#/components/parameters/HunterIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetHunterPinRequest'
+      responses:
+        '200':
+          description: Updated hunter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Hunter'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/quests:
+    get:
+      tags: [Quests]
+      summary: List quests and habits in the current guild
+      responses:
+        '200':
+          description: Quest list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Quest'
+    post:
+      tags: [Quests]
+      summary: Create a quest or habit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateQuestRequest'
+      responses:
+        '201':
+          description: Quest created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Quest'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/quests/{quest_id}/submit:
+    post:
+      tags: [Quests]
+      summary: Submit quest or habit completion
+      parameters:
+        - $ref: '#/components/parameters/QuestIdPath'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitQuestRequest'
+      responses:
+        '200':
+          description: Updated quest
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Quest'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/quests/{quest_id}/proof-media:
+    post:
+      tags: [Quests]
+      summary: Upload quest or habit proof image
+      parameters:
+        - $ref: '#/components/parameters/QuestIdPath'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Proof media stored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestProofMedia'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/quests/{quest_id}/review:
+    post:
+      tags: [Quests]
+      summary: Approve or reject a submitted quest
+      parameters:
+        - $ref: '#/components/parameters/QuestIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewQuestRequest'
+      responses:
+        '200':
+          description: Review result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewQuestResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/quests/proof-media/{media_id}/content:
+    get:
+      tags: [Quests]
+      summary: Download uploaded quest proof media
+      parameters:
+        - $ref: '#/components/parameters/MediaIdPath'
+      responses:
+        '200':
+          description: Quest proof media bytes
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+
+  /api/v1/social/friends:
+    get:
+      tags: [Social]
+      summary: List friend profiles
+      responses:
+        '200':
+          description: Friend list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FriendProfile'
+    post:
+      tags: [Social]
+      summary: Add a friend immediately by player ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlayerIdRequest'
+      responses:
+        '201':
+          description: Friend linked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FriendProfile'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/friends/request:
+    post:
+      tags: [Social]
+      summary: Send a friend request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlayerIdRequest'
+      responses:
+        '200':
+          description: Existing pending request returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FriendRequest'
+        '201':
+          description: Friend request created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FriendRequest'
+
+  /api/v1/friends/requests/incoming:
+    get:
+      tags: [Social]
+      summary: List incoming pending friend requests
+      responses:
+        '200':
+          description: Pending requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FriendRequest'
+
+  /api/v1/friends/requests/{request_id}/respond:
+    post:
+      tags: [Social]
+      summary: Accept or reject a friend request
+      parameters:
+        - $ref: '#/components/parameters/RequestIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RespondBooleanRequest'
+      responses:
+        '200':
+          description: Updated friend request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FriendRequest'
+
+  /api/v1/social/profile:
+    get:
+      tags: [Social]
+      summary: Get current social profile
+      responses:
+        '200':
+          description: Social profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SocialProfile'
+    patch:
+      tags: [Social]
+      summary: Update current profile motto
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSocialProfileRequest'
+      responses:
+        '200':
+          description: Updated social profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SocialProfile'
+
+  /api/v1/social/profile/pass-qr:
+    get:
+      tags: [Social]
+      summary: Generate a short-lived player pass QR payload
+      responses:
+        '200':
+          description: Player pass QR bundle
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlayerPassQr'
+
+  /api/v1/social/guild/invites:
+    get:
+      tags: [Social]
+      summary: List incoming guild invites for the current hunter
+      responses:
+        '200':
+          description: Guild invites
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GuildInvite'
+    post:
+      tags: [Social]
+      summary: Invite a friend into the current guild
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlayerIdRequest'
+      responses:
+        '200':
+          description: Existing invite returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GuildInvite'
+        '201':
+          description: Guild invite created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GuildInvite'
+
+  /api/v1/guilds/summon:
+    post:
+      tags: [Social]
+      summary: Alias endpoint to invite a friend into the current guild
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlayerIdRequest'
+      responses:
+        '200':
+          description: Existing invite returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GuildInvite'
+        '201':
+          description: Guild invite created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GuildInvite'
+
+  /api/v1/social/guild/invites/{invite_id}/respond:
+    post:
+      tags: [Social]
+      summary: Accept or reject a guild invite
+      parameters:
+        - $ref: '#/components/parameters/InviteIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RespondBooleanRequest'
+      responses:
+        '200':
+          description: Updated guild invite
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GuildInvite'
+
+  /api/v1/direct-messages/threads:
+    get:
+      tags: [Direct Messages]
+      summary: List DM inbox threads
+      parameters:
         - in: query
-          name: household_id
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+      responses:
+        '200':
+          description: DM threads
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DirectMessageThread'
+
+  /api/v1/direct-messages/threads/{counterpart_hunter_id}/read:
+    post:
+      tags: [Direct Messages]
+      summary: Mark a DM thread as read
+      parameters:
+        - $ref: '#/components/parameters/CounterpartHunterIdPath'
+      responses:
+        '200':
+          description: Read cursor updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DmThreadRead'
+
+  /api/v1/direct-messages/history:
+    get:
+      tags: [Direct Messages]
+      summary: Load plaintext DM history
+      parameters:
+        - $ref: '#/components/parameters/CounterpartHunterIdQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+        - $ref: '#/components/parameters/BeforeMsQuery'
+      responses:
+        '200':
+          description: Plaintext DM history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DirectMessage'
+
+  /api/v1/direct-messages/messages:
+    post:
+      tags: [Direct Messages]
+      summary: Send a plaintext DM
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PersistDirectMessageRequest'
+      responses:
+        '200':
+          description: Sent DM
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DirectMessage'
+
+  /api/v1/direct-messages/encrypted/history:
+    get:
+      tags: [Direct Messages]
+      summary: Load encrypted DM history
+      parameters:
+        - $ref: '#/components/parameters/CounterpartHunterIdQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+        - $ref: '#/components/parameters/BeforeMsQuery'
+      responses:
+        '200':
+          description: Encrypted DM history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EncryptedDirectMessage'
+
+  /api/v1/direct-messages/encrypted/messages:
+    post:
+      tags: [Direct Messages]
+      summary: Send an encrypted DM
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PersistEncryptedDirectMessageRequest'
+      responses:
+        '200':
+          description: Sent encrypted DM
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EncryptedDirectMessage'
+
+  /api/v1/direct-messages/device-keys:
+    get:
+      tags: [Direct Messages]
+      summary: Batch fetch active DM device keys
+      parameters:
+        - in: query
+          name: hunter_ids
           required: true
           schema:
             type: string
-            format: uuid
+          description: Comma-separated hunter IDs
+      responses:
+        '200':
+          description: Device keys grouped by hunter
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DmDeviceKeyBatch'
+
+  /api/v1/direct-messages/device-keys/{hunter_id}:
+    get:
+      tags: [Direct Messages]
+      summary: Fetch active DM device keys for one hunter
+      parameters:
+        - $ref: '#/components/parameters/HunterIdPath'
+      responses:
+        '200':
+          description: Active DM device keys
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DmDeviceKey'
+
+  /api/v1/direct-messages/device-keys/register:
+    post:
+      tags: [Direct Messages]
+      summary: Register a DM device key pair
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterDmDeviceKeyRequest'
+      responses:
+        '200':
+          description: Registered DM device key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DmDeviceKey'
+
+  /api/v1/direct-messages/device-keys/revoke:
+    post:
+      tags: [Direct Messages]
+      summary: Revoke an existing DM device key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RevokeDmDeviceKeyRequest'
+      responses:
+        '200':
+          description: Revoked DM device key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DmDeviceKey'
+
+  /api/v1/media/vault:
+    get:
+      tags: [Media]
+      summary: List media stored in the player's vault
+      parameters:
+        - $ref: '#/components/parameters/LimitQuery'
+      responses:
+        '200':
+          description: Vault media
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MediaAsset'
+
+  /api/v1/media/vault/upload:
+    post:
+      tags: [Media]
+      summary: Upload media into the vault
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                caption:
+                  type: string
+                include_in_dump:
+                  type: boolean
+      responses:
+        '200':
+          description: Uploaded media asset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaAsset'
+
+  /api/v1/media/once/inbox:
+    get:
+      tags: [Media]
+      summary: List one-time photo inbox deliveries
+      parameters:
+        - $ref: '#/components/parameters/LimitQuery'
+      responses:
+        '200':
+          description: One-time inbox
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MediaOnceDelivery'
+
+  /api/v1/media/once/send:
+    post:
+      tags: [Media]
+      summary: Send a regular or one-time image to a friend
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, recipient_player_id]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                recipient_player_id:
+                  type: string
+                caption:
+                  type: string
+                ttl_seconds:
+                  type: integer
+                encryption_mode:
+                  type: string
+                  enum: [plaintext, e2ee]
+                protocol_version:
+                  type: string
+                sender_device_id:
+                  type: string
+                recipient_device_id:
+                  type: string
+                encryption_nonce:
+                  type: string
+                encryption_mac:
+                  type: string
+      responses:
+        '200':
+          description: Created one-time delivery
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaOnceDelivery'
+
+  /api/v1/media/once/{delivery_id}/open:
+    post:
+      tags: [Media]
+      summary: Open a one-time delivery and mint a short-lived access token
+      parameters:
+        - $ref: '#/components/parameters/DeliveryIdPath'
+      responses:
+        '200':
+          description: Open result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaOnceOpen'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/media/once/{delivery_id}/content:
+    get:
+      tags: [Media]
+      summary: Download one-time media content with a minted access token
+      parameters:
+        - $ref: '#/components/parameters/DeliveryIdPath'
+      responses:
+        '200':
+          description: One-time media bytes
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+
+  /api/v1/media/assets/{media_id}/content:
+    get:
+      tags: [Media]
+      summary: Download vault media content
+      parameters:
+        - $ref: '#/components/parameters/MediaIdPath'
+      responses:
+        '200':
+          description: Vault media bytes
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+
+  /api/v1/media/photo-dumps:
+    get:
+      tags: [Media]
+      summary: List photo dump exports
+      parameters:
+        - $ref: '#/components/parameters/LimitQuery'
+      responses:
+        '200':
+          description: Photo dump exports
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PhotoDumpExport'
+
+  /api/v1/media/photo-dumps/export:
+    post:
+      tags: [Media]
+      summary: Create a photo dump export from vault assets
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePhotoDumpExportRequest'
+      responses:
+        '200':
+          description: Photo dump export created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PhotoDumpExport'
+
+  /api/v1/shop/items:
+    get:
+      tags: [Shop]
+      summary: List shop items for the current guild
+      parameters:
         - in: query
-          name: active
-          required: false
+          name: include_inactive
           schema:
             type: boolean
       responses:
         '200':
-          description: list of templates
+          description: Shop items
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/QuestTemplate'
-  /api/v1/quests:
-    get:
-      summary: List quest instances for child member
-      parameters:
-        - $ref: '#/components/parameters/AuthMemberIdHeader'
-        - in: query
-          name: assignee_member_id
-          required: true
-          schema:
-            type: string
-            format: uuid
-        - in: query
-          name: status
-          required: false
-          schema:
-            type: string
-            enum: [available, submitted, approved, rejected]
-      responses:
-        '200':
-          description: list of quests
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/QuestInstance'
-  /api/v1/quests/{quest_instance_id}/submissions:
+                  $ref: '#/components/schemas/ShopItem'
     post:
-      summary: Submit quest completion evidence
-      parameters:
-        - $ref: '#/components/parameters/AuthMemberIdHeader'
-        - in: path
-          name: quest_instance_id
-          required: true
-          schema:
-            type: string
-            format: uuid
+      tags: [Shop]
+      summary: Create a guild shop item
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateSubmissionRequest'
+              $ref: '#/components/schemas/ShopItemUpsertRequest'
       responses:
-        '200':
-          description: idempotent return of existing submission
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Submission'
         '201':
-          description: created
+          description: Shop item created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Submission'
-  /api/v1/submissions/{submission_id}/review:
-    post:
-      summary: Guardian approve/reject submission
+                $ref: '#/components/schemas/ShopItem'
+
+  /api/v1/shop/items/{item_id}:
+    put:
+      tags: [Shop]
+      summary: Update a guild shop item
       parameters:
-        - $ref: '#/components/parameters/AuthMemberIdHeader'
-        - in: path
-          name: submission_id
-          required: true
-          schema:
-            type: string
-            format: uuid
+        - $ref: '#/components/parameters/ItemIdPath'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ReviewSubmissionRequest'
+              $ref: '#/components/schemas/ShopItemUpsertRequest'
       responses:
         '200':
-          description: review result and reward outcome
+          description: Updated shop item
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ReviewSubmissionResponse'
-  /api/v1/submissions/pending:
-    get:
-      summary: List guardian pending submissions in a household
+                $ref: '#/components/schemas/ShopItem'
+    delete:
+      tags: [Shop]
+      summary: Deactivate a guild shop item
       parameters:
-        - $ref: '#/components/parameters/AuthMemberIdHeader'
-        - in: query
-          name: household_id
-          required: true
-          schema:
-            type: string
-            format: uuid
-        - in: query
-          name: limit
-          required: false
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
+        - $ref: '#/components/parameters/ItemIdPath'
       responses:
         '200':
-          description: pending submissions
+          description: Deactivated shop item
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShopItem'
+
+  /api/v1/shop/buy/{item_id}:
+    post:
+      tags: [Shop]
+      summary: Buy a guild shop item
+      parameters:
+        - $ref: '#/components/parameters/ItemIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BuyItemRequest'
+      responses:
+        '200':
+          description: Purchase result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuyItemResponse'
+
+  /api/v1/inventory:
+    get:
+      tags: [Inventory]
+      summary: List current hunter inventory
+      responses:
+        '200':
+          description: Inventory items
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/PendingSubmission'
-  /api/v1/children/{child_member_id}/progression:
-    get:
-      summary: Get child progression summary
+                  $ref: '#/components/schemas/InventoryItem'
+
+  /api/v1/inventory/use/{item_id}:
+    post:
+      tags: [Inventory]
+      summary: Use an inventory item
       parameters:
-        - $ref: '#/components/parameters/AuthMemberIdHeader'
-        - in: path
-          name: child_member_id
-          required: true
-          schema:
-            type: string
-            format: uuid
+        - $ref: '#/components/parameters/ItemIdPath'
       responses:
         '200':
-          description: progression data
+          description: Inventory use result
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Progression'
-  /api/v1/children/{child_member_id}/ledger:
-    get:
-      summary: Get child point ledger
-      parameters:
-        - $ref: '#/components/parameters/AuthMemberIdHeader'
-        - in: path
-          name: child_member_id
-          required: true
-          schema:
-            type: string
-            format: uuid
-        - in: query
-          name: limit
-          required: false
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
+                $ref: '#/components/schemas/UseInventoryItemResponse'
+
+  /api/v1/telemetry/public-events:
+    post:
+      tags: [Telemetry]
+      summary: Ingest public client telemetry events
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TelemetryIngestRequest'
+      responses:
+        '202':
+          description: Telemetry accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TelemetryIngestResponse'
+
+  /api/v1/telemetry/events:
+    post:
+      tags: [Telemetry]
+      summary: Ingest authenticated hunter telemetry events
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TelemetryIngestRequest'
+      responses:
+        '202':
+          description: Telemetry accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TelemetryIngestResponse'
+
+  /api/v1/voice/token:
+    post:
+      tags: [Voice]
+      summary: Issue a LiveKit access token
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VoiceTokenRequest'
       responses:
         '200':
-          description: ledger entries
+          description: LiveKit token bundle
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoiceTokenResponse'
+
+  /api/v1/chat/history:
+    get:
+      tags: [Chat]
+      summary: List campfire chat history
+      parameters:
+        - in: query
+          name: room_id
+          schema:
+            type: string
+        - $ref: '#/components/parameters/LimitQuery'
+        - $ref: '#/components/parameters/BeforeMsQuery'
+      responses:
+        '200':
+          description: Chat history
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/LedgerEntry'
+                  $ref: '#/components/schemas/ChatMessage'
+
+  /api/v1/chat/messages:
+    post:
+      tags: [Chat]
+      summary: Send a campfire chat message
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PersistChatMessageRequest'
+      responses:
+        '200':
+          description: Sent chat message
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatMessage'
+
+  /api/v1/realtime/ticket:
+    post:
+      tags: [Realtime]
+      summary: Issue a short-lived WebSocket ticket
+      responses:
+        '200':
+          description: Realtime ticket
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RealtimeTicket'
+
+  /api/v1/realtime/ws:
+    get:
+      tags: [Realtime]
+      summary: Upgrade the connection to the guild realtime WebSocket
+      parameters:
+        - $ref: '#/components/parameters/RealtimeTicketQuery'
+      responses:
+        '101':
+          description: WebSocket upgrade accepted
+
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    ErrorResponse:
+      description: Error response
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
   parameters:
-    AuthMemberIdHeader:
-      in: header
-      name: x-member-id
+    HunterIdPath:
+      in: path
+      name: hunter_id
       required: true
       schema:
         type: string
         format: uuid
-      description: Authenticated member identity used for role and household checks.
+    CounterpartHunterIdPath:
+      in: path
+      name: counterpart_hunter_id
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CounterpartHunterIdQuery:
+      in: query
+      name: counterpart_hunter_id
+      required: true
+      schema:
+        type: string
+        format: uuid
+    QuestIdPath:
+      in: path
+      name: quest_id
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ItemIdPath:
+      in: path
+      name: item_id
+      required: true
+      schema:
+        type: string
+        format: uuid
+    DeliveryIdPath:
+      in: path
+      name: delivery_id
+      required: true
+      schema:
+        type: string
+        format: uuid
+    MediaIdPath:
+      in: path
+      name: media_id
+      required: true
+      schema:
+        type: string
+        format: uuid
+    RequestIdPath:
+      in: path
+      name: request_id
+      required: true
+      schema:
+        type: string
+        format: uuid
+    InviteIdPath:
+      in: path
+      name: invite_id
+      required: true
+      schema:
+        type: string
+        format: uuid
+    LimitQuery:
+      in: query
+      name: limit
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+    BeforeMsQuery:
+      in: query
+      name: before_ms
+      schema:
+        type: integer
+    RealtimeTicketQuery:
+      in: query
+      name: ticket
+      required: true
+      schema:
+        type: string
+
   schemas:
-    QuestTemplate:
+    ErrorResponse:
       type: object
       properties:
-        id: { type: string, format: uuid }
-        household_id: { type: string, format: uuid }
-        title: { type: string }
-        description: { type: string, nullable: true }
-        category: { type: string, enum: [chore, study, exam, habit] }
-        base_xp: { type: integer }
-        base_coins: { type: integer }
-        active: { type: boolean }
-        created_at: { type: string, format: date-time }
-    QuestInstance:
+        error:
+          type: string
+      required: [error]
+
+    HealthResponse:
       type: object
       properties:
-        id: { type: string, format: uuid }
-        template_id: { type: string, format: uuid }
-        template_title: { type: string, nullable: true }
-        category: { type: string, nullable: true }
-        base_xp: { type: integer, nullable: true }
-        base_coins: { type: integer, nullable: true }
-        status: { type: string, enum: [available, submitted, approved, rejected] }
-        due_at: { type: string, format: date-time, nullable: true }
-        updated_at: { type: string, format: date-time }
-    CreateSubmissionRequest:
+        status:
+          type: string
+        now:
+          type: string
+          format: date-time
+      required: [status, now]
+
+    UnifiedRegisterRequest:
       type: object
       properties:
-        note: { type: string, nullable: true }
-        evidence_url: { type: string, nullable: true }
-        idempotency_key: { type: string, nullable: true }
-    Submission:
+        account:
+          type: string
+        secret:
+          type: string
+        display_name:
+          type: string
+        avatar_type:
+          type: string
+      required: [account, secret, display_name]
+
+    UnifiedLoginRequest:
       type: object
       properties:
-        id: { type: string, format: uuid }
-        quest_instance_id: { type: string, format: uuid }
-        submitted_by_member_id: { type: string, format: uuid }
-        status: { type: string, enum: [pending, approved, rejected] }
-        note: { type: string, nullable: true }
-        evidence_url: { type: string, nullable: true }
-        submitted_at: { type: string, format: date-time }
-    ReviewSubmissionRequest:
-      type: object
-      required: [approve]
-      properties:
-        approve: { type: boolean }
-        review_note: { type: string, nullable: true }
-    ReviewSubmissionResponse:
+        account:
+          type: string
+        secret:
+          type: string
+      required: [account, secret]
+
+    FirebaseLoginRequest:
       type: object
       properties:
-        submission_id: { type: string, format: uuid }
-        status: { type: string, enum: [pending, approved, rejected] }
-        quest_status: { type: string, enum: [available, submitted, approved, rejected] }
-        xp_delta: { type: integer }
-        coin_delta: { type: integer }
-        child_level: { type: integer, nullable: true }
-        child_xp: { type: integer, nullable: true }
-        child_coins: { type: integer, nullable: true }
-    PendingSubmission:
+        id_token:
+          type: string
+        display_name:
+          type: string
+        avatar_type:
+          type: string
+      required: [id_token]
+
+    LoginResponse:
       type: object
       properties:
-        submission_id: { type: string, format: uuid }
-        quest_instance_id: { type: string, format: uuid }
-        assignee_member_id: { type: string, format: uuid }
-        template_title: { type: string, nullable: true }
-        note: { type: string, nullable: true }
-        evidence_url: { type: string, nullable: true }
-        submitted_at: { type: string, format: date-time }
-    Progression:
+        access_token:
+          type: string
+        token_type:
+          type: string
+        expires_in:
+          type: integer
+        role:
+          type: string
+          enum: [player]
+        guild_role:
+          type: string
+          enum: [master, member]
+        guild_id:
+          type: string
+          format: uuid
+        hunter_id:
+          type: string
+          format: uuid
+          nullable: true
+        invite_code:
+          type: string
+          nullable: true
+        player_id:
+          type: string
+          nullable: true
+        display_name:
+          type: string
+          nullable: true
+        avatar_type:
+          type: string
+          nullable: true
+      required:
+        - access_token
+        - token_type
+        - expires_in
+        - role
+        - guild_role
+        - guild_id
+
+    MeResponse:
       type: object
       properties:
-        child_member_id: { type: string, format: uuid }
-        level: { type: integer }
-        xp: { type: integer }
-        coins: { type: integer }
-        available_quests: { type: integer }
-        submitted_quests: { type: integer }
-    LedgerEntry:
+        sub:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [player]
+        guild_role:
+          type: string
+          enum: [master, member]
+        guild_id:
+          type: string
+          format: uuid
+        hunter_id:
+          type: string
+          format: uuid
+          nullable: true
+        player_id:
+          type: string
+          nullable: true
+        display_name:
+          type: string
+          nullable: true
+        avatar_type:
+          type: string
+          nullable: true
+      required: [sub, role, guild_role, guild_id]
+
+    CreateHunterRequest:
       type: object
       properties:
-        id: { type: string, format: uuid }
-        source_type: { type: string, enum: [quest_approval, manual_adjust, reward_spend] }
-        source_id: { type: string, format: uuid, nullable: true }
-        xp_delta: { type: integer }
-        coin_delta: { type: integer }
-        note: { type: string, nullable: true }
-        created_at: { type: string, format: date-time }
+        name:
+          type: string
+        avatar_type:
+          type: string
+        pin_code:
+          type: string
+        player_id:
+          type: string
+          nullable: true
+      required: [name, avatar_type, pin_code]
+
+    ResetHunterPinRequest:
+      type: object
+      properties:
+        pin_code:
+          type: string
+      required: [pin_code]
+
+    Hunter:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        guild_id:
+          type: string
+          format: uuid
+        player_id:
+          type: string
+        name:
+          type: string
+        avatar_type:
+          type: string
+        level:
+          type: integer
+        xp:
+          type: integer
+        coins:
+          type: integer
+      required: [id, guild_id, player_id, name, avatar_type, level, xp, coins]
+
+    HunterStatsBreakdown:
+      type: object
+      properties:
+        str_xp: { type: integer }
+        int_xp: { type: integer }
+        agi_xp: { type: integer }
+        cha_xp: { type: integer }
+        vit_xp: { type: integer }
+        none_xp: { type: integer }
+      required: [str_xp, int_xp, agi_xp, cha_xp, vit_xp, none_xp]
+
+    HunterStats:
+      type: object
+      properties:
+        hunter_id:
+          type: string
+          format: uuid
+        guild_id:
+          type: string
+          format: uuid
+        stat_xp:
+          $ref: '#/components/schemas/HunterStatsBreakdown'
+        total_xp:
+          type: integer
+        total_coins:
+          type: integer
+        entry_count:
+          type: integer
+      required: [hunter_id, guild_id, stat_xp, total_xp, total_coins, entry_count]
+
+    CreateQuestRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        reward_xp:
+          type: integer
+        reward_coins:
+          type: integer
+        stat_category:
+          type: string
+          enum: [STR, INT, AGI, VIT, CHA, NONE]
+        category:
+          type: string
+          enum: [chore, study, exam, habit]
+        assigned_hunter_id:
+          type: string
+          format: uuid
+          nullable: true
+        cadence:
+          type: string
+          enum: [daily, weekly]
+          nullable: true
+      required: [title, reward_xp, reward_coins]
+
+    SubmitQuestRequest:
+      type: object
+      properties:
+        proof_note:
+          type: string
+          nullable: true
+
+    ReviewQuestRequest:
+      type: object
+      properties:
+        approved:
+          type: boolean
+        hunter_id:
+          type: string
+          format: uuid
+          nullable: true
+        review_note:
+          type: string
+          nullable: true
+      required: [approved]
+
+    QuestProofMedia:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        quest_id:
+          type: string
+          format: uuid
+        original_filename:
+          type: string
+          nullable: true
+        mime_type:
+          type: string
+        byte_size:
+          type: integer
+        content_path:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required: [id, quest_id, mime_type, byte_size, content_path, created_at]
+
+    Quest:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        guild_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        reward_xp:
+          type: integer
+        reward_coins:
+          type: integer
+        stat_category:
+          type: string
+        category:
+          type: string
+        assigned_hunter_id:
+          type: string
+          format: uuid
+          nullable: true
+        created_by_hunter_id:
+          type: string
+          format: uuid
+          nullable: true
+        cadence:
+          type: string
+          nullable: true
+        streak_count:
+          type: integer
+        best_streak:
+          type: integer
+        completions_count:
+          type: integer
+        proof_note:
+          type: string
+          nullable: true
+        proof_submitted_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_completed_at:
+          type: string
+          format: date
+          nullable: true
+        last_review_note:
+          type: string
+          nullable: true
+        proof_media:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuestProofMedia'
+        updated_at:
+          type: string
+          format: date-time
+        status:
+          type: string
+      required:
+        - id
+        - guild_id
+        - title
+        - reward_xp
+        - reward_coins
+        - stat_category
+        - category
+        - streak_count
+        - best_streak
+        - completions_count
+        - proof_media
+        - updated_at
+        - status
+
+    HunterRewardSnapshot:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        guild_id:
+          type: string
+          format: uuid
+        level:
+          type: integer
+        xp:
+          type: integer
+        coins:
+          type: integer
+      required: [id, guild_id, level, xp, coins]
+
+    ReviewRewardEvent:
+      type: object
+      properties:
+        reward_event_id:
+          type: string
+          format: uuid
+        hunter_id:
+          type: string
+          format: uuid
+        gained_xp:
+          type: integer
+        gained_coins:
+          type: integer
+        leveled_up:
+          type: boolean
+        new_level:
+          type: integer
+      required:
+        - reward_event_id
+        - hunter_id
+        - gained_xp
+        - gained_coins
+        - leveled_up
+        - new_level
+
+    ReviewQuestResponse:
+      type: object
+      properties:
+        quest:
+          $ref: '#/components/schemas/Quest'
+        hunter:
+          allOf:
+            - $ref: '#/components/schemas/HunterRewardSnapshot'
+          nullable: true
+        reward:
+          allOf:
+            - $ref: '#/components/schemas/ReviewRewardEvent'
+          nullable: true
+      required: [quest]
+
+    PlayerIdRequest:
+      type: object
+      properties:
+        player_id:
+          type: string
+      required: [player_id]
+
+    RespondBooleanRequest:
+      type: object
+      properties:
+        accept:
+          type: boolean
+      required: [accept]
+
+    FriendProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        player_id:
+          type: string
+        name:
+          type: string
+        guild_id:
+          type: string
+          format: uuid
+        avatar_type:
+          type: string
+        level:
+          type: integer
+        xp:
+          type: integer
+        coins:
+          type: integer
+      required: [id, player_id, name, guild_id, avatar_type, level, xp, coins]
+
+    FriendRequest:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        requester_hunter_id:
+          type: string
+          format: uuid
+        requester_player_id:
+          type: string
+        requester_name:
+          type: string
+        target_hunter_id:
+          type: string
+          format: uuid
+        target_player_id:
+          type: string
+        target_name:
+          type: string
+        status:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        responded_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - id
+        - requester_hunter_id
+        - requester_player_id
+        - requester_name
+        - target_hunter_id
+        - target_player_id
+        - target_name
+        - status
+        - created_at
+
+    GuildInvite:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        guild_id:
+          type: string
+          format: uuid
+        inviter_hunter_id:
+          type: string
+          format: uuid
+        inviter_player_id:
+          type: string
+        inviter_name:
+          type: string
+        invited_hunter_id:
+          type: string
+          format: uuid
+        invited_player_id:
+          type: string
+        invited_name:
+          type: string
+        status:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        responded_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - id
+        - guild_id
+        - inviter_hunter_id
+        - inviter_player_id
+        - inviter_name
+        - invited_hunter_id
+        - invited_player_id
+        - invited_name
+        - status
+        - created_at
+
+    SocialProfile:
+      type: object
+      properties:
+        guild_id:
+          type: string
+          format: uuid
+        guild_name:
+          type: string
+        role_title:
+          type: string
+        player_id:
+          type: string
+          nullable: true
+        hunter_tag:
+          type: string
+        display_name:
+          type: string
+        level:
+          type: integer
+        xp:
+          type: integer
+        coins:
+          type: integer
+        motto:
+          type: string
+          nullable: true
+      required:
+        - guild_id
+        - guild_name
+        - role_title
+        - hunter_tag
+        - display_name
+        - level
+        - xp
+        - coins
+
+    UpdateSocialProfileRequest:
+      type: object
+      properties:
+        motto:
+          type: string
+          nullable: true
+
+    PlayerPassQr:
+      type: object
+      properties:
+        qr_value:
+          type: string
+        token_type:
+          type: string
+        expires_in:
+          type: integer
+        expires_at:
+          type: string
+          format: date-time
+      required: [qr_value, token_type, expires_in, expires_at]
+
+    PersistDirectMessageRequest:
+      type: object
+      properties:
+        recipient_hunter_id:
+          type: string
+          format: uuid
+        content:
+          type: string
+        client_message_id:
+          type: string
+          format: uuid
+          nullable: true
+        sent_at_ms:
+          type: integer
+          nullable: true
+      required: [recipient_hunter_id, content]
+
+    RegisterDmDeviceKeyRequest:
+      type: object
+      properties:
+        device_id:
+          type: string
+        device_label:
+          type: string
+          nullable: true
+        signing_public_key:
+          type: string
+        encryption_public_key:
+          type: string
+      required: [device_id, signing_public_key, encryption_public_key]
+
+    RevokeDmDeviceKeyRequest:
+      type: object
+      properties:
+        device_id:
+          type: string
+      required: [device_id]
+
+    PersistEncryptedDirectMessageRequest:
+      type: object
+      properties:
+        recipient_hunter_id:
+          type: string
+          format: uuid
+        sender_device_id:
+          type: string
+        recipient_device_id:
+          type: string
+        client_message_id:
+          type: string
+          format: uuid
+          nullable: true
+        protocol_version:
+          type: string
+          nullable: true
+        ciphertext:
+          type: string
+        nonce:
+          type: string
+        sent_at_ms:
+          type: integer
+          nullable: true
+      required:
+        - recipient_hunter_id
+        - sender_device_id
+        - recipient_device_id
+        - ciphertext
+        - nonce
+
+    DirectMessage:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        sender_hunter_id:
+          type: string
+          format: uuid
+        recipient_hunter_id:
+          type: string
+          format: uuid
+        counterpart_hunter_id:
+          type: string
+          format: uuid
+        counterpart_name:
+          type: string
+        counterpart_player_id:
+          type: string
+        counterpart_guild_id:
+          type: string
+          format: uuid
+        sender_name:
+          type: string
+        client_message_id:
+          type: string
+          format: uuid
+        content:
+          type: string
+        sent_at:
+          type: string
+          format: date-time
+        sent_at_ms:
+          type: integer
+        encryption_mode:
+          type: string
+        decryption_failed:
+          type: boolean
+      required:
+        - id
+        - sender_hunter_id
+        - recipient_hunter_id
+        - counterpart_hunter_id
+        - counterpart_name
+        - counterpart_player_id
+        - counterpart_guild_id
+        - sender_name
+        - client_message_id
+        - content
+        - sent_at
+        - sent_at_ms
+
+    EncryptedDirectMessage:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        sender_hunter_id:
+          type: string
+          format: uuid
+        recipient_hunter_id:
+          type: string
+          format: uuid
+        counterpart_hunter_id:
+          type: string
+          format: uuid
+        counterpart_name:
+          type: string
+        counterpart_player_id:
+          type: string
+        counterpart_guild_id:
+          type: string
+          format: uuid
+        sender_device_id:
+          type: string
+        recipient_device_id:
+          type: string
+        client_message_id:
+          type: string
+          format: uuid
+        protocol_version:
+          type: string
+        ciphertext:
+          type: string
+        nonce:
+          type: string
+        sent_at:
+          type: string
+          format: date-time
+        sent_at_ms:
+          type: integer
+        encryption_mode:
+          type: string
+      required:
+        - id
+        - sender_hunter_id
+        - recipient_hunter_id
+        - counterpart_hunter_id
+        - counterpart_name
+        - counterpart_player_id
+        - counterpart_guild_id
+        - sender_device_id
+        - recipient_device_id
+        - client_message_id
+        - protocol_version
+        - ciphertext
+        - nonce
+        - sent_at
+        - sent_at_ms
+        - encryption_mode
+
+    DirectMessageThread:
+      type: object
+      properties:
+        conversation_key:
+          type: string
+        counterpart_hunter_id:
+          type: string
+          format: uuid
+        counterpart_name:
+          type: string
+        counterpart_player_id:
+          type: string
+        counterpart_guild_id:
+          type: string
+          format: uuid
+        counterpart_avatar_type:
+          type: string
+        last_message:
+          type: string
+        last_message_sender_hunter_id:
+          type: string
+          format: uuid
+        last_message_sender_name:
+          type: string
+        last_message_at:
+          type: string
+          format: date-time
+        last_message_at_ms:
+          type: integer
+        encryption_mode:
+          type: string
+        unread_count:
+          type: integer
+      required:
+        - conversation_key
+        - counterpart_hunter_id
+        - counterpart_name
+        - counterpart_player_id
+        - counterpart_guild_id
+        - counterpart_avatar_type
+        - last_message
+        - last_message_sender_hunter_id
+        - last_message_sender_name
+        - last_message_at
+        - last_message_at_ms
+        - encryption_mode
+        - unread_count
+
+    DmThreadRead:
+      type: object
+      properties:
+        conversation_key:
+          type: string
+        hunter_id:
+          type: string
+          format: uuid
+        counterpart_hunter_id:
+          type: string
+          format: uuid
+        last_read_at:
+          type: string
+          format: date-time
+      required: [conversation_key, hunter_id, counterpart_hunter_id, last_read_at]
+
+    DmDeviceKey:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        hunter_id:
+          type: string
+          format: uuid
+        device_id:
+          type: string
+        device_label:
+          type: string
+          nullable: true
+        signing_public_key:
+          type: string
+        encryption_public_key:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        last_seen_at:
+          type: string
+          format: date-time
+        revoked_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - id
+        - hunter_id
+        - device_id
+        - signing_public_key
+        - encryption_public_key
+        - created_at
+        - last_seen_at
+
+    DmDeviceKeyBatch:
+      type: object
+      properties:
+        hunter_id:
+          type: string
+          format: uuid
+        keys:
+          type: array
+          items:
+            $ref: '#/components/schemas/DmDeviceKey'
+      required: [hunter_id, keys]
+
+    MediaEncryptionMeta:
+      type: object
+      properties:
+        mode:
+          type: string
+        protocol_version:
+          type: string
+          nullable: true
+        sender_device_id:
+          type: string
+          nullable: true
+        recipient_device_id:
+          type: string
+          nullable: true
+        nonce:
+          type: string
+          nullable: true
+        mac:
+          type: string
+          nullable: true
+      required: [mode]
+
+    MediaAsset:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        guild_id:
+          type: string
+          format: uuid
+        owner_hunter_id:
+          type: string
+          format: uuid
+        owner_name:
+          type: string
+        owner_player_id:
+          type: string
+        mode:
+          type: string
+        original_filename:
+          type: string
+          nullable: true
+        mime_type:
+          type: string
+        byte_size:
+          type: integer
+        caption:
+          type: string
+          nullable: true
+        is_photo_dump_ready:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        content_path:
+          type: string
+      required:
+        - id
+        - guild_id
+        - owner_hunter_id
+        - owner_name
+        - owner_player_id
+        - mode
+        - mime_type
+        - byte_size
+        - is_photo_dump_ready
+        - created_at
+        - content_path
+
+    MediaOnceDelivery:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        media_asset_id:
+          type: string
+          format: uuid
+        guild_id:
+          type: string
+          format: uuid
+        sender_hunter_id:
+          type: string
+          format: uuid
+        sender_name:
+          type: string
+        sender_player_id:
+          type: string
+        recipient_hunter_id:
+          type: string
+          format: uuid
+        caption:
+          type: string
+          nullable: true
+        mime_type:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        opened_at:
+          type: string
+          format: date-time
+          nullable: true
+        consumed_at:
+          type: string
+          format: date-time
+          nullable: true
+        remaining_views:
+          type: integer
+        encryption:
+          $ref: '#/components/schemas/MediaEncryptionMeta'
+      required:
+        - id
+        - media_asset_id
+        - guild_id
+        - sender_hunter_id
+        - sender_name
+        - sender_player_id
+        - recipient_hunter_id
+        - mime_type
+        - created_at
+        - remaining_views
+        - encryption
+
+    MediaOnceOpen:
+      type: object
+      properties:
+        delivery_id:
+          type: string
+          format: uuid
+        media_asset_id:
+          type: string
+          format: uuid
+        opened_at:
+          type: string
+          format: date-time
+        consumed_at:
+          type: string
+          format: date-time
+          nullable: true
+        content_path:
+          type: string
+        token_ttl_seconds:
+          type: integer
+        encryption:
+          $ref: '#/components/schemas/MediaEncryptionMeta'
+      required:
+        - delivery_id
+        - media_asset_id
+        - opened_at
+        - content_path
+        - token_ttl_seconds
+        - encryption
+
+    CreatePhotoDumpExportRequest:
+      type: object
+      properties:
+        asset_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        title:
+          type: string
+          nullable: true
+        style:
+          type: string
+          nullable: true
+      required: [asset_ids]
+
+    PhotoDumpExport:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        guild_id:
+          type: string
+          format: uuid
+        owner_hunter_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        style:
+          type: string
+        asset_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        assets:
+          type: array
+          items:
+            $ref: '#/components/schemas/MediaAsset'
+      required:
+        - id
+        - guild_id
+        - owner_hunter_id
+        - title
+        - style
+        - asset_count
+        - created_at
+        - assets
+
+    ShopItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        guild_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        cost_coins:
+          type: integer
+        icon_tag:
+          type: string
+        is_active:
+          type: boolean
+      required: [id, guild_id, name, cost_coins, icon_tag, is_active]
+
+    ShopItemUpsertRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        cost_coins:
+          type: integer
+        icon_tag:
+          type: string
+      required: [name, cost_coins, icon_tag]
+
+    BuyItemRequest:
+      type: object
+      properties:
+        idempotency_key:
+          type: string
+          format: uuid
+      required: [idempotency_key]
+
+    BuyItemResponse:
+      type: object
+      properties:
+        ledger_event_id:
+          type: string
+          format: uuid
+        idempotency_key:
+          type: string
+          format: uuid
+        hunter_id:
+          type: string
+          format: uuid
+        item:
+          $ref: '#/components/schemas/ShopItem'
+        spent_coins:
+          type: integer
+        remaining_coins:
+          type: integer
+        inventory_quantity:
+          type: integer
+        replayed:
+          type: boolean
+      required:
+        - ledger_event_id
+        - idempotency_key
+        - hunter_id
+        - item
+        - spent_coins
+        - remaining_coins
+        - inventory_quantity
+        - replayed
+
+    InventoryItem:
+      type: object
+      properties:
+        item_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        icon_tag:
+          type: string
+        quantity:
+          type: integer
+        updated_at:
+          type: string
+          format: date-time
+      required: [item_id, name, icon_tag, quantity, updated_at]
+
+    UseInventoryItemResponse:
+      type: object
+      properties:
+        item_id:
+          type: string
+          format: uuid
+        item_name:
+          type: string
+        remaining_quantity:
+          type: integer
+        system_message:
+          type: string
+        chat_message_id:
+          type: string
+          format: uuid
+      required:
+        - item_id
+        - item_name
+        - remaining_quantity
+        - system_message
+        - chat_message_id
+
+    VoiceTokenRequest:
+      type: object
+      properties:
+        room_id:
+          type: string
+          nullable: true
+
+    VoiceTokenResponse:
+      type: object
+      properties:
+        url:
+          type: string
+        room_id:
+          type: string
+        token:
+          type: string
+        identity:
+          type: string
+        display_name:
+          type: string
+        chat_topic:
+          type: string
+        expires_in:
+          type: integer
+      required: [url, room_id, token, identity, display_name, chat_topic, expires_in]
+
+    PersistChatMessageRequest:
+      type: object
+      properties:
+        room_id:
+          type: string
+          nullable: true
+        client_message_id:
+          type: string
+          format: uuid
+          nullable: true
+        content:
+          type: string
+        sent_at_ms:
+          type: integer
+          nullable: true
+      required: [content]
+
+    ChatMessage:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        guild_id:
+          type: string
+          format: uuid
+        room_id:
+          type: string
+        sender_hunter_id:
+          type: string
+          format: uuid
+        sender_name:
+          type: string
+        client_message_id:
+          type: string
+          format: uuid
+        content:
+          type: string
+        sent_at:
+          type: string
+          format: date-time
+        sent_at_ms:
+          type: integer
+      required:
+        - id
+        - guild_id
+        - room_id
+        - sender_hunter_id
+        - sender_name
+        - client_message_id
+        - content
+        - sent_at
+        - sent_at_ms
+
+    TelemetryEvent:
+      type: object
+      properties:
+        event_name:
+          type: string
+        status:
+          type: string
+          nullable: true
+        source:
+          type: string
+          nullable: true
+        platform:
+          type: string
+          nullable: true
+        locale:
+          type: string
+          nullable: true
+        app_version:
+          type: string
+          nullable: true
+        session_id:
+          type: string
+          nullable: true
+        occurred_at_ms:
+          type: integer
+          nullable: true
+        properties:
+          type: object
+          nullable: true
+          additionalProperties: true
+      required: [event_name]
+
+    TelemetryIngestRequest:
+      type: object
+      properties:
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/TelemetryEvent'
+      required: [events]
+
+    TelemetryIngestResponse:
+      type: object
+      properties:
+        accepted:
+          type: integer
+      required: [accepted]
+
+    RealtimeTicket:
+      type: object
+      properties:
+        ticket:
+          type: string
+        expires_in:
+          type: integer
+      required: [ticket, expires_in]

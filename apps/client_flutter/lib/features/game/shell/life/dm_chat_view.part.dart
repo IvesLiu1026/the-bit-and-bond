@@ -92,6 +92,7 @@ class _DirectMessageConversation extends ConsumerWidget {
                 SizedBox(
                   width: 86,
                   child: PixelButton(
+                    tapTargetKey: AppTestIds.dmBackButtonKey,
                     label: strings.tr(zh: '收件匣', en: 'Inbox'),
                     onPressed: onBack,
                     compact: true,
@@ -323,6 +324,7 @@ class _DirectMessageConversation extends ConsumerWidget {
               SizedBox(
                 width: 84,
                 child: PixelButton(
+                  tapTargetKey: AppTestIds.dmSendImageButtonKey,
                   label: sendingImage
                       ? strings.dmUploadingShort
                       : strings.dmSendImage,
@@ -340,6 +342,7 @@ class _DirectMessageConversation extends ConsumerWidget {
               SizedBox(
                 width: 106,
                 child: PixelButton(
+                  tapTargetKey: AppTestIds.dmSendOneTimeImageButtonKey,
                   label: sendingOneTimeImage
                       ? strings.dmSendingShort
                       : strings.dmSendOneTimeImage,
@@ -370,6 +373,7 @@ class _DirectMessageConversation extends ConsumerWidget {
           if (mediaStatusMessage != null) ...[
             const SizedBox(height: 8),
             PixelPanel(
+              key: AppTestIds.dmMediaStatusBannerKey,
               tone: mediaStatusTone,
               showShadow: false,
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -391,6 +395,7 @@ class _DirectMessageConversation extends ConsumerWidget {
             children: [
               Expanded(
                 child: _PixelTextInput(
+                  key: AppTestIds.dmComposerFieldKey,
                   controller: messageController,
                   enabled: selectedCounterpartId != null && !sending,
                   minLines: 1,
@@ -408,6 +413,7 @@ class _DirectMessageConversation extends ConsumerWidget {
               SizedBox(
                 width: 110,
                 child: PixelButton(
+                  tapTargetKey: AppTestIds.dmSendButtonKey,
                   label: sending
                       ? strings.dmSendingShort
                       : strings.dmSendMessage,
@@ -454,6 +460,7 @@ class _DirectMessageConversation extends ConsumerWidget {
       return ClipRRect(
         borderRadius: BorderRadius.circular(6),
         child: SizedBox(
+          key: AppTestIds.dmImageBubble(message.id),
           height: 180,
           child: Image.network(
             imageUrl,
@@ -479,6 +486,7 @@ class _DirectMessageConversation extends ConsumerWidget {
           (!mine && !openableOneTimeDeliveryIds.contains(onceDeliveryId));
       final opening = openingOneTimeDeliveryIds.contains(onceDeliveryId);
       return PixelPanel(
+        key: AppTestIds.dmOneTimeBubble(onceDeliveryId),
         tone: mine ? PixelTone.slate : PixelTone.parchment,
         showShadow: false,
         padding: const EdgeInsets.all(8),
@@ -498,6 +506,7 @@ class _DirectMessageConversation extends ConsumerWidget {
               SizedBox(
                 width: 88,
                 child: PixelTag(
+                  key: AppTestIds.dmOneTimeViewedTag(onceDeliveryId),
                   label: strings.dmViewed,
                   tone: PixelTone.slate,
                   compact: true,
@@ -507,6 +516,7 @@ class _DirectMessageConversation extends ConsumerWidget {
               SizedBox(
                 width: 88,
                 child: PixelButton(
+                  tapTargetKey: AppTestIds.dmOneTimeOpenButton(onceDeliveryId),
                   label: opening
                       ? strings.dmOpeningShort
                       : strings.photoDumpOpenOnce,

@@ -84,6 +84,7 @@ class _InventoryPanelState extends State<_InventoryPanel>
                       const SizedBox(width: 8),
                       Expanded(
                         child: _StampButton(
+                          key: AppTestIds.inventoryConfirmUseButtonKey,
                           label: strings.tr(zh: '確定使用', en: 'Use Now'),
                           tone: _StampTone.green,
                           onPressed: () =>
@@ -161,6 +162,7 @@ class _InventoryPanelState extends State<_InventoryPanel>
       ),
     );
     final useButton = _StampButton(
+      key: AppTestIds.inventoryUseButton(item.itemId),
       label: AppStrings.of(
         context,
       ).tr(zh: using ? '處理中' : '使用', en: using ? 'Working' : 'Use'),
@@ -186,6 +188,7 @@ class _InventoryPanelState extends State<_InventoryPanel>
   Widget build(BuildContext context) {
     final strings = AppStrings.of(context);
     return Column(
+      key: AppTestIds.inventoryPanelKey,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
@@ -223,6 +226,7 @@ class _InventoryPanelState extends State<_InventoryPanel>
           Padding(
             padding: const EdgeInsets.only(bottom: 6),
             child: Text(
+              key: AppTestIds.inventorySuccessTextKey,
               _successText!,
               style: const TextStyle(
                 color: AppColors.stampGreen,
@@ -295,6 +299,7 @@ class _InventoryPanelState extends State<_InventoryPanel>
                             );
                           },
                           child: Container(
+                            key: AppTestIds.inventoryItemCard(item.itemId),
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
                               color: const Color(0xFFF4ECE1),

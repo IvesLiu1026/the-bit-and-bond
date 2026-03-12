@@ -27,9 +27,12 @@ dependencies:
   cryptography: ^2.7.0
   image_picker: ^1.1.2
   http_parser: ^4.1.2
+  qr_flutter: ^4.1.0
 
 dev_dependencies:
   flutter_test:
+    sdk: flutter
+  integration_test:
     sdk: flutter
   flutter_lints: ^6.0.0
 

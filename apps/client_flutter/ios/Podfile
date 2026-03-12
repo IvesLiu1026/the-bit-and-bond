@@ -39,4 +39,19 @@ post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
   end
+
+  # Flutter routes the app artifact to build/ios/iphoneos, while CocoaPods keeps
+  # pod frameworks under PODS_CONFIGURATION_BUILD_DIR. Make the generated embed
+  # script copy frameworks from the pod products directory so device debug builds
+  # can install successfully.
+  Dir.glob(File.join(__dir__, 'Pods', 'Target Support Files', 'Pods-*', 'Pods-*-frameworks.sh')).each do |script_path|
+    script = File.read(script_path)
+    patched = script.gsub(
+      'install_framework "${BUILT_PRODUCTS_DIR}/',
+      'install_framework "${PODS_CONFIGURATION_BUILD_DIR}/'
+    )
+    next if patched == script
+
+    File.write(script_path, patched)
+  end
 end

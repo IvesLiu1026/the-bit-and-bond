@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../features/quests/models.dart';
+import '../core/models/models.dart';
 import '../features/quests/quest_repository.dart';
 import 'hunter_directory_controller.dart';
 import 'providers.dart';

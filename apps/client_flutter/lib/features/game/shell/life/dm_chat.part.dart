@@ -390,6 +390,14 @@ class _DirectMessageConversationPageState
     }
 
     Future<MediaUpload?> pickDmUpload() async {
+      final smokeUpload = ref.read(dmSmokeMediaUploadProvider);
+      if (smokeUpload != null) {
+        return MediaUpload(
+          filename: smokeUpload.filename,
+          bytes: List<int>.from(smokeUpload.bytes),
+          mimeType: smokeUpload.mimeType,
+        );
+      }
       final strings = ref.read(appStringsProvider);
       final source = await showModalBottomSheet<ImageSource>(
         context: context,

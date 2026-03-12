@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:the_bit_and_bond_client/core/auth/auth_session.dart';
 import 'package:the_bit_and_bond_client/core/network/api_client.dart';
 import 'package:the_bit_and_bond_client/core/security/dm_e2ee_service.dart';
-import 'package:the_bit_and_bond_client/features/quests/models.dart';
+import 'package:the_bit_and_bond_client/core/models/models.dart';
 
 void main() {
   test(
