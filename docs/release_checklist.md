@@ -2,7 +2,9 @@
 
 ## 1. Environment and Secrets
 - Confirm `.env` and local secret files are not tracked.
-- Verify Firebase production files are injected in CI/CD, not committed.
+- Verify Firebase client configuration points to the intended project. Client
+  identifiers are public metadata; service-account credentials and admin keys
+  must be injected through CI/CD and never committed.
 - Set mobile/web API targets with `--dart-define`:
   - `APP_ENV=staging` or `APP_ENV=production`
   - `STAGING_API_BASE_URL=...` and/or `PRODUCTION_API_BASE_URL=...`

@@ -7,6 +7,19 @@
 
 本文檔是給協作夥伴與新加入成員的架構總覽與開發手冊（以目前程式碼為準）。
 
+## Public repository note
+
+This repository is a source-available portfolio project. It includes a Rust
+backend, a Flutter/Flame client, tests, and deployment examples. Runtime
+secrets such as JWT signing keys, database passwords, service-account files,
+and production environment values must stay outside Git.
+
+Firebase mobile client configuration is intentionally present because those
+identifiers are distributed with every installed app; it is not an
+authorization boundary. Before deploying your own instance, use your own
+Firebase project and enforce Authentication, Security Rules, App Check, and
+API-key restrictions in the Firebase/Google Cloud consoles.
+
 ## 1. 專案目標
 
 - 讓玩家在酒館場景中移動、互動、接取任務
