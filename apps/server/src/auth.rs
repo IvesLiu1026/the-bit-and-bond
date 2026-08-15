@@ -485,7 +485,7 @@ where
         ))?),
         hunter_tag: Set(format!(
             "GG-{}",
-            &identity.uid.chars().take(8).collect::<String>()
+            identity.uid.chars().take(8).collect::<String>()
         )),
         current_role: Set("Explorer".to_string()),
         created_at: Set(Utc::now()),

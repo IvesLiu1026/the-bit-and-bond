@@ -562,7 +562,7 @@ pub async fn list_direct_message_threads(
         ));
     }
 
-    threads.sort_by(|a, b| b.last_message_at.cmp(&a.last_message_at));
+    threads.sort_by_key(|thread| std::cmp::Reverse(thread.last_message_at));
     Ok(Json(threads))
 }
 
@@ -1003,7 +1003,7 @@ async fn load_latest_thread_candidates_fallback(
     }
 
     let mut latest_rows = latest_by_conversation.into_values().collect::<Vec<_>>();
-    latest_rows.sort_by(|a, b| b.last_message_at.cmp(&a.last_message_at));
+    latest_rows.sort_by_key(|row| std::cmp::Reverse(row.last_message_at));
     latest_rows.truncate(limit as usize);
     Ok(latest_rows)
 }

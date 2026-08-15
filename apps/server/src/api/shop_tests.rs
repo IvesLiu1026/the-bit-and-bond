@@ -440,7 +440,7 @@ impl TestDbContext {
             owner_id: Set(user_id),
             invite_code: Set(format!(
                 "S{}",
-                &Uuid::new_v4().simple().to_string()[..5].to_ascii_uppercase()
+                Uuid::new_v4().simple().to_string()[..5].to_ascii_uppercase()
             )),
         }
         .insert(&self.app_db)

@@ -688,7 +688,7 @@ pub async fn list_photo_dump_exports(
 
     let response = rows
         .into_iter()
-        .zip(parsed_ids.into_iter())
+        .zip(parsed_ids)
         .map(|(row, ids)| {
             let assets = ids
                 .iter()
