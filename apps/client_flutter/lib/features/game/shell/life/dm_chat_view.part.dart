@@ -218,7 +218,7 @@ class _DirectMessageConversation extends ConsumerWidget {
                     )
                   : ListView.builder(
                       controller: scrollController,
-                      cacheExtent: 640,
+                      scrollCacheExtent: 640,
                       itemCount: timelineEntries.length,
                       itemBuilder: (context, index) {
                         final entry = timelineEntries[index];

@@ -112,7 +112,7 @@ class _DirectMessageRoster extends StatelessWidget {
                     ),
                   )
                 : ListView.builder(
-                    cacheExtent: 720,
+                    scrollCacheExtent: 720,
                     itemCount: listItems.length,
                     itemBuilder: (context, index) {
                       final item = listItems[index];
