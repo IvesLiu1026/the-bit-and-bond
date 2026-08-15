@@ -112,7 +112,7 @@ class _DirectMessageRoster extends StatelessWidget {
                     ),
                   )
                 : ListView.builder(
-                    scrollCacheExtent: 720,
+                    scrollCacheExtent: const ScrollCacheExtent.pixels(720),
                     itemCount: listItems.length,
                     itemBuilder: (context, index) {
                       final item = listItems[index];
